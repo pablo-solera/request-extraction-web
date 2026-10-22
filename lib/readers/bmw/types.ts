@@ -27,7 +27,7 @@ export type BmwBrand = z.infer<typeof bmwBrandSchema>;
 export type BmwLabourState = z.infer<typeof bmwLabourStateSchema>;
 export type BmwSeriesOption = { value: string; label: string };
 export type BmwDevelopmentCodeOption = { value: string; label: string };
-export type BmwTypekeyOption = { value: string; label: string; validFrom?: string; validUntil?: string };
+export type BmwTypekeyOption = { value: string; label: string; baseType?: string; validFrom?: string; validUntil?: string };
 
 export function parseBmwSeriesOptions(value: unknown): BmwSeriesOption[] {
   const parsed = modelOptionsSchema.parse(value);
@@ -82,9 +82,14 @@ export function parseBmwTypekeys(value: unknown): BmwTypekeyOption[] {
     else if (validFrom !== undefined && validFrom !== null) details.push(`desde ${displayedDate(validFrom)}`);
     else if (validUntil !== undefined && validUntil !== null) details.push(`hasta ${displayedDate(validUntil)}`);
 
+    const rawBaseType = model.attributes.baseType;
+    const baseType = typeof rawBaseType === "string" && /^[A-Z0-9]{4}$/.test(rawBaseType) && rawBaseType !== model.id ? rawBaseType : undefined;
+    if (baseType) details.push(`tipo base ${baseType}`);
+
     return [{
       value: model.id,
       label: details.join(" · "),
+      ...(baseType ? { baseType } : {}),
       ...(validFrom !== undefined && validFrom !== null ? { validFrom: displayedDate(validFrom) } : {}),
       ...(validUntil !== undefined && validUntil !== null ? { validUntil: displayedDate(validUntil) } : {}),
     }];

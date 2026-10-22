@@ -55,6 +55,9 @@ describe("BMW reader client", () => {
       { id: "61HX", label: "61HX", attributes: {} },
       { id: "71HW", label: "71HW", attributes: { validFrom: "not-a-date", validUntil: "2026-12-31T00:00:00Z[UTC]" } },
       { id: "invalid", label: "invalid", attributes: {} },
+      { id: "6J02", label: "6J02", attributes: { typekey: "6J02", baseType: "6J92", power: "412", powerUnit: "kw" } },
+      { id: "6J92", label: "6J92", attributes: { typekey: "6J92", baseType: "6J92" } },
+      { id: "6J03", label: "6J03", attributes: { baseType: "bad" } },
     ] }));
     const client = createBmwReaderClient({ fetcher, now: () => Date.UTC(2026, 9, 20, 12) });
 
@@ -64,6 +67,9 @@ describe("BMW reader client", () => {
       { value: "51HY", label: "51HY · desde 01/11/2026", validFrom: "01/11/2026" },
       { value: "61HX", label: "61HX" },
       { value: "71HW", label: "71HW · hasta 31/12/2026", validUntil: "31/12/2026" },
+      { value: "6J02", label: "6J02 · 412 kW · tipo base 6J92", baseType: "6J92" },
+      { value: "6J92", label: "6J92" },
+      { value: "6J03", label: "6J03" },
     ]);
     const url = fetcher.mock.calls[0]![0] as URL;
     expect(url.searchParams.get("modelSeries")).toBe("7'");
