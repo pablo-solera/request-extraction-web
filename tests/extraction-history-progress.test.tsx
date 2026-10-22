@@ -1,4 +1,4 @@
-import { cleanup, render, screen } from "@testing-library/react";
+import { cleanup, render, screen, within } from "@testing-library/react";
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 import type { ExtractionListItem } from "@/lib/extractions/types";
 
@@ -90,7 +90,7 @@ describe("BMW extraction progress in history", () => {
     render(<ExtractionHistory initialItems={[item({ status: "failed", progress: null, canRepeat: true, canViewDetails: true })]} />);
 
     await user.click(screen.getAllByRole("button", { name: "Opciones para AX-100, X5 · G05, 41HZ" })[0]!);
-    expect(screen.getByRole("link", { name: "Volver a solicitar" })).toHaveAttribute("href", expect.stringContaining("from="));
+    expect(within(screen.getByLabelText("Acciones para AX-100")).getByRole("link", { name: "Volver a solicitar" })).toHaveAttribute("href", expect.stringContaining("from="));
     await user.click(screen.getByRole("button", { name: "Ver detalles" }));
 
     expect(extractionDetail).toHaveBeenCalledWith(expect.any(String));
@@ -117,6 +117,17 @@ describe("grouped request history", () => {
     expect(screen.getByText("Completada con incidencias")).toBeInTheDocument();
     expect(screen.getByText("2 de 3 typekeys completados · 1 fallido")).toBeInTheDocument();
     expect(screen.getByText(/Edición IMC/)).toHaveTextContent("05/0");
+  });
+
+  it("offers repeating only when failed or cancelled items exist, linking to the request", () => {
+    vi.stubGlobal("fetch", vi.fn().mockResolvedValue(Response.json([])));
+    const withFailure = rows().map((entry) => entry.id === "b" ? { ...entry, canRepeat: true } : entry);
+    const { unmount } = render(<ExtractionHistory initialItems={withFailure} />);
+    expect(screen.getAllByRole("link", { name: "Volver a solicitar" })[0]).toHaveAttribute("href", `/extractions?request=${group}`);
+    unmount();
+
+    render(<ExtractionHistory initialItems={rows().map((entry) => ({ ...entry, status: "completed" as const, canResume: false }))} />);
+    expect(screen.queryByRole("link", { name: "Volver a solicitar" })).not.toBeInTheDocument();
   });
 
   it("resumes every failed item of the request and updates the summary", async () => {

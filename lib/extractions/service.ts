@@ -1,5 +1,6 @@
 import "server-only";
 
+import { retryableItems } from "@/lib/extractions/request-summary";
 import type { Extraction, ExtractionStatus } from "@/db/schema";
 import {
   attachReaderRequest,
@@ -13,6 +14,7 @@ import {
   claimReaderProgressPoll,
   updateExtractionState,
   getExtractionWithRequester,
+  listRequestExtractions,
   listVisibleExtractions as listVisibleExtractionsRepository,
   listVisibleExtractionsByIds as listVisibleExtractionsByIdsRepository,
   cancelUnsubmittedExtraction,
@@ -156,12 +158,23 @@ export async function getReaderCapabilitiesForExtractions(rows: Array<{ extracti
   return new Map(entries);
 }
 
+async function canManage(ownerId: string, requester: Parameters<typeof isUserInCoordinatorTeam>[1], actor: ExtractionActor) {
+  if (ownerId === actor.id || actor.role === "admin") return true;
+  return actor.role === "coordinator" && await isUserInCoordinatorTeam(actor, requester);
+}
+
 export async function getManageableExtraction(id: string, actor: ExtractionActor) {
   const row = await getExtractionWithRequester(id);
   if (!row) return null;
-  if (row.extraction.userId === actor.id || actor.role === "admin") return row;
-  if (actor.role === "coordinator" && await isUserInCoordinatorTeam(actor, row.requester)) return row;
-  return null;
+  return await canManage(row.extraction.userId, row.requester, actor) ? row : null;
+}
+
+export async function getRepeatableRequestItems(requestGroupId: string, actor: ExtractionActor) {
+  const rows = await listRequestExtractions(requestGroupId);
+  const first = rows[0];
+  if (!first || first.requestStatus === "pending" || !await canManage(first.extraction.userId, first.requester, actor)) return null;
+  const items = retryableItems(rows.map((row) => row.extraction));
+  return items.length > 0 ? items : null;
 }
 
 export async function performExtractionAction(

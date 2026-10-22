@@ -124,6 +124,7 @@ function RequestActions({ items, expanded, onToggle, onUpdated }: { items: Extra
   const cancellable = items.filter((item) => item.canCancel);
   const resumable = retryableItems(items).filter((item) => item.status === "failed" && item.canResume);
   const axCode = items[0]?.axCode ?? "";
+  const canRepeat = retryableItems(items).some((item) => item.canRepeat);
 
   async function runAll(action: "cancel" | "resume", targets: ExtractionListItem[]) {
     if (action === "cancel" && !window.confirm(`¿Cancelar las ${targets.length} extracciones activas de la solicitud ${axCode}?`)) return;
@@ -147,6 +148,7 @@ function RequestActions({ items, expanded, onToggle, onUpdated }: { items: Extra
     <button aria-expanded={expanded} className={`${buttonClass} border-zinc-300 bg-white text-zinc-800 hover:bg-zinc-50`} onClick={onToggle} type="button">{expanded ? "Ocultar detalle" : `Mostrar detalle (${items.length})`}</button>
     {cancellable.length ? <button className={`${buttonClass} border-red-200 bg-white text-red-700 hover:bg-red-50`} disabled={busy} onClick={() => void runAll("cancel", cancellable)} type="button">Cancelar solicitud</button> : null}
     {resumable.length ? <button className={`${buttonClass} border-zinc-300 bg-white text-zinc-800 hover:bg-zinc-50`} disabled={busy} onClick={() => void runAll("resume", resumable)} type="button">Reanudar fallidos</button> : null}
+    {canRepeat ? <Link className={`${buttonClass} border-zinc-300 bg-white text-zinc-800 hover:bg-zinc-50`} href={`/extractions?request=${encodeURIComponent(items[0]!.requestGroupId)}`}>Volver a solicitar</Link> : null}
     {busy ? <span className="text-xs text-zinc-600" role="status">Procesando…</span> : null}
     {feedback ? <span className="text-xs text-zinc-600" role="status">{feedback}</span> : null}
   </div>;

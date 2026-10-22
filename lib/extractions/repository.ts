@@ -293,10 +293,21 @@ export async function listActiveExtractions(limit = 100) {
     .orderBy(extractions.updatedAt).limit(limit).then((rows) => rows.map((row) => row.extraction));
 }
 
+export async function listRequestExtractions(requestGroupId: string) {
+  return getDb().select({
+    extraction: extractionColumns,
+    requestStatus: extractionRequests.status,
+    requester: { id: users.id, oracleEmpId: users.oracleEmpId, fallbackName: users.fallbackName, fallbackEmail: users.fallbackEmail },
+  }).from(extractions)
+    .innerJoin(extractionRequests, eq(extractions.requestGroupId, extractionRequests.requestGroupId))
+    .innerJoin(users, eq(extractions.userId, users.id))
+    .where(eq(extractions.requestGroupId, requestGroupId)).orderBy(extractions.createdAt);
+}
+
 export async function listPendingRequests(userId?: string, isAdmin = false) {
   return getDb().select({
-    request: { requestGroupId: extractionRequests.requestGroupId, requesterId: extractionRequests.requesterId, coordinatorId: extractionRequests.coordinatorId, status: extractionRequests.status, createdAt: extractionRequests.createdAt },
-    extraction: { id: extractions.id, axCode: extractionRequests.axCode, modelDescription: extractions.modelDescription },
+    request: { requestGroupId: extractionRequests.requestGroupId, requesterId: extractionRequests.requesterId, coordinatorId: extractionRequests.coordinatorId, status: extractionRequests.status, createdAt: extractionRequests.createdAt, axCode: extractionRequests.axCode, imcEdition: extractionRequests.imcEdition, completion: extractionRequests.completion, developmentStart: extractionRequests.developmentStart, manufacturerGroup: extractionRequests.manufacturerGroup, brand: extractionRequests.brand },
+    extraction: { id: extractions.id, modelDescription: extractions.modelDescription },
     requester: { id: users.id, oracleEmpId: users.oracleEmpId, fallbackName: users.fallbackName, fallbackEmail: users.fallbackEmail },
   }).from(extractionRequests)
     .innerJoin(extractions, eq(extractions.requestGroupId, extractionRequests.requestGroupId)).innerJoin(users, eq(users.id, extractionRequests.requesterId))
