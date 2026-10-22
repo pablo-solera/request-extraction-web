@@ -1,4 +1,4 @@
-import { cleanup, render, screen, within } from "@testing-library/react";
+import { cleanup, fireEvent, render, screen, within } from "@testing-library/react";
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 import type { ExtractionListItem } from "@/lib/extractions/types";
 
@@ -10,6 +10,10 @@ vi.mock("@/app/(dashboard)/history/actions", () => ({ extractionAction, extracti
 import { ExtractionHistory } from "@/components/extractions/extraction-history";
 
 afterEach(() => { cleanup(); vi.unstubAllGlobals(); });
+
+function openAll() {
+  for (const button of screen.getAllByRole("button", { expanded: false })) fireEvent.click(button);
+}
 
 function item(overrides: Partial<ExtractionListItem> = {}): ExtractionListItem {
   return {
@@ -47,6 +51,7 @@ describe("BMW extraction progress in history", () => {
   it("shows the reader percentage and pause notice with an accessible progress bar", () => {
     vi.stubGlobal("fetch", vi.fn().mockResolvedValue(Response.json([])));
     render(<ExtractionHistory initialItems={[item()]} />);
+    openAll();
 
     expect(screen.getByText("En pausa por límite de BMW")).toBeInTheDocument();
     expect(screen.getAllByText("45%")).toHaveLength(2);
@@ -61,6 +66,7 @@ describe("BMW extraction progress in history", () => {
       item({ id: "paused", axCode: "AX-P", readerStatus: "paused", progress: 30 }),
       item({ id: "completed", axCode: "AX-C", status: "completed", progress: 100, readerStatus: "completed" }),
     ]} />);
+    openAll();
 
     expect(screen.getByText("En cola")).toBeInTheDocument();
     expect(screen.getByText("En pausa")).toBeInTheDocument();
@@ -74,6 +80,7 @@ describe("BMW extraction progress in history", () => {
     vi.stubGlobal("confirm", vi.fn(() => true));
     extractionAction.mockResolvedValueOnce({ ok: true, status: "cancelled", readerStatus: "cancelled" });
     render(<ExtractionHistory initialItems={[item({ canCancel: true, canResume: true, progress: null })]} />);
+    openAll();
 
     await user.click(screen.getAllByRole("button", { name: "Opciones para AX-100, X5 · G05, 41HZ" })[0]!);
     expect(screen.getByRole("button", { name: "Reanudar extracción" })).toBeInTheDocument();
@@ -88,6 +95,7 @@ describe("BMW extraction progress in history", () => {
     const user = (await import("@testing-library/user-event")).default.setup();
     extractionDetail.mockResolvedValueOnce({ ok: true, detail: { status: "completed", stage: "completed", progress: 100, stalled: false, typekeys: [{ typekey: "41HZ", series: "X", family: "G05", completed: 2785, total: 2785, remaining: 0, failed: 0, groups: 34 }] } });
     render(<ExtractionHistory initialItems={[item({ status: "failed", progress: null, canRepeat: true, canViewDetails: true })]} />);
+    openAll();
 
     await user.click(screen.getAllByRole("button", { name: "Opciones para AX-100, X5 · G05, 41HZ" })[0]!);
     expect(within(screen.getByLabelText("Acciones para AX-100")).getByRole("link", { name: "Volver a solicitar" })).toHaveAttribute("href", expect.stringContaining("from="));
@@ -112,6 +120,7 @@ describe("grouped request history", () => {
   it("shows one card per request with the shared data and an aggregate summary", () => {
     vi.stubGlobal("fetch", vi.fn().mockResolvedValue(Response.json([])));
     render(<ExtractionHistory initialItems={rows()} />);
+    openAll();
 
     expect(screen.getAllByRole("heading", { level: 2 })).toHaveLength(1);
     expect(screen.getByText("Completada con incidencias")).toBeInTheDocument();
@@ -123,10 +132,12 @@ describe("grouped request history", () => {
     vi.stubGlobal("fetch", vi.fn().mockResolvedValue(Response.json([])));
     const withFailure = rows().map((entry) => entry.id === "b" ? { ...entry, canRepeat: true } : entry);
     const { unmount } = render(<ExtractionHistory initialItems={withFailure} />);
+    openAll();
     expect(screen.getAllByRole("link", { name: "Volver a solicitar" })[0]).toHaveAttribute("href", `/extractions?request=${group}`);
     unmount();
 
     render(<ExtractionHistory initialItems={rows().map((entry) => ({ ...entry, status: "completed" as const, canResume: false }))} />);
+    openAll();
     expect(screen.queryByRole("link", { name: "Volver a solicitar" })).not.toBeInTheDocument();
   });
 
@@ -135,13 +146,15 @@ describe("grouped request history", () => {
     vi.stubGlobal("fetch", vi.fn().mockResolvedValue(Response.json([])));
     extractionAction.mockResolvedValueOnce({ ok: true, status: "running", readerStatus: "queued" });
     render(<ExtractionHistory initialItems={rows()} />);
+    openAll();
 
     await user.click(screen.getByRole("button", { name: "Reanudar fallidos" }));
 
     expect(extractionAction).toHaveBeenCalledTimes(1);
     expect(extractionAction).toHaveBeenCalledWith({ id: "b", action: "resume" });
     expect(await screen.findByText("1 extracciones reanudadas.")).toBeInTheDocument();
-    expect(screen.getAllByText("En proceso")).toHaveLength(2);
+    expect(screen.getByText(/^En proceso · \d+ %$/)).toBeInTheDocument();
+    expect(screen.getAllByText("En proceso")).toHaveLength(1);
     expect(screen.queryByText("Completada con incidencias")).not.toBeInTheDocument();
   });
 
@@ -155,6 +168,7 @@ describe("grouped request history", () => {
       item({ id: "y", requestGroupId: group, status: "completed", progress: 100, readerStatus: "completed" }),
       item({ id: "z", requestGroupId: group, status: "pending", canCancel: true, progress: 0, readerStatus: "queued" }),
     ]} />);
+    openAll();
 
     await user.click(screen.getByRole("button", { name: "Cancelar solicitud" }));
 
@@ -162,5 +176,48 @@ describe("grouped request history", () => {
     expect(await screen.findByText("2 extracciones canceladas.")).toBeInTheDocument();
     expect(screen.queryByRole("button", { name: "Cancelar solicitud" })).not.toBeInTheDocument();
     extractionAction.mockReset();
+  });
+});
+
+describe("request accordion", () => {
+  const group = crypto.randomUUID();
+
+  it("keeps the status on the header and hides the actions until the request is opened", async () => {
+    const user = (await import("@testing-library/user-event")).default.setup();
+    vi.stubGlobal("fetch", vi.fn().mockResolvedValue(Response.json([])));
+    render(<ExtractionHistory initialItems={[item({ id: "f", requestGroupId: group, status: "failed", progress: null, canResume: true, canRepeat: true })]} />);
+
+    const header = screen.getByRole("button", { name: /^AX-100/ });
+    expect(header).toHaveAttribute("aria-expanded", "false");
+    expect(within(header).getByText("Fallida")).toBeInTheDocument();
+    expect(screen.queryByRole("button", { name: "Reanudar fallidos" })).not.toBeInTheDocument();
+
+    await user.click(header);
+    expect(header).toHaveAttribute("aria-expanded", "true");
+    expect(screen.getByRole("button", { name: "Reanudar fallidos" })).toBeInTheDocument();
+    expect(screen.getByRole("link", { name: "Volver a solicitar" })).toBeInTheDocument();
+
+    header.focus();
+    await user.keyboard("{Enter}");
+    expect(header).toHaveAttribute("aria-expanded", "false");
+    expect(screen.queryByRole("button", { name: "Reanudar fallidos" })).not.toBeInTheDocument();
+  });
+
+  it("opens the request that was just created", () => {
+    vi.stubGlobal("fetch", vi.fn().mockResolvedValue(Response.json([])));
+    render(<ExtractionHistory createdId={group} initialItems={[item({ requestGroupId: group })]} />);
+    expect(screen.getByRole("button", { name: /^AX-100/ })).toHaveAttribute("aria-expanded", "true");
+  });
+
+  it("pulses the progress bars only while work is in progress", () => {
+    vi.stubGlobal("fetch", vi.fn().mockResolvedValue(Response.json([])));
+    const { unmount } = render(<ExtractionHistory initialItems={[item({ requestGroupId: group, status: "running", progress: 40 })]} />);
+    openAll();
+    for (const bar of screen.getAllByRole("progressbar")) expect(bar.firstElementChild).toHaveClass("motion-safe:animate-pulse");
+    unmount();
+
+    render(<ExtractionHistory initialItems={[item({ requestGroupId: group, status: "completed", progress: 100, readerStatus: "completed" })]} />);
+    openAll();
+    expect(screen.getByRole("progressbar", { name: "Progreso de la solicitud AX-100" }).firstElementChild).not.toHaveClass("motion-safe:animate-pulse");
   });
 });

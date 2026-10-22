@@ -118,7 +118,7 @@ function ExtractionActions({ item, detailsExpanded, onToggleDetails, onUpdated }
   </div>;
 }
 
-function RequestActions({ items, expanded, onToggle, onUpdated }: { items: ExtractionListItem[]; expanded: boolean; onToggle(): void; onUpdated(itemId: string, update: Partial<ExtractionListItem>): void }) {
+function RequestActions({ items, onUpdated }: { items: ExtractionListItem[]; onUpdated(itemId: string, update: Partial<ExtractionListItem>): void }) {
   const [busy, setBusy] = useState(false);
   const [feedback, setFeedback] = useState("");
   const cancellable = items.filter((item) => item.canCancel);
@@ -145,7 +145,6 @@ function RequestActions({ items, expanded, onToggle, onUpdated }: { items: Extra
 
   const buttonClass = "inline-flex min-h-11 items-center rounded-lg border px-3 text-sm font-medium focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-sky-700 disabled:opacity-50";
   return <div className="flex flex-wrap items-center gap-2">
-    <button aria-expanded={expanded} className={`${buttonClass} border-zinc-300 bg-white text-zinc-800 hover:bg-zinc-50`} onClick={onToggle} type="button">{expanded ? "Ocultar detalle" : `Mostrar detalle (${items.length})`}</button>
     {cancellable.length ? <button className={`${buttonClass} border-red-200 bg-white text-red-700 hover:bg-red-50`} disabled={busy} onClick={() => void runAll("cancel", cancellable)} type="button">Cancelar solicitud</button> : null}
     {resumable.length ? <button className={`${buttonClass} border-zinc-300 bg-white text-zinc-800 hover:bg-zinc-50`} disabled={busy} onClick={() => void runAll("resume", resumable)} type="button">Reanudar fallidos</button> : null}
     {canRepeat ? <Link className={`${buttonClass} border-zinc-300 bg-white text-zinc-800 hover:bg-zinc-50`} href={`/extractions?request=${encodeURIComponent(items[0]!.requestGroupId)}`}>Volver a solicitar</Link> : null}
@@ -272,33 +271,40 @@ export function ExtractionHistory({ createdId, draftKey = "extraction-draft-v1",
           const first = group.items[0]!;
           const noun = first.manufacturerGroup === "Renault" ? "familia" : "typekey";
           const summary = summarizeRequest(first.requestStatus, group.items, noun);
-          const expanded = toggledGroups[group.id] ?? summary.status !== "completed";
+          const expanded = toggledGroups[group.id] ?? group.id === createdId;
+          const panelId = `request-panel-${group.id}`;
+          const hasProgress = summary.status !== "pending_approval" && summary.status !== "rejected";
+          const running = summary.status === "running";
           return <section aria-label={`Solicitud ${first.axCode}`} className={`overflow-hidden rounded-2xl border bg-white shadow-sm ${group.id === createdId ? "border-emerald-300" : "border-zinc-200"}`} key={group.id}>
-            <div className="grid min-w-0 gap-4 px-5 py-5 md:grid-cols-[1.4fr_1fr] md:px-6">
-              <div className="min-w-0">
-                <h2 className="break-words font-mono text-sm font-semibold text-zinc-950" translate="no">{first.axCode}</h2>
-                <p className="mt-1 text-xs text-zinc-600">Edición IMC <span translate="no">{first.imcEdition}</span> · Finalización {formatSpanishDate(first.completion)}{first.developmentStart ? ` · Inicio de desarrollo ${formatSpanishDate(first.developmentStart)}` : ""}</p>
-                <p className="mt-1 text-xs text-zinc-600"><span translate="no">{first.manufacturerGroup} / {first.brand}</span> · {group.items.length} {group.items.length === 1 ? noun : `${noun}s`}</p>
-                <time className="mt-1 block text-xs text-zinc-600" dateTime={first.createdAt}>{formatSpanishDateTime(first.createdAt)}</time>
-                {first.requesterName ? <p className="mt-1 truncate text-xs text-zinc-500">Solicitante: {first.requesterName}</p> : null}
-              </div>
-              <div className="min-w-0">
-                <span className={`inline-flex rounded-full border px-2.5 py-1 text-xs font-semibold ${aggregateStyles[summary.status]}`}>{summary.label}</span>
-                {summary.status !== "pending_approval" && summary.status !== "rejected" ? <>
-                  <p className="mt-2 text-xs text-zinc-700">{summary.description}</p>
-                  <div className="mt-2 max-w-64"><div className="mb-1 flex justify-between text-xs text-zinc-600"><span>Progreso</span><span>{summary.progress}%</span></div><div aria-label={`Progreso de la solicitud ${first.axCode}`} aria-valuemax={100} aria-valuemin={0} aria-valuenow={summary.progress} className="h-2 overflow-hidden rounded-full bg-zinc-200" role="progressbar"><div className="h-full rounded-full bg-sky-600 transition-[width] duration-500" style={{ width: `${summary.progress}%` }} /></div></div>
+            <h2 className="m-0">
+              <button aria-controls={panelId} aria-expanded={expanded} className="flex w-full min-w-0 items-center gap-4 px-5 py-5 text-left hover:bg-zinc-50 focus-visible:outline-2 focus-visible:-outline-offset-2 focus-visible:outline-sky-700 md:px-6" onClick={() => setToggledGroups((current) => ({ ...current, [group.id]: !expanded }))} type="button">
+                <span className="min-w-0 flex-1">
+                  <span className="block break-words font-mono text-sm font-semibold text-zinc-950" translate="no">{first.axCode}</span>
+                  <span className="mt-1 block text-xs font-normal text-zinc-600">Edición IMC <span translate="no">{first.imcEdition}</span> · Finalización {formatSpanishDate(first.completion)}{first.developmentStart ? ` · Inicio de desarrollo ${formatSpanishDate(first.developmentStart)}` : ""}</span>
+                  <span className="mt-1 block text-xs font-normal text-zinc-600"><span translate="no">{first.manufacturerGroup} / {first.brand}</span> · {group.items.length} {group.items.length === 1 ? noun : `${noun}s`} · <time dateTime={first.createdAt}>{formatSpanishDateTime(first.createdAt)}</time>{first.requesterName ? ` · ${first.requesterName}` : ""}</span>
+                </span>
+                <span className="flex shrink-0 items-center gap-3">
+                  <span className={`inline-flex rounded-full border px-2.5 py-1 text-xs font-semibold ${aggregateStyles[summary.status]}`}>{summary.label}{running ? ` · ${summary.progress} %` : ""}</span>
+                  <svg aria-hidden="true" className={`size-5 text-zinc-500 transition-transform ${expanded ? "rotate-180" : ""}`} fill="none" stroke="currentColor" strokeWidth="2" viewBox="0 0 20 20"><path d="m5 8 5 5 5-5" strokeLinecap="round" strokeLinejoin="round" /></svg>
+                </span>
+              </button>
+            </h2>
+            {expanded ? <div className="border-t border-zinc-200" id={panelId}>
+              <div className="space-y-3 px-5 py-4 md:px-6">
+                {hasProgress ? <>
+                  <p className="text-sm text-zinc-700">{summary.description}</p>
+                  <div className="max-w-80"><div className="mb-1 flex justify-between text-xs text-zinc-600"><span>Progreso</span><span>{summary.progress}%</span></div><div aria-label={`Progreso de la solicitud ${first.axCode}`} aria-valuemax={100} aria-valuemin={0} aria-valuenow={summary.progress} className="h-2 overflow-hidden rounded-full bg-zinc-200" role="progressbar"><div className={`h-full rounded-full bg-sky-600 transition-[width] duration-500 ${running ? "motion-safe:animate-pulse" : ""}`} style={{ width: `${summary.progress}%` }} /></div></div>
                 </> : null}
+                <RequestActions items={group.items} onUpdated={updateItem} />
               </div>
-            </div>
-            <div className="border-t border-zinc-100 px-5 py-3 md:px-6"><RequestActions expanded={expanded} items={group.items} onToggle={() => setToggledGroups((current) => ({ ...current, [group.id]: !expanded }))} onUpdated={updateItem} /></div>
-            {expanded ? <div className="divide-y divide-zinc-200 border-t border-zinc-200 bg-zinc-50/50">
+              <div className="divide-y divide-zinc-200 border-t border-zinc-200 bg-zinc-50/50">
               {group.items.map((item) => {
             const status = visibleStatus(item);
             const detailState = readerDetails[item.id];
             return <article className={`min-w-0 px-5 py-4 md:px-6`} key={item.id}>
               <div className="grid min-w-0 gap-5 md:grid-cols-[1.6fr_1fr_auto] md:items-center">
               <div className="min-w-0"><p className="break-words text-sm font-medium text-zinc-900">{item.modelDescription}</p><p className="mt-1 break-words text-xs text-zinc-600"><span translate="no">{item.manufacturerGroup} / {item.brand} · {item.modelCode}</span> · {item.domain}</p></div>
-              <div className="min-w-0"><span className={`inline-flex rounded-full border px-2.5 py-1 text-xs font-semibold ${status.style}`}>{status.label}</span>{readerStatusNotice(item) ? <p className="mt-2 text-xs font-medium text-amber-800">{readerStatusNotice(item)}</p> : null}{item.progress !== null && item.progress !== undefined && (item.status === "pending" || item.status === "running") ? <div className="mt-3 max-w-56"><div className="mb-1 flex justify-between text-xs text-zinc-600"><span>Progreso</span><span>{item.progress}%</span></div><div aria-label={`Progreso de ${item.axCode}`} aria-valuemax={100} aria-valuemin={0} aria-valuenow={item.progress} className="h-2 overflow-hidden rounded-full bg-zinc-200" role="progressbar"><div className="h-full rounded-full bg-sky-600 transition-[width] duration-500" style={{ width: `${item.progress}%` }} /></div></div> : null}{item.errorMessage ? <p className="mt-2 break-words text-xs text-red-700">{item.errorMessage}</p> : null}</div>
+              <div className="min-w-0"><span className={`inline-flex rounded-full border px-2.5 py-1 text-xs font-semibold ${status.style}`}>{status.label}</span>{readerStatusNotice(item) ? <p className="mt-2 text-xs font-medium text-amber-800">{readerStatusNotice(item)}</p> : null}{item.progress !== null && item.progress !== undefined && (item.status === "pending" || item.status === "running") ? <div className="mt-3 max-w-56"><div className="mb-1 flex justify-between text-xs text-zinc-600"><span>Progreso</span><span>{item.progress}%</span></div><div aria-label={`Progreso de ${item.axCode}`} aria-valuemax={100} aria-valuemin={0} aria-valuenow={item.progress} className="h-2 overflow-hidden rounded-full bg-zinc-200" role="progressbar"><div className="h-full rounded-full bg-sky-600 transition-[width] duration-500 motion-safe:animate-pulse" style={{ width: `${item.progress}%` }} /></div></div> : null}{item.errorMessage ? <p className="mt-2 break-words text-xs text-red-700">{item.errorMessage}</p> : null}</div>
                 <ExtractionActions item={item} detailsExpanded={openDetailId === item.id} onToggleDetails={(id) => void toggleReaderDetails(id)} onUpdated={updateItem} />
               </div>
               {openDetailId === item.id ? <section aria-label={`Detalle de la extracción ${item.axCode}`} className="mt-5 rounded-lg border border-zinc-200 bg-zinc-50 p-4">
@@ -311,6 +317,7 @@ export function ExtractionHistory({ createdId, draftKey = "extraction-draft-v1",
               </section> : null}
             </article>;
               })}
+              </div>
             </div> : null}
           </section>;
         })}
