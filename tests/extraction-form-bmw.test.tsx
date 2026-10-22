@@ -76,6 +76,74 @@ describe("extraction request stepper", () => {
     expect(screen.getByText("01/03/2026")).toBeInTheDocument();
   });
 
+  function availabilityFetch(answers: Record<string, unknown>, typekeys: string[]) {
+    return vi.fn(async (input: RequestInfo | URL) => {
+      const url = new URL(String(input), "http://localhost");
+      if (url.pathname.endsWith("/series")) return Response.json({ options: [{ value: "6'", label: "6'" }] });
+      if (url.pathname.endsWith("/development-codes")) return Response.json({ options: [{ value: "F13", label: "F13" }] });
+      if (url.pathname.endsWith("/typekeys")) return Response.json({ options: typekeys.map((value) => ({ value, label: value })) });
+      if (url.pathname.endsWith("/availability")) return Response.json({ availability: answers[url.searchParams.get("typekey")!] });
+      return Response.json({ error: { message: "Ruta no encontrada." } }, { status: 404 });
+    });
+  }
+
+  async function reachSummary(user: ReturnType<typeof userEvent.setup>, fetchMock: ReturnType<typeof vi.fn>, typekey: string) {
+    await completeCommonStep(user);
+    await user.click(screen.getByRole("button", { name: "BMW Group" }));
+    await user.click(screen.getByRole("button", { name: /^BMW$/ }));
+    await user.click(screen.getByRole("button", { name: "Continuar" }));
+    await user.selectOptions(await screen.findByRole("combobox", { name: "Serie" }), "6'");
+    await user.selectOptions(await screen.findByRole("combobox", { name: "Código de desarrollo" }), "F13");
+    await waitFor(() => expect(fetchMock.mock.calls.some(([input]) => String(input).includes("developmentCode=F13"))).toBe(true));
+    await user.selectOptions(await screen.findByRole("combobox", { name: "Typekey" }), typekey);
+    await user.click(screen.getByRole("button", { name: "Continuar" }));
+  }
+
+  it("blocks submission for an unavailable typekey and explains why its base type is not suggested", async () => {
+    const fetchMock = availabilityFetch({
+      "6J02": { typekey: "6J02", status: "unavailable", code: "CGWATB0085", suggestedTypekey: null, baseType: { typekey: "6J92", status: "available", reliable: false, differences: [{ attribute: "transmission", requested: "AUT", baseType: "MECH" }] } },
+    }, ["6J02"]);
+    vi.stubGlobal("fetch", fetchMock);
+    const user = userEvent.setup();
+    render(<ExtractionForm />);
+    await reachSummary(user, fetchMock, "6J02");
+
+    expect(await screen.findByText("6J02: No disponible en BMW Flat Rates (CGWATB0085).")).toBeInTheDocument();
+    expect(screen.getByText("Tipo base 6J92 disponible, pero difiere en: cambio (automático → manual). No se sugiere.")).toBeInTheDocument();
+    expect(screen.queryByRole("button", { name: /Usar tipo base/ })).not.toBeInTheDocument();
+    expect(screen.getByText(/BMW no tiene tiempos para 6J02/)).toBeInTheDocument();
+    expect(screen.getByRole("button", { name: "Iniciar extracción" })).toBeDisabled();
+  });
+
+  it("replaces an unavailable typekey with its reliable base type and re-enables submission", async () => {
+    const fetchMock = availabilityFetch({
+      "6J03": { typekey: "6J03", status: "unavailable", code: "CGWATB0085", suggestedTypekey: "6J93", baseType: { typekey: "6J93", status: "available", reliable: true, differences: [] } },
+      "6J93": { typekey: "6J93", status: "available", suggestedTypekey: null },
+    }, ["6J03", "6J93"]);
+    vi.stubGlobal("fetch", fetchMock);
+    const user = userEvent.setup();
+    render(<ExtractionForm />);
+    await reachSummary(user, fetchMock, "6J03");
+
+    await user.click(await screen.findByRole("button", { name: "Usar tipo base 6J93" }));
+
+    expect(await screen.findByText("6' · F13 · 6J93")).toBeInTheDocument();
+    await waitFor(() => expect(screen.getByRole("button", { name: "Iniciar extracción" })).toBeEnabled());
+    expect(screen.queryByText(/No disponible en BMW Flat Rates/)).not.toBeInTheDocument();
+    expect(fetchMock.mock.calls.some(([input]) => String(input).includes("/availability") && String(input).includes("typekey=6J93"))).toBe(true);
+  });
+
+  it("lets an available typekey through and keeps submission possible when BMW cannot be checked", async () => {
+    const fetchMock = availabilityFetch({ "6J92": { typekey: "6J92", status: "unknown", suggestedTypekey: null } }, ["6J92"]);
+    vi.stubGlobal("fetch", fetchMock);
+    const user = userEvent.setup();
+    render(<ExtractionForm />);
+    await reachSummary(user, fetchMock, "6J92");
+
+    expect(await screen.findByText("BMW no ha respondido a tiempo; se volverá a comprobar al enviar la solicitud.")).toBeInTheDocument();
+    expect(screen.getByRole("button", { name: "Iniciar extracción" })).toBeEnabled();
+  });
+
   it("reports malformed BMW options with a retry control", async () => {
     const fetchMock = vi.fn().mockResolvedValue(Response.json({ series: "7'" }));
     vi.stubGlobal("fetch", fetchMock);

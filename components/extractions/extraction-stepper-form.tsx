@@ -4,8 +4,10 @@ import { useActionState, useEffect, useId, useState } from "react";
 import { z } from "zod";
 import { createExtractionAction, type ExtractionFormState } from "@/app/(dashboard)/extractions/actions";
 import { SubmitButton } from "@/components/common/submit-button";
+import { BmwAvailabilityNotice } from "@/components/extractions/bmw-availability-notice";
 import { formatSpanishDate } from "@/lib/date-format";
 import { extractionFormSchema, type ExtractionVehicle } from "@/lib/extractions/validation";
+import { useBmwAvailability, type AvailabilityTarget } from "@/lib/hooks/use-bmw-availability";
 
 type Vehicle = ExtractionVehicle & { id: string };
 type ManufacturerGroup = ExtractionVehicle["manufacturerGroup"];
@@ -213,6 +215,17 @@ export function ExtractionStepperForm({
   const [draftSaved, setDraftSaved] = useState(false);
   const [localErrors, setLocalErrors] = useState<Record<string, string>>({});
   const [stepError, setStepError] = useState("");
+  const availabilityTargets = new Map<string, AvailabilityTarget>();
+  for (const vehicle of vehicles) {
+    if (vehicle.manufacturerGroup === "BMW" && vehicle.series && vehicle.developmentCode && /^[A-Z0-9]{4}$/.test(vehicle.typekey)) {
+      availabilityTargets.set(vehicle.id, { brand: vehicle.brand, series: vehicle.series, developmentCode: vehicle.developmentCode, typekey: vehicle.typekey });
+    }
+  }
+  const availability = useBmwAvailability([...availabilityTargets.values()], step === 3 && group === "BMW");
+  const unavailableTypekeys = step === 3 ? [...availabilityTargets.values()].filter((target) => {
+    const entry = availability.entryFor(target);
+    return entry.state === "ready" && entry.availability.status === "unavailable";
+  }).map((target) => target.typekey) : [];
 
   useEffect(() => {
     if (initialValues) return;
@@ -299,6 +312,13 @@ export function ExtractionStepperForm({
     }
     clearValidation();
     return fresh.length;
+  }
+
+  function replaceWithBaseType(id: string, baseTypekey: string) {
+    const duplicate = vehicles.some((vehicle) => vehicle.id !== id && vehicle.manufacturerGroup === "BMW" && vehicle.typekey === baseTypekey);
+    if (duplicate && vehicles.length > 1) setVehicles((current) => current.filter((vehicle) => vehicle.id !== id));
+    else updateBmwVehicle(id, { typekey: baseTypekey });
+    clearValidation();
   }
 
   function addBlankBmwVehicle() {
@@ -449,8 +469,15 @@ export function ExtractionStepperForm({
         </dl>
         <div className="rounded-xl border border-zinc-200 bg-white p-4">
           <div className="flex flex-wrap items-baseline justify-between gap-2"><h3 className="font-semibold text-zinc-950">Modelos seleccionados</h3><span className="text-sm tabular-nums text-zinc-600">{vehicles.length} {vehicles.length === 1 ? "extracción" : "extracciones"}</span></div>
-          <ul className="mt-3 divide-y divide-zinc-200">{vehicles.map((vehicle) => <li className="flex flex-wrap items-center justify-between gap-2 py-3 text-sm" key={vehicle.id}><span className="font-medium text-zinc-900">{vehicle.modelDescription || "Modelo seleccionado"}</span><span className="font-mono text-xs text-zinc-600">{vehicle.manufacturerGroup === "BMW" ? `${vehicle.series} · ${vehicle.developmentCode} · ${vehicle.typekey}` : vehicle.modelCode}</span></li>)}</ul>
+          <ul className="mt-3 divide-y divide-zinc-200">{vehicles.map((vehicle) => {
+            const target = availabilityTargets.get(vehicle.id);
+            return <li className="py-3 text-sm" key={vehicle.id}>
+              <div className="flex flex-wrap items-center justify-between gap-2"><span className="font-medium text-zinc-900">{vehicle.modelDescription || "Modelo seleccionado"}</span><span className="font-mono text-xs text-zinc-600">{vehicle.manufacturerGroup === "BMW" ? `${vehicle.series} · ${vehicle.developmentCode} · ${vehicle.typekey}` : vehicle.modelCode}</span></div>
+              {target ? <BmwAvailabilityNotice entry={availability.entryFor(target)} onRetry={() => availability.retry(target)} onUseBaseType={(baseTypekey) => replaceWithBaseType(vehicle.id, baseTypekey)} typekey={target.typekey} /> : null}
+            </li>;
+          })}</ul>
         </div>
+        {unavailableTypekeys.length ? <p className="rounded-lg border border-red-200 bg-red-50 px-4 py-3 text-sm text-red-800" role="alert">BMW no tiene tiempos para {unavailableTypekeys.join(", ")}. Quita esos typekeys o sustitúyelos por un tipo base sugerido para poder iniciar la extracción.</p> : null}
         {requiresApproval ? <p className="rounded-lg border border-amber-200 bg-amber-50 px-4 py-3 text-sm text-amber-900">La solicitud quedará pendiente de aprobación de tu coordinador.</p> : null}
         <label className="block"><span className="field-label">Comentarios (opcional)</span><textarea autoComplete="off" className="field-control min-h-24 resize-y" maxLength={4_000} onChange={(event) => setValues((current) => ({ ...current, comments: event.target.value }))} placeholder="Añade información útil para la extracción…" value={values.comments} /></label>
         {state.error ? <div aria-live="polite" className="rounded-xl border border-red-200 bg-red-50 px-4 py-3 text-sm text-red-700" role="alert"><p>{state.error}</p>{state.fieldErrors ? <ul className="mt-2 list-inside list-disc">{Object.entries(state.fieldErrors).map(([field, message]) => <li key={field}>{message}</li>)}</ul> : null}</div> : null}
@@ -464,7 +491,7 @@ export function ExtractionStepperForm({
       <input name="vehicles" type="hidden" value={JSON.stringify(vehicles)} />
       <div className="flex flex-col-reverse gap-3 border-t border-zinc-200 pt-5 sm:flex-row sm:items-center sm:justify-between">
         <div className="flex items-center gap-2"><button className="min-h-11 rounded-lg px-3 py-2 text-sm font-semibold text-zinc-700 hover:bg-zinc-100 disabled:invisible" disabled={step === 0} onClick={() => { setStep((current) => Math.max(0, current - 1)); clearValidation(); }} type="button">Atrás</button><span className="text-xs text-zinc-500">{draftReady ? draftSaved ? "Borrador guardado" : "Guardando borrador…" : "Cargando borrador…"}</span></div>
-        {step < 3 ? <button className="inline-flex min-h-11 items-center justify-center rounded-lg bg-zinc-950 px-5 py-2 text-sm font-semibold text-white hover:bg-zinc-800 focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-sky-700" onClick={nextStep} type="button">Continuar</button> : <SubmitButton className="sm:min-w-52" pendingLabel="Iniciando…">Iniciar extracción</SubmitButton>}
+        {step < 3 ? <button className="inline-flex min-h-11 items-center justify-center rounded-lg bg-zinc-950 px-5 py-2 text-sm font-semibold text-white hover:bg-zinc-800 focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-sky-700" onClick={nextStep} type="button">Continuar</button> : <SubmitButton className="sm:min-w-52" disabled={unavailableTypekeys.length > 0} pendingLabel="Iniciando…">Iniciar extracción</SubmitButton>}
       </div>
     </div>
   </form>;

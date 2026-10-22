@@ -9,7 +9,8 @@ Portal interno para solicitar y seguir extracciones técnicas de distintos fabri
 - Formulario con AX Code, Edición IMC, Completion, tiempos, comentarios y múltiples vehículos.
 - Creación y seguimiento asíncrono de exportaciones Renault TM01.
 - Historial privado por usuario y descarga protegida del ZIP.
-- BMW, Mercedes, Grupo VAG y piezas visibles como próximas integraciones.
+- Extracciones BMW/MINI por typekey. En el paso "Resumen" el formulario comprueba, de tres en tres, que BMW Flat Rates tenga tiempos para cada typekey (`GET /api/readers/bmw/availability`, que consulta `GET /v1/models/availability` del reader). Los no disponibles (`CGWATB0085`) bloquean el envío y solo se ofrece el tipo base cuando coincide con el typekey en todas las características; si difiere en alguna se explica el motivo y no se sugiere. Si BMW no responde, el envío sigue permitido y el reader lo rechaza con `422 NOT_AVAILABLE` si procede.
+- Mercedes, Grupo VAG y piezas visibles como próximas integraciones.
 
 El envío de correo y el correo en copia no forman parte de esta aplicación.
 
