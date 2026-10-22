@@ -113,17 +113,29 @@ describe("BMW reader client", () => {
     const fetcher = vi.fn().mockResolvedValue(Response.json({ requestId: "7be5f2af-879b-4c61-84d5-6e728f438a02", resource: "labours", status: "queued", links: { self: "/v1/labours/7be5f2af-879b-4c61-84d5-6e728f438a02" } }, { status: 202 }));
     const client = createBmwReaderClient({ fetcher });
 
-    await expect(client.createLabour({ brand: "MINI", series: "F56", developmentCode: "F56", typekey: "11EH", axCode: "AX_123", imcEdition: "05/0", language: "es-ES" })).resolves.toEqual({ requestId: "7be5f2af-879b-4c61-84d5-6e728f438a02", status: "queued" });
+    await expect(client.createLabour({ brand: "MINI", series: "F56", developmentCode: "F56", typekey: "11EH", axCode: "ax1", imcEdition: "05/0", language: "es-ES" })).resolves.toEqual({ requestId: "7be5f2af-879b-4c61-84d5-6e728f438a02", status: "queued" });
 
     expect(fetcher).toHaveBeenCalledWith(new URL("http://localhost:3004/v1/labours"), expect.objectContaining({ method: "POST", redirect: "manual" }));
     const init = fetcher.mock.calls[0]![1] as RequestInit;
     expect(JSON.parse(String(init.body))).toMatchObject({
       manufacturer: "MINI",
-      axCode: "AX_123",
+      axCode: "AX1",
       edition: "05_0",
       language: "es-ES",
       selection: { series: "F56", typekeys: [{ typekey: "11EH", series: "F56", family: "F56" }] },
     });
+  });
+
+  it("rejects BMW AX codes outside the 3–4 character alphanumeric rule before calling the reader", async () => {
+    process.env.BMW_READER_BASE_URL = "http://localhost:3004";
+    const fetcher = vi.fn();
+    const client = createBmwReaderClient({ fetcher });
+    const base = { brand: "BMW" as const, series: "7", developmentCode: "G70", typekey: "11EH", imcEdition: "05/0" };
+
+    for (const axCode of ["AB", "ABCDE", "A_1", "A-1", "A 1"]) {
+      await expect(client.createLabour({ ...base, axCode })).rejects.toThrow();
+    }
+    expect(fetcher).not.toHaveBeenCalled();
   });
 
   it("surfaces the reader's NOT_AVAILABLE message and keeps other 4xx answers generic", async () => {
@@ -133,7 +145,7 @@ describe("BMW reader client", () => {
       .mockResolvedValueOnce(Response.json({ error: { code: "NOT_AVAILABLE", message, details: { typekeys: [{ typekey: "YM13", code: "CGWATB0085" }] } } }, { status: 422 }))
       .mockResolvedValueOnce(Response.json({ error: { code: "VALIDATION_ERROR", message: "internal detail" } }, { status: 400 }));
     const client = createBmwReaderClient({ fetcher });
-    const params = { brand: "BMW" as const, series: "6'", developmentCode: "F13", typekey: "YM13", axCode: "AX_1", imcEdition: "01/0" };
+    const params = { brand: "BMW" as const, series: "6'", developmentCode: "F13", typekey: "YM13", axCode: "AX1", imcEdition: "01/0" };
     await expect(client.createLabour(params)).rejects.toMatchObject({ message, code: "TYPEKEY_NOT_AVAILABLE", retryable: false, status: 422 });
     await expect(client.createLabour(params)).rejects.toMatchObject({ message: "BMW no ha aceptado la solicitud.", code: "READER_REQUEST_FAILED" });
   });

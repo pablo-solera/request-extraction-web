@@ -260,7 +260,7 @@ export function createBmwReaderClient(options: { fetcher?: typeof fetch; now?: (
         series: z.string().trim().min(1).max(100),
         developmentCode: z.string().regex(/^[A-Z0-9]+$/),
         typekey: z.string().regex(/^[A-Z0-9]{4}$/),
-        axCode: z.string().regex(/^[A-Za-z0-9_]{1,100}$/),
+        axCode: z.string().regex(/^[A-Za-z0-9]{3,4}$/).transform((value) => value.toUpperCase()),
         imcEdition: z.string().regex(/^\d{2}\/\d$/),
         language: z.string().trim().min(2).max(20).optional(),
       }).parse(params);

@@ -73,7 +73,7 @@ describe("insertExtractionsWithCapacity reader persistence", () => {
     database.transaction.mockImplementationOnce(async (callback: (tx: typeof transaction) => Promise<unknown>) => callback(transaction));
 
     await insertExtractionsWithCapacity("user-1", {
-      axCode: "AX_123",
+      axCode: "AX12",
       imcEdition: "05/0",
       completion: "2026-03-14",
       comments: "",
@@ -81,7 +81,7 @@ describe("insertExtractionsWithCapacity reader persistence", () => {
       vehicles: [{ manufacturerGroup: "BMW", brand: "MINI", series: "F56", developmentCode: "F56", typekey: "11EH", modelDescription: "Cooper S" }],
     }, 50, { status: "approved", coordinatorId: null });
 
-    expect(requestValues).toMatchObject({ manufacturerGroup: "BMW", brand: "MINI", axCode: "AX_123", imcEdition: "05/0", completion: "2026-03-14", developmentStart: "2026-03-14", comments: null });
+    expect(requestValues).toMatchObject({ manufacturerGroup: "BMW", brand: "MINI", axCode: "AX12", imcEdition: "05/0", completion: "2026-03-14", developmentStart: "2026-03-14", comments: null });
     expect(insertedRows[0]).toMatchObject({
       modelCode: "11EH",
       modelDescription: "Cooper S · F56 / F56",
@@ -109,7 +109,7 @@ describe("insertExtractionsWithCapacity reader persistence", () => {
     database.transaction.mockImplementationOnce(async (callback: (tx: typeof transaction) => Promise<unknown>) => callback(transaction));
 
     await insertExtractionsWithCapacity("user-1", {
-      axCode: "AX_123",
+      axCode: "AX12",
       imcEdition: "05/0",
       completion: "2026-03-14",
       comments: "",

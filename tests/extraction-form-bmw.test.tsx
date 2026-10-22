@@ -20,7 +20,7 @@ afterEach(() => {
 });
 
 async function completeCommonStep(user: ReturnType<typeof userEvent.setup>) {
-  await user.type(screen.getAllByLabelText("Código AX")[0]!, "AX_123");
+  await user.type(screen.getAllByLabelText("Código AX")[0]!, "1xf");
   await user.type(screen.getAllByLabelText("Edición IMC")[0]!, "05/0");
   await user.type(screen.getAllByLabelText(/Completion/)[0]!, "2026-10-20");
   await user.type(screen.getAllByLabelText(/Inicio del desarrollo/)[0]!, "2026-03-01");
@@ -38,6 +38,13 @@ async function chooseBmw(user: ReturnType<typeof userEvent.setup>, fetchMock: Re
 }
 
 describe("extraction request stepper", () => {
+  it("ignores spaces and symbols typed in the AX code", async () => {
+    const user = userEvent.setup();
+    render(<ExtractionForm />);
+    await user.type(screen.getAllByLabelText("Código AX")[0]!, " a b-1_x ");
+    expect(screen.getAllByLabelText("Código AX")[0]).toHaveValue("AB1X");
+  });
+
   it("keeps common data while navigating and shows the selected group manufacturers", async () => {
     const user = userEvent.setup();
     render(<ExtractionForm />);
@@ -49,7 +56,7 @@ describe("extraction request stepper", () => {
     await user.click(screen.getByRole("button", { name: "Dacia" }));
     await user.click(screen.getByRole("button", { name: "Atrás" }));
 
-    expect(screen.getAllByLabelText("Código AX")[0]).toHaveValue("AX_123");
+    expect(screen.getAllByLabelText("Código AX")[0]).toHaveValue("1XF");
     await user.click(screen.getByRole("button", { name: "Continuar" }));
     expect(screen.getByRole("button", { name: "Dacia" })).toHaveAttribute("aria-pressed", "true");
   });
@@ -72,7 +79,7 @@ describe("extraction request stepper", () => {
     await user.click(screen.getByRole("button", { name: "Continuar" }));
 
     expect(screen.getByText("7 · G70 · 41HZ")).toBeInTheDocument();
-    expect(screen.getAllByText("1 extracción")).toHaveLength(2);
+    expect(screen.getAllByText("1 extracción")).toHaveLength(1);
     expect(screen.getByText("01/03/2026")).toBeInTheDocument();
   });
 
@@ -177,7 +184,7 @@ describe("extraction request stepper", () => {
     expect(await screen.findByText("2 typekeys añadidos.")).toBeInTheDocument();
     await user.click(screen.getByRole("button", { name: "Continuar" }));
     expect(screen.getAllByText(/11EH|41HZ/).length).toBeGreaterThanOrEqual(2);
-    expect(screen.getAllByText("2 extracciones")).toHaveLength(2);
+    expect(screen.getAllByText("2 extracciones")).toHaveLength(1);
   });
 
   it("loads and summarizes several Renault families for the selected single manufacturer", async () => {
@@ -194,7 +201,7 @@ describe("extraction request stepper", () => {
     await user.click(screen.getByRole("button", { name: "Continuar" }));
 
     expect(screen.getByText("Dacia")).toBeInTheDocument();
-    expect(screen.getAllByText("2 extracciones")).toHaveLength(2);
+    expect(screen.getAllByText("2 extracciones")).toHaveLength(1);
     expect(screen.getByText("B52")).toBeInTheDocument();
     expect(screen.getByText("HJD")).toBeInTheDocument();
     expect(fetchMock).toHaveBeenCalledWith(expect.stringContaining("/api/readers/renault/families?brand=Dacia"), expect.objectContaining({ cache: "no-store" }));

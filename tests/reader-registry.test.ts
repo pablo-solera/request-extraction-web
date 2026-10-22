@@ -39,7 +39,7 @@ describe("extraction reader registry", () => {
     const reader = getExtractionReader("bmw-labours");
     const extraction = {
       brand: "MINI",
-      axCode: "AX_123",
+      axCode: "AX12",
       imcEdition: "05/0",
       readerParams: { series: "F56", developmentCode: "F56", typekey: "11EH", language: "en-GB", developmentStart: "2026-03-14" },
     } as never;
@@ -51,7 +51,7 @@ describe("extraction reader registry", () => {
       series: "F56",
       developmentCode: "F56",
       typekey: "11EH",
-      axCode: "AX_123",
+      axCode: "AX12",
       imcEdition: "05/0",
       language: "en-GB",
     });

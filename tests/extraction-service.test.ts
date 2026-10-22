@@ -248,7 +248,7 @@ describe("reader registry extraction flow", () => {
   it("revalidates selected BMW codes and returned typekeys before saving", async () => {
     repository.insertExtractionsWithCapacity.mockResolvedValueOnce([{ requestGroupId: "g-bmw" }]);
     const input = {
-      axCode: "AX_123",
+      axCode: "AX12",
       imcEdition: "05/0",
       completion: "2026-10-20",
       comments: "",
@@ -267,7 +267,7 @@ describe("reader registry extraction flow", () => {
     repository.insertExtractionsWithCapacity.mockResolvedValueOnce([{ requestGroupId: "g-renault" }]);
     bmwReader.getRenaultLabourFamilies.mockResolvedValueOnce([{ value: "B52", label: "Sandero" }, { value: "HJD", label: "Duster" }]);
     const input = {
-      axCode: "AX_456",
+      axCode: "AX45",
       imcEdition: "05/0",
       completion: "2026-10-20",
       comments: "",
@@ -286,7 +286,7 @@ describe("reader registry extraction flow", () => {
   it("rejects a Renault family that the reader no longer returns", async () => {
     bmwReader.getRenaultLabourFamilies.mockResolvedValueOnce([]);
     const input = {
-      axCode: "AX_456",
+      axCode: "AX45",
       imcEdition: "05/0",
       completion: "2026-10-20",
       comments: "",
@@ -301,7 +301,7 @@ describe("reader registry extraction flow", () => {
   it("rejects a typekey that BMW did not return before persisting the request", async () => {
     bmwReader.getBmwTypekeys.mockResolvedValueOnce([]);
     const input = {
-      axCode: "AX_123",
+      axCode: "AX12",
       imcEdition: "05/0",
       completion: "2026-10-20",
       comments: "",

@@ -2,7 +2,7 @@ import { describe, expect, it } from "vitest";
 import { extractionFormSchema } from "@/lib/extractions/validation";
 
 const validInput = {
-  axCode: "AX-100",
+  axCode: "1xf",
   imcEdition: "05/0",
   completion: "2026-03-14",
   laboursDevelopmentStart: "2026-03-01",
@@ -12,7 +12,18 @@ const validInput = {
 
 describe("extractionFormSchema", () => {
   it("accepts an extraction with all common dates", () => {
-    expect(extractionFormSchema.safeParse(validInput).success).toBe(true);
+    const parsed = extractionFormSchema.safeParse(validInput);
+    expect(parsed.success).toBe(true);
+    if (parsed.success) expect(parsed.data.axCode).toBe("1XF");
+  });
+
+  it("accepts only 3–4 ASCII alphanumeric AX characters for every manufacturer", () => {
+    for (const axCode of ["ABC", "AB12", "1xf"]) {
+      expect(extractionFormSchema.safeParse({ ...validInput, axCode }).success).toBe(true);
+    }
+    for (const axCode of ["AB", "ABCDE", "AX-1", "AX_1", "A 1", " 1XF", "1XF ", "ß12"]) {
+      expect(extractionFormSchema.safeParse({ ...validInput, axCode }).success).toBe(false);
+    }
   });
 
   it("requires all common identifiers and dates", () => {
@@ -31,12 +42,12 @@ describe("extractionFormSchema", () => {
   it("validates BMW manufacturer, series, development code and typekey", () => {
     const bmwInput = {
       ...validInput,
-      axCode: "AX_100",
+      axCode: "AB12",
       vehicles: [{ manufacturerGroup: "BMW" as const, brand: "BMW" as const, series: "7", developmentCode: "G70", typekey: "11EH", modelDescription: "740i" }],
     };
     expect(extractionFormSchema.safeParse(bmwInput).success).toBe(true);
     expect(extractionFormSchema.safeParse({ ...bmwInput, vehicles: [{ ...bmwInput.vehicles[0], brand: "BMW i" }] }).success).toBe(false);
-    expect(extractionFormSchema.safeParse({ ...bmwInput, axCode: "AX-100" }).success).toBe(false);
+    expect(extractionFormSchema.safeParse({ ...bmwInput, axCode: "A_1" }).success).toBe(false);
     expect(extractionFormSchema.safeParse({ ...bmwInput, vehicles: [{ ...bmwInput.vehicles[0], typekey: "11E" }] }).success).toBe(false);
     expect(extractionFormSchema.safeParse({ ...bmwInput, vehicles: [{ ...bmwInput.vehicles[0], developmentCode: "g70" }] }).success).toBe(false);
   });

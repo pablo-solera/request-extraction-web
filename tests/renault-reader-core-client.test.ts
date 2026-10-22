@@ -31,7 +31,7 @@ describe("Renault shared reader-core adapter", () => {
     await expect(cancelRenaultLabour(requestId)).resolves.toMatchObject({ requestId, status: "cancelling" });
     await expect(resumeRenaultLabour(requestId, true)).resolves.toMatchObject({ requestId, status: "queued" });
     await expect(getRenaultLabourState(requestId)).resolves.toMatchObject({ status: "paused", progress: 37, details: { stalled: true } });
-    await expect(createRenaultLabour({ brand: "Dacia", family: "X98", axCode: "AX_123", edition: "05/0", language: "es", format: "TM01", range: "active" })).resolves.toMatchObject({ requestId, status: "queued" });
+    await expect(createRenaultLabour({ brand: "Dacia", family: "X98", axCode: "AX12", edition: "05/0", language: "es", format: "TM01", range: "active" })).resolves.toMatchObject({ requestId, status: "queued" });
     await expect(getRenaultDownloadLocation(requestId)).resolves.toBeInstanceOf(URL);
 
     expect(fetcher.mock.calls.map(([url]) => String(url))).toEqual([
@@ -47,7 +47,7 @@ describe("Renault shared reader-core adapter", () => {
     expect(JSON.parse(String(fetcher.mock.calls[3]?.[1]?.body))).toEqual({ force: true });
     expect(JSON.parse(String(fetcher.mock.calls[5]?.[1]?.body))).toMatchObject({
       manufacturer: "Dacia",
-      axCode: "AX_123",
+      axCode: "AX12",
       edition: "05_0",
       language: "es",
       selection: { family: "X98", format: "TM01", range: "active" },

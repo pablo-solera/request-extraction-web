@@ -10,6 +10,9 @@ function isCalendarDate(value: string) {
 
 const requiredDate = z.string().trim().min(1, "La fecha de finalización es obligatoria.").refine(isCalendarDate, "La fecha debe ser válida y tener formato DD/MM/AAAA.");
 const requiredDevelopmentStart = z.string().trim().min(1, "La fecha de inicio del desarrollo es obligatoria.").refine(isCalendarDate, "La fecha debe ser válida y tener formato DD/MM/AAAA.");
+const axCodeSchema = z.string()
+  .regex(/^[A-Za-z0-9]{3,4}$/, "El código AX debe tener entre 3 y 4 caracteres alfanuméricos.")
+  .transform((value) => value.toUpperCase());
 
 const renaultVehicleSchema = z.object({
   manufacturerGroup: z.literal("Renault", { error: "Solo Renault esta disponible actualmente." }),
@@ -48,16 +51,12 @@ const vehiclesSchema = z.array(z.discriminatedUnion("manufacturerGroup", [renaul
   });
 
 export const extractionFormSchema = z.object({
-  axCode: z.string().trim().min(1, "AX Code es obligatorio.").max(100),
+  axCode: axCodeSchema,
   imcEdition: z.string().trim().regex(/^\d{2}\/\d$/, "La edición debe tener el formato XX/X, por ejemplo 05/0."),
   completion: requiredDate,
   comments: z.string().trim().max(4_000, "Los comentarios son demasiado largos."),
   laboursDevelopmentStart: requiredDevelopmentStart,
   vehicles: vehiclesSchema,
-}).superRefine((input, context) => {
-  if (input.vehicles[0]?.manufacturerGroup === "BMW" && !/^[A-Za-z0-9_]{1,100}$/.test(input.axCode)) {
-    context.addIssue({ code: "custom", message: "AX Code para BMW solo admite letras, números y guion bajo.", path: ["axCode"] });
-  }
 });
 
 export type ExtractionFormInput = z.infer<typeof extractionFormSchema>;

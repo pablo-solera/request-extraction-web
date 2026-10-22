@@ -25,6 +25,9 @@ const BRAND_OPTIONS: Record<ManufacturerGroup, ManufacturerBrand[]> = {
 function isBrandInGroup(group: ManufacturerGroup | "", brand: ManufacturerBrand | ""): boolean {
   return group ? brand === "" || BRAND_OPTIONS[group].some((option) => option === brand) : brand === "";
 }
+function normalizeAxCode(value: string) {
+  return value.replace(/[^A-Za-z0-9]/g, "").toUpperCase().slice(0, 4);
+}
 const initialState: ExtractionFormState = {};
 const emptyValues: FormValues = { axCode: "", imcEdition: "", completion: "", laboursDevelopmentStart: "", comments: "" };
 const datePattern = /^(\d{4})-(\d{2})-(\d{2})$/;
@@ -37,7 +40,7 @@ function isCalendarDate(value: string) {
 }
 
 const commonStepSchema = z.object({
-  axCode: z.string().trim().min(1, "El Código AX es obligatorio.").max(100),
+  axCode: z.string().regex(/^[A-Za-z0-9]{3,4}$/, "El código AX debe tener entre 3 y 4 caracteres alfanuméricos."),
   imcEdition: z.string().trim().regex(/^\d{2}\/\d$/, "La edición debe tener el formato XX/X, por ejemplo 05/0."),
   completion: z.string().trim().min(1, "La fecha de finalización es obligatoria.").refine(isCalendarDate, "Introduce una fecha de finalización válida."),
   laboursDevelopmentStart: z.string().trim().min(1, "La fecha de inicio del desarrollo es obligatoria.").refine(isCalendarDate, "Introduce una fecha de inicio válida."),
@@ -48,7 +51,7 @@ const draftSchema = z.object({
   brand: z.union([z.literal(""), z.enum(["BMW", "MINI", "Renault", "Dacia"])]),
   step: z.number().int().min(0).max(3).optional(),
   values: z.object({
-    axCode: z.string().max(100),
+    axCode: z.string().max(4),
     imcEdition: z.string().max(4),
     completion: z.string().max(10),
     laboursDevelopmentStart: z.string().max(10),
@@ -209,7 +212,9 @@ export function ExtractionStepperForm({
   const [vehicles, setVehicles] = useState<Vehicle[]>(() => initialValues
     ? initialValues.vehicles.map((vehicle, index) => ({ ...vehicle, id: `${formId}-seed-${index}` } as Vehicle))
     : []);
-  const [values, setValues] = useState<FormValues>(initialValues?.values ?? emptyValues);
+  const [values, setValues] = useState<FormValues>(() => initialValues
+    ? { ...initialValues.values, axCode: normalizeAxCode(initialValues.values.axCode) }
+    : emptyValues);
   const [step, setStep] = useState(initialValues ? 3 : 0);
   const [draftReady, setDraftReady] = useState(Boolean(initialValues));
   const [draftSaved, setDraftSaved] = useState(false);
@@ -237,7 +242,7 @@ export function ExtractionStepperForm({
           if (parsed.success && isBrandInGroup(parsed.data.group, parsed.data.brand) && parsed.data.vehicles.every((vehicle) => (parsed.data.group === "" || vehicle.manufacturerGroup === parsed.data.group) && (parsed.data.brand === "" || vehicle.brand === parsed.data.brand))) {
             setGroup(parsed.data.group);
             setBrand(parsed.data.brand);
-            setValues(parsed.data.values);
+            setValues({ ...parsed.data.values, axCode: normalizeAxCode(parsed.data.values.axCode) });
             setVehicles(parsed.data.vehicles.map((vehicle) => ({ ...vehicle })) as Vehicle[]);
             setStep(parsed.data.step ?? 0);
           } else localStorage.removeItem(draftKey);
@@ -398,33 +403,30 @@ export function ExtractionStepperForm({
   const summaryTitle = group === "BMW" ? `Tiempos ${brand}` : `Tiempos ${brand}`;
 
   return <form action={action} className="overflow-hidden rounded-2xl border border-zinc-200 bg-white shadow-sm">
-    <div className="flex flex-col gap-3 border-b border-zinc-200 bg-zinc-50 px-5 py-5 sm:flex-row sm:items-center sm:justify-between sm:px-7">
-      <div><h2 className="text-xl font-semibold text-zinc-950">Nueva solicitud de extracción</h2><p className="mt-1 text-sm text-zinc-600">Completa los pasos y revisa los modelos antes de iniciar.</p></div>
-      <span className="w-fit rounded-full border border-zinc-200 bg-white px-3 py-1 text-xs font-medium text-zinc-700">{vehicles.length} {vehicles.length === 1 ? "extracción" : "extracciones"}</span>
-    </div>
 
     <div className="border-b border-zinc-200 px-5 py-4 sm:px-7">
       <nav aria-label="Progreso de la solicitud">
-        <ol className="grid grid-cols-4 gap-2">
-          {STEP_TITLES.map((title, index) => <li key={title}>
-            <button aria-current={step === index ? "step" : undefined} className={`flex min-h-11 w-full items-center gap-2 rounded-lg px-2 text-left text-xs font-medium transition-colors sm:px-3 sm:text-sm ${step === index ? "bg-sky-50 text-sky-900" : index < step ? "text-zinc-800 hover:bg-zinc-100" : "cursor-not-allowed text-zinc-400"}`} disabled={index > step} onClick={() => goToStep(index)} type="button">
-              <span className={`flex size-7 shrink-0 items-center justify-center rounded-full border text-xs tabular-nums ${step === index ? "border-sky-700 bg-sky-700 text-white" : index < step ? "border-zinc-500 bg-zinc-700 text-white" : "border-zinc-300 bg-white"}`}>{index + 1}</span>
-              <span className="hidden sm:inline">{title}</span>
+        <ol className="flex items-center">
+          {STEP_TITLES.map((title, index) => <li className={`flex min-w-0 items-center ${index < STEP_TITLES.length - 1 ? "flex-1" : ""}`} key={title}>
+            <button aria-current={step === index ? "step" : undefined} className={`flex min-h-11 shrink-0 items-center gap-3 rounded-lg text-xs transition-colors focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-sky-700 sm:text-sm ${step === index ? "font-semibold text-zinc-950" : index < step ? "text-zinc-800 hover:text-sky-800" : "cursor-not-allowed text-zinc-500"}`} disabled={index > step} onClick={() => goToStep(index)} type="button">
+              <span className={`flex size-8 shrink-0 items-center justify-center rounded-full border text-sm font-medium tabular-nums ${step === index ? "border-2 border-sky-700 bg-white text-sky-800" : index < step ? "border-sky-700 bg-sky-700 text-white" : "border-zinc-400 bg-white text-zinc-700"}`}>{index < step ? <svg aria-hidden="true" className="size-4" fill="none" stroke="currentColor" strokeLinecap="round" strokeLinejoin="round" strokeWidth="3" viewBox="0 0 24 24"><path d="M5 12.5l4.5 4.5L19 7.5" /></svg> : index + 1}</span>
+              <span className={step === index ? "inline" : "hidden sm:inline"}>{title}</span>{index < step ? <span className="sr-only"> (completado)</span> : null}
             </button>
+            {index < STEP_TITLES.length - 1 ? <span aria-hidden="true" className={`mx-1 h-px min-w-3 flex-1 sm:mx-3 ${index < step ? "bg-sky-700" : "bg-zinc-300"}`} /> : null}
           </li>)}
         </ol>
       </nav>
-      <p aria-live="polite" className="mt-3 text-xs font-medium text-zinc-600">Paso {step + 1} de 4 · {STEP_TITLES[step]}</p>
+      <p aria-live="polite" className="sr-only">Paso {step + 1} de 4 · {STEP_TITLES[step]}</p>
     </div>
 
     <div className="space-y-6 p-5 sm:p-7">
       {step === 0 ? <section aria-labelledby="step-common" className="space-y-5">
         <StepHeading title="Datos comunes" description="Estos datos se aplicarán a todas las extracciones de esta solicitud." />
         <div className="grid gap-5 md:grid-cols-2">
-          <label><span className="field-label">Código AX</span><input aria-invalid={Boolean(localErrors.axCode || state.fieldErrors?.axCode)} autoComplete="off" className="field-control font-mono" maxLength={100} onChange={(event) => setValues((current) => ({ ...current, axCode: event.target.value }))} placeholder="Ej.: AX_123456" required spellCheck={false} value={values.axCode} /><FieldError>{localErrors.axCode ?? state.fieldErrors?.axCode}</FieldError></label>
+          <label><span className="field-label">Código AX</span><input aria-invalid={Boolean(localErrors.axCode || state.fieldErrors?.axCode)} autoComplete="off" className="field-control font-mono uppercase" maxLength={4} onChange={(event) => setValues((current) => ({ ...current, axCode: normalizeAxCode(event.target.value) }))} placeholder="Ej.: 1XF" required spellCheck={false} value={values.axCode} /><FieldError>{localErrors.axCode ?? state.fieldErrors?.axCode}</FieldError></label>
           <label><span className="field-label">Edición IMC</span><input aria-invalid={Boolean(localErrors.imcEdition || state.fieldErrors?.imcEdition)} autoComplete="off" className="field-control font-mono" inputMode="numeric" maxLength={4} onChange={(event) => setValues((current) => ({ ...current, imcEdition: event.target.value }))} placeholder="Ej.: 05/0" required spellCheck={false} value={values.imcEdition} /><FieldError>{localErrors.imcEdition ?? state.fieldErrors?.imcEdition}</FieldError></label>
-          <label><span className="field-label">Completion</span><input aria-invalid={Boolean(localErrors.completion || state.fieldErrors?.completion)} autoComplete="off" className="field-control" lang="es-ES" onChange={(event) => setValues((current) => ({ ...current, completion: event.target.value }))} required type="date" value={values.completion} /><span className="mt-1 block text-xs text-zinc-500">Fecha de finalización · DD/MM/AAAA</span><FieldError>{localErrors.completion ?? state.fieldErrors?.completion}</FieldError></label>
-          <label><span className="field-label">Inicio del desarrollo</span><input aria-invalid={Boolean(localErrors.laboursDevelopmentStart || state.fieldErrors?.laboursDevelopmentStart)} autoComplete="off" className="field-control" lang="es-ES" onChange={(event) => setValues((current) => ({ ...current, laboursDevelopmentStart: event.target.value }))} required type="date" value={values.laboursDevelopmentStart} /><span className="mt-1 block text-xs text-zinc-500">Dato de la solicitud; no filtra la extracción.</span><FieldError>{localErrors.laboursDevelopmentStart ?? state.fieldErrors?.laboursDevelopmentStart}</FieldError></label>
+          <label><span className="field-label">Completion</span><input aria-invalid={Boolean(localErrors.completion || state.fieldErrors?.completion)} autoComplete="off" className="field-control" lang="es-ES" onChange={(event) => setValues((current) => ({ ...current, completion: event.target.value }))} required type="date" value={values.completion} /><FieldError>{localErrors.completion ?? state.fieldErrors?.completion}</FieldError></label>
+          <label><span className="field-label">Inicio del desarrollo</span><input aria-invalid={Boolean(localErrors.laboursDevelopmentStart || state.fieldErrors?.laboursDevelopmentStart)} autoComplete="off" className="field-control" lang="es-ES" onChange={(event) => setValues((current) => ({ ...current, laboursDevelopmentStart: event.target.value }))} required type="date" value={values.laboursDevelopmentStart} /><FieldError>{localErrors.laboursDevelopmentStart ?? state.fieldErrors?.laboursDevelopmentStart}</FieldError></label>
         </div>
       </section> : null}
 
@@ -460,20 +462,24 @@ export function ExtractionStepperForm({
 
       {step === 3 ? <section aria-labelledby="step-summary" className="space-y-5">
         <StepHeading title="Revisa e inicia" description="Confirma los datos comunes y los modelos antes de crear las extracciones." />
-        <dl className="grid gap-3 rounded-xl border border-zinc-200 bg-zinc-50 p-4 text-sm sm:grid-cols-2">
-          <div><dt className="text-xs font-medium uppercase tracking-wide text-zinc-500">Código AX</dt><dd className="mt-1 font-mono font-semibold text-zinc-900">{values.axCode}</dd></div>
-          <div><dt className="text-xs font-medium uppercase tracking-wide text-zinc-500">Edición IMC</dt><dd className="mt-1 text-zinc-900">{values.imcEdition}</dd></div>
-            <div><dt className="text-xs font-medium uppercase tracking-wide text-zinc-500">Completion</dt><dd className="mt-1 text-zinc-900">{formatSpanishDate(values.completion)}</dd></div>
-            <div><dt className="text-xs font-medium uppercase tracking-wide text-zinc-500">Inicio del desarrollo</dt><dd className="mt-1 text-zinc-900">{formatSpanishDate(values.laboursDevelopmentStart)}</dd></div>
-          <div className="sm:col-span-2"><dt className="text-xs font-medium uppercase tracking-wide text-zinc-500">Fabricante</dt><dd className="mt-1 font-medium text-zinc-900">{brand}</dd></div>
-        </dl>
-        <div className="rounded-xl border border-zinc-200 bg-white p-4">
-          <div className="flex flex-wrap items-baseline justify-between gap-2"><h3 className="font-semibold text-zinc-950">Modelos seleccionados</h3><span className="text-sm tabular-nums text-zinc-600">{vehicles.length} {vehicles.length === 1 ? "extracción" : "extracciones"}</span></div>
-          <ul className="mt-3 divide-y divide-zinc-200">{vehicles.map((vehicle) => {
+        <div className="overflow-hidden rounded-xl border border-zinc-200 bg-white">
+          <div className="flex flex-wrap items-center justify-between gap-3 border-b border-zinc-200 bg-zinc-50 px-5 py-4">
+            <div><p className="text-xs font-medium text-zinc-500">Código AX</p><p className="mt-0.5 font-mono text-2xl font-semibold tracking-wide text-zinc-950">{values.axCode}</p></div>
+            <span className="rounded-full border border-sky-200 bg-sky-50 px-3 py-1 text-sm font-semibold text-sky-900">{brand}</span>
+          </div>
+          <dl className="grid divide-y divide-zinc-200 text-sm sm:grid-cols-3 sm:divide-x sm:divide-y-0">
+            <div className="px-5 py-4"><dt className="text-xs font-medium text-zinc-500">Edición IMC</dt><dd className="mt-1 font-medium text-zinc-900">{values.imcEdition}</dd></div>
+            <div className="px-5 py-4"><dt className="text-xs font-medium text-zinc-500">Completion</dt><dd className="mt-1 font-medium text-zinc-900">{formatSpanishDate(values.completion)}</dd></div>
+            <div className="px-5 py-4"><dt className="text-xs font-medium text-zinc-500">Inicio del desarrollo</dt><dd className="mt-1 font-medium text-zinc-900">{formatSpanishDate(values.laboursDevelopmentStart)}</dd></div>
+          </dl>
+        </div>
+        <div className="overflow-hidden rounded-xl border border-zinc-200 bg-white">
+          <div className="flex flex-wrap items-baseline justify-between gap-2 border-b border-zinc-200 px-5 py-4"><h3 className="font-semibold text-zinc-950">Modelos seleccionados</h3><span className="rounded-full bg-zinc-100 px-2.5 py-0.5 text-xs font-medium tabular-nums text-zinc-700">{vehicles.length} {vehicles.length === 1 ? "extracción" : "extracciones"}</span></div>
+          <ul className="divide-y divide-zinc-100">{vehicles.map((vehicle, index) => {
             const target = availabilityTargets.get(vehicle.id);
-            return <li className="py-3 text-sm" key={vehicle.id}>
-              <div className="flex flex-wrap items-center justify-between gap-2"><span className="font-medium text-zinc-900">{vehicle.modelDescription || "Modelo seleccionado"}</span><span className="font-mono text-xs text-zinc-600">{vehicle.manufacturerGroup === "BMW" ? `${vehicle.series} · ${vehicle.developmentCode} · ${vehicle.typekey}` : vehicle.modelCode}</span></div>
-              {target ? <BmwAvailabilityNotice entry={availability.entryFor(target)} onRetry={() => availability.retry(target)} onUseBaseType={(baseTypekey) => replaceWithBaseType(vehicle.id, baseTypekey)} typekey={target.typekey} /> : null}
+            return <li className="px-5 py-3 text-sm" key={vehicle.id}>
+              <div className="flex items-center gap-3"><span aria-hidden="true" className="flex size-6 shrink-0 items-center justify-center rounded-full bg-zinc-100 text-xs font-medium tabular-nums text-zinc-600">{index + 1}</span><span className="min-w-0 flex-1 font-medium text-zinc-900">{vehicle.modelDescription || "Modelo seleccionado"}</span><span className="shrink-0 rounded-md border border-zinc-200 bg-zinc-50 px-2 py-1 font-mono text-xs text-zinc-700">{vehicle.manufacturerGroup === "BMW" ? `${vehicle.series} · ${vehicle.developmentCode} · ${vehicle.typekey}` : vehicle.modelCode}</span></div>
+              {target ? <div className="mt-2 pl-9"><BmwAvailabilityNotice entry={availability.entryFor(target)} onRetry={() => availability.retry(target)} onUseBaseType={(baseTypekey) => replaceWithBaseType(vehicle.id, baseTypekey)} typekey={target.typekey} /></div> : null}
             </li>;
           })}</ul>
         </div>
@@ -489,7 +495,7 @@ export function ExtractionStepperForm({
       <input name="laboursDevelopmentStart" type="hidden" value={values.laboursDevelopmentStart} />
       <input name="comments" type="hidden" value={values.comments} />
       <input name="vehicles" type="hidden" value={JSON.stringify(vehicles)} />
-      <div className="flex flex-col-reverse gap-3 border-t border-zinc-200 pt-5 sm:flex-row sm:items-center sm:justify-between">
+      <div className="flex flex-col-reverse gap-3 sm:flex-row sm:items-center sm:justify-between">
         <div className="flex items-center gap-2"><button className="min-h-11 rounded-lg px-3 py-2 text-sm font-semibold text-zinc-700 hover:bg-zinc-100 disabled:invisible" disabled={step === 0} onClick={() => { setStep((current) => Math.max(0, current - 1)); clearValidation(); }} type="button">Atrás</button><span className="text-xs text-zinc-500">{draftReady ? draftSaved ? "Borrador guardado" : "Guardando borrador…" : "Cargando borrador…"}</span></div>
         {step < 3 ? <button className="inline-flex min-h-11 items-center justify-center rounded-lg bg-zinc-950 px-5 py-2 text-sm font-semibold text-white hover:bg-zinc-800 focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-sky-700" onClick={nextStep} type="button">Continuar</button> : <SubmitButton className="sm:min-w-52" disabled={unavailableTypekeys.length > 0} pendingLabel="Iniciando…">Iniciar extracción</SubmitButton>}
       </div>
