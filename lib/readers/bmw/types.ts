@@ -21,10 +21,25 @@ export const bmwLabourStateSchema = z.object({
   error: z.object({ message: z.string() }).nullable().optional(),
 });
 
+const availabilityStatusSchema = z.enum(["available", "unavailable", "unknown"]);
+export const bmwTypekeyAvailabilitySchema = z.object({
+  typekey: z.string().regex(/^[A-Z0-9]{4}$/),
+  status: availabilityStatusSchema,
+  code: z.string().optional(),
+  suggestedTypekey: z.string().regex(/^[A-Z0-9]{4}$/).nullable(),
+  baseType: z.object({
+    typekey: z.string().regex(/^[A-Z0-9]{4}$/),
+    status: availabilityStatusSchema,
+    reliable: z.boolean(),
+    differences: z.array(z.object({ attribute: z.string(), requested: z.string().nullable(), baseType: z.string().nullable() })),
+  }).optional(),
+});
+
 export const bmwLabourActionResponseSchema = z.object({ requestId: z.uuid(), status: z.string() });
 
 export type BmwBrand = z.infer<typeof bmwBrandSchema>;
 export type BmwLabourState = z.infer<typeof bmwLabourStateSchema>;
+export type BmwTypekeyAvailability = z.infer<typeof bmwTypekeyAvailabilitySchema>;
 export type BmwSeriesOption = { value: string; label: string };
 export type BmwDevelopmentCodeOption = { value: string; label: string };
 export type BmwTypekeyOption = { value: string; label: string; baseType?: string; validFrom?: string; validUntil?: string };

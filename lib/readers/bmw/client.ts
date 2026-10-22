@@ -2,11 +2,13 @@ import "server-only";
 
 import { z } from "zod";
 import { ReaderError } from "@/lib/readers/errors";
-import { bmwBrandSchema, bmwCreateResponseSchema, bmwLabourActionResponseSchema, bmwLabourStateSchema, parseBmwDevelopmentCodes, parseBmwSeriesOptions, parseBmwTypekeys, type BmwBrand, type BmwDevelopmentCodeOption, type BmwLabourState, type BmwSeriesOption, type BmwTypekeyOption } from "@/lib/readers/bmw/types";
+import { bmwBrandSchema, bmwCreateResponseSchema, bmwLabourActionResponseSchema, bmwLabourStateSchema, bmwTypekeyAvailabilitySchema, parseBmwDevelopmentCodes, parseBmwSeriesOptions, parseBmwTypekeys, type BmwBrand, type BmwDevelopmentCodeOption, type BmwLabourState, type BmwSeriesOption, type BmwTypekeyAvailability, type BmwTypekeyOption } from "@/lib/readers/bmw/types";
 
 const REQUEST_TIMEOUT_MS = 12_000;
 const MAX_OPTIONS_RESPONSE_BYTES = 512 * 1024;
 const SERIES_CACHE_TTL_MS = 60 * 60 * 1000;
+const AVAILABILITY_TIMEOUT_MS = 45_000;
+const AVAILABILITY_CACHE_TTL_MS = 10 * 60 * 1000;
 
 function requiredBaseUrl() {
   const raw = process.env.BMW_READER_BASE_URL?.trim();
@@ -94,6 +96,7 @@ export type BmwReaderClient = {
   getSeries(brand: BmwBrand): Promise<BmwSeriesOption[]>;
   getDevelopmentCodes(brand: BmwBrand, series: string): Promise<BmwDevelopmentCodeOption[]>;
   getTypekeys(brand: BmwBrand, series: string, developmentCode: string): Promise<BmwTypekeyOption[]>;
+  getTypekeyAvailability(brand: BmwBrand, series: string, developmentCode: string, typekey: string): Promise<BmwTypekeyAvailability>;
   createLabour(params: BmwLabourParams): Promise<{ requestId: string; status?: string }>;
   getLabourState(requestId: string): Promise<BmwLabourState>;
   cancelLabour(requestId: string): Promise<{ requestId: string; status: "cancelled" | "cancelling" }>;
@@ -134,7 +137,7 @@ export function createBmwReaderClient(options: { fetcher?: typeof fetch; now?: (
     });
   }
 
-  async function read(path: string, init?: RequestInit, maxBytes = MAX_OPTIONS_RESPONSE_BYTES) {
+  async function read(path: string, init?: RequestInit, maxBytes = MAX_OPTIONS_RESPONSE_BYTES, timeoutMs = REQUEST_TIMEOUT_MS) {
     const url = endpoint(path);
     let response: Response;
     try {
@@ -143,7 +146,7 @@ export function createBmwReaderClient(options: { fetcher?: typeof fetch; now?: (
         cache: "no-store",
         redirect: "manual",
         headers: { Accept: "application/json", "Content-Type": "application/json", ...init?.headers },
-        signal: AbortSignal.timeout(REQUEST_TIMEOUT_MS),
+        signal: AbortSignal.timeout(timeoutMs),
       });
     } catch {
       throw new ReaderError("El servicio de BMW no está disponible.", "READER_UNAVAILABLE", true);
@@ -215,10 +218,38 @@ export function createBmwReaderClient(options: { fetcher?: typeof fetch; now?: (
     });
   }
 
+  const availabilityCache = new Map<string, { expiresAt: number; value: BmwTypekeyAvailability }>();
+  const availabilityInflight = new Map<string, Promise<BmwTypekeyAvailability>>();
+
+  async function getTypekeyAvailability(rawBrand: BmwBrand, rawSeries: string, rawDevelopmentCode: string, rawTypekey: string) {
+    const brand = bmwBrandSchema.parse(rawBrand);
+    const series = z.string().trim().min(1).max(100).parse(rawSeries);
+    const developmentCode = z.string().regex(/^[A-Z0-9]+$/).parse(rawDevelopmentCode);
+    const typekey = z.string().regex(/^[A-Z0-9]{4}$/).parse(rawTypekey);
+    const query = new URLSearchParams({ brand, typekey, series, developmentCode, language: process.env.BMW_READER_LANGUAGE?.trim() || "en-GB" });
+    const key = query.toString();
+    const cached = availabilityCache.get(key);
+    if (cached && cached.expiresAt > now()) return cached.value;
+    const active = availabilityInflight.get(key);
+    if (active) return active;
+    const pending = (async () => {
+      const raw = await read(`/v1/models/availability?${key}`, undefined, 64 * 1024, AVAILABILITY_TIMEOUT_MS);
+      let value: BmwTypekeyAvailability;
+      try { value = bmwTypekeyAvailabilitySchema.parse(raw); }
+      catch { throw new ReaderError("BMW ha devuelto una disponibilidad no válida.", "INVALID_READER_RESPONSE", false); }
+      if (value.status !== "unknown") availabilityCache.set(key, { expiresAt: now() + AVAILABILITY_CACHE_TTL_MS, value });
+      return value;
+    })();
+    availabilityInflight.set(key, pending);
+    try { return await pending; }
+    finally { if (availabilityInflight.get(key) === pending) availabilityInflight.delete(key); }
+  }
+
   return {
     getSeries,
     getDevelopmentCodes,
     getTypekeys,
+    getTypekeyAvailability,
     async createLabour(params) {
       const parsed = z.object({
         brand: bmwBrandSchema,
@@ -316,6 +347,10 @@ export function getBmwDevelopmentCodes(brand: BmwBrand, series: string) {
 
 export function getBmwTypekeys(brand: BmwBrand, series: string, developmentCode: string) {
   return bmwReaderClient.getTypekeys(brand, series, developmentCode);
+}
+
+export function getBmwTypekeyAvailability(brand: BmwBrand, series: string, developmentCode: string, typekey: string) {
+  return bmwReaderClient.getTypekeyAvailability(brand, series, developmentCode, typekey);
 }
 
 export function createBmwLabour(params: BmwLabourParams) {

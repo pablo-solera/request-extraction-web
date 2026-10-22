@@ -76,6 +76,37 @@ describe("BMW reader client", () => {
     expect(url.searchParams.get("developmentCode")).toBe("G70");
   });
 
+  it("checks typekey availability once per typekey and keeps unknown answers uncached", async () => {
+    process.env.BMW_READER_BASE_URL = "http://localhost:3004";
+    process.env.BMW_READER_LANGUAGE = "en-GB";
+    const unavailable = { typekey: "6J02", status: "unavailable", code: "CGWATB0085", suggestedTypekey: null, baseType: { typekey: "6J92", status: "available", reliable: false, differences: [{ attribute: "transmission", requested: "AUT", baseType: "MECH" }] } };
+    const fetcher = vi.fn()
+      .mockResolvedValueOnce(Response.json(unavailable))
+      .mockResolvedValueOnce(Response.json({ typekey: "6J92", status: "unknown", suggestedTypekey: null }))
+      .mockResolvedValueOnce(Response.json({ typekey: "6J92", status: "available", suggestedTypekey: null }));
+    const client = createBmwReaderClient({ fetcher, now: () => 1_000 });
+
+    await expect(client.getTypekeyAvailability("BMW", "6'", "F13", "6J02")).resolves.toEqual(unavailable);
+    await expect(client.getTypekeyAvailability("BMW", "6'", "F13", "6J02")).resolves.toEqual(unavailable);
+    expect(fetcher).toHaveBeenCalledTimes(1);
+    const url = fetcher.mock.calls[0]![0] as URL;
+    expect(url.pathname).toBe("/v1/models/availability");
+    expect(Object.fromEntries(url.searchParams)).toEqual({ brand: "BMW", typekey: "6J02", series: "6'", developmentCode: "F13", language: "en-GB" });
+
+    await expect(client.getTypekeyAvailability("BMW", "6'", "F13", "6J92")).resolves.toMatchObject({ status: "unknown" });
+    await expect(client.getTypekeyAvailability("BMW", "6'", "F13", "6J92")).resolves.toMatchObject({ status: "available" });
+    expect(fetcher).toHaveBeenCalledTimes(3);
+  });
+
+  it("rejects malformed availability answers and typekeys before calling the reader", async () => {
+    process.env.BMW_READER_BASE_URL = "http://localhost:3004";
+    const fetcher = vi.fn().mockResolvedValue(Response.json({ typekey: "6J02", status: "maybe", suggestedTypekey: null }));
+    const client = createBmwReaderClient({ fetcher });
+    await expect(client.getTypekeyAvailability("BMW", "6'", "F13", "6J02")).rejects.toMatchObject({ code: "INVALID_READER_RESPONSE" });
+    await expect(client.getTypekeyAvailability("BMW", "6'", "F13", "../..")).rejects.toThrow();
+    expect(fetcher).toHaveBeenCalledTimes(1);
+  });
+
   it("submits one typekey and converts the common edition format for BMW", async () => {
     process.env.BMW_READER_BASE_URL = "http://localhost:3004";
     process.env.BMW_READER_LANGUAGE = "es-ES";
