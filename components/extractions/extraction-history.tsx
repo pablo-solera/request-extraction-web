@@ -4,7 +4,8 @@ import Link from "next/link";
 import { startTransition, useEffect, useRef, useState } from "react";
 import { useRouter } from "next/navigation";
 import type { ExtractionListItem, ExtractionReaderDetail } from "@/lib/extractions/types";
-import { formatSpanishDateTime } from "@/lib/date-format";
+import { formatSpanishDate, formatSpanishDateTime } from "@/lib/date-format";
+import { retryableItems, summarizeRequest, type RequestAggregateStatus } from "@/lib/extractions/request-summary";
 import { extractionAction, extractionDetail } from "@/app/(dashboard)/history/actions";
 
 const statusStyles = {
@@ -15,6 +16,15 @@ const statusStyles = {
   cancelled: "border-zinc-300 bg-zinc-100 text-zinc-700",
 };
 const statusLabels = { pending: "Pendiente", running: "En proceso", completed: "Completada", failed: "Fallida", cancelled: "Cancelada" };
+const aggregateStyles: Record<RequestAggregateStatus, string> = {
+  pending_approval: statusStyles.pending,
+  rejected: statusStyles.failed,
+  running: statusStyles.running,
+  completed: statusStyles.completed,
+  completed_with_issues: statusStyles.pending,
+  failed: statusStyles.failed,
+  cancelled: statusStyles.cancelled,
+};
 const requestStatusLabels = { pending: "Pendiente de aprobación", approved: "Aprobada", rejected: "Rechazada" };
 
 function readerStatusNotice(item: ExtractionListItem) {
@@ -108,6 +118,40 @@ function ExtractionActions({ item, detailsExpanded, onToggleDetails, onUpdated }
   </div>;
 }
 
+function RequestActions({ items, expanded, onToggle, onUpdated }: { items: ExtractionListItem[]; expanded: boolean; onToggle(): void; onUpdated(itemId: string, update: Partial<ExtractionListItem>): void }) {
+  const [busy, setBusy] = useState(false);
+  const [feedback, setFeedback] = useState("");
+  const cancellable = items.filter((item) => item.canCancel);
+  const resumable = retryableItems(items).filter((item) => item.status === "failed" && item.canResume);
+  const axCode = items[0]?.axCode ?? "";
+
+  async function runAll(action: "cancel" | "resume", targets: ExtractionListItem[]) {
+    if (action === "cancel" && !window.confirm(`¿Cancelar las ${targets.length} extracciones activas de la solicitud ${axCode}?`)) return;
+    setBusy(true);
+    setFeedback("");
+    let succeeded = 0;
+    for (const item of targets) {
+      const result = await extractionAction({ id: item.id, action });
+      if (!result.ok) continue;
+      succeeded++;
+      const status = result.status === "cancelled" ? "cancelled" : action === "resume" ? "running" : item.status;
+      onUpdated(item.id, { status, readerStatus: result.readerStatus, readerStalled: false, errorMessage: null, ...(action === "cancel" ? { canCancel: false } : { canResume: false, canForceResume: false }), updatedAt: new Date().toISOString() });
+    }
+    setBusy(false);
+    const verb = action === "cancel" ? "canceladas" : "reanudadas";
+    setFeedback(succeeded === targets.length ? `${succeeded} extracciones ${verb}.` : `${succeeded} de ${targets.length} extracciones ${verb}; revisa las demás.`);
+  }
+
+  const buttonClass = "inline-flex min-h-11 items-center rounded-lg border px-3 text-sm font-medium focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-sky-700 disabled:opacity-50";
+  return <div className="flex flex-wrap items-center gap-2">
+    <button aria-expanded={expanded} className={`${buttonClass} border-zinc-300 bg-white text-zinc-800 hover:bg-zinc-50`} onClick={onToggle} type="button">{expanded ? "Ocultar detalle" : `Mostrar detalle (${items.length})`}</button>
+    {cancellable.length ? <button className={`${buttonClass} border-red-200 bg-white text-red-700 hover:bg-red-50`} disabled={busy} onClick={() => void runAll("cancel", cancellable)} type="button">Cancelar solicitud</button> : null}
+    {resumable.length ? <button className={`${buttonClass} border-zinc-300 bg-white text-zinc-800 hover:bg-zinc-50`} disabled={busy} onClick={() => void runAll("resume", resumable)} type="button">Reanudar fallidos</button> : null}
+    {busy ? <span className="text-xs text-zinc-600" role="status">Procesando…</span> : null}
+    {feedback ? <span className="text-xs text-zinc-600" role="status">{feedback}</span> : null}
+  </div>;
+}
+
 function visibleStatus(item: ExtractionListItem) {
   if (item.status === "cancelled") return { label: statusLabels.cancelled, style: statusStyles.cancelled };
   if (item.requestStatus === "rejected") return { label: "Rechazada", style: statusStyles.failed };
@@ -120,6 +164,7 @@ export function ExtractionHistory({ createdId, draftKey = "extraction-draft-v1",
   const [items, setItems] = useState(initialItems);
   const [previousInitialItems, setPreviousInitialItems] = useState(initialItems);
   const [refreshError, setRefreshError] = useState(false);
+  const [toggledGroups, setToggledGroups] = useState<Record<string, boolean>>({});
   const [openDetailId, setOpenDetailId] = useState<string | null>(null);
   const [readerDetails, setReaderDetails] = useState<Record<string, { loading?: boolean; detail?: ExtractionReaderDetail; error?: string }>>({});
   if (initialItems !== previousInitialItems) {
@@ -206,6 +251,12 @@ export function ExtractionHistory({ createdId, draftKey = "extraction-draft-v1",
     return <div className="rounded-2xl border border-dashed border-zinc-300 bg-white px-6 py-16 text-center"><p className="text-sm font-medium text-zinc-900">Todavía no hay extracciones</p><p className="mt-2 text-sm text-zinc-500">Crea una solicitud para verla aquí.</p><Link className="mt-4 inline-flex min-h-11 items-center rounded-lg bg-zinc-950 px-4 py-2 text-sm font-semibold text-white hover:bg-zinc-800" href="/extractions">Nueva extracción</Link></div>;
   }
 
+  const groups: Array<{ id: string; items: ExtractionListItem[] }> = [];
+  for (const item of items) {
+    const group = groups.find((entry) => entry.id === item.requestGroupId);
+    if (group) group.items.push(item);
+    else groups.push({ id: item.requestGroupId, items: [item] });
+  }
   const createdItems = createdId ? items.filter((item) => item.requestGroupId === createdId) : [];
   const hasPendingApproval = createdItems.some((item) => item.requestStatus === "pending");
 
@@ -214,15 +265,36 @@ export function ExtractionHistory({ createdId, draftKey = "extraction-draft-v1",
       {createdId ? <p className="rounded-xl border border-emerald-200 bg-emerald-50 px-4 py-3 text-sm text-emerald-800" role="status">{hasPendingApproval ? "Solicitud enviada y pendiente de aprobación." : "Solicitud enviada correctamente."}</p> : null}
       {refreshError ? <p className="rounded-xl border border-amber-200 bg-amber-50 px-4 py-3 text-sm text-amber-900" role="status">No se pudo actualizar el estado. Se volverá a intentar automáticamente.</p> : null}
       <p className="sr-only" aria-live="polite">{items.filter((item) => item.status === "completed" || item.status === "failed" || item.requestStatus === "approved" || item.requestStatus === "rejected").map((item) => `${item.axCode}: ${visibleStatus(item).label}`).join(". ")}</p>
-      <div className="overflow-hidden rounded-2xl border border-zinc-200 bg-white shadow-sm">
-         <div className="hidden grid-cols-[1fr_1.4fr_0.8fr_0.8fr] gap-4 border-b border-zinc-200 bg-zinc-50 px-6 py-3 text-xs font-semibold uppercase tracking-wider text-zinc-600 md:grid"><span>Solicitud</span><span>Vehículo</span><span>Estado</span><span className="text-right">Opciones</span></div>
-        <div className="divide-y divide-zinc-200">
-          {items.map((item) => {
+      <div className="space-y-4">
+        {groups.map((group) => {
+          const first = group.items[0]!;
+          const noun = first.manufacturerGroup === "Renault" ? "familia" : "typekey";
+          const summary = summarizeRequest(first.requestStatus, group.items, noun);
+          const expanded = toggledGroups[group.id] ?? summary.status !== "completed";
+          return <section aria-label={`Solicitud ${first.axCode}`} className={`overflow-hidden rounded-2xl border bg-white shadow-sm ${group.id === createdId ? "border-emerald-300" : "border-zinc-200"}`} key={group.id}>
+            <div className="grid min-w-0 gap-4 px-5 py-5 md:grid-cols-[1.4fr_1fr] md:px-6">
+              <div className="min-w-0">
+                <h2 className="break-words font-mono text-sm font-semibold text-zinc-950" translate="no">{first.axCode}</h2>
+                <p className="mt-1 text-xs text-zinc-600">Edición IMC <span translate="no">{first.imcEdition}</span> · Finalización {formatSpanishDate(first.completion)}{first.developmentStart ? ` · Inicio de desarrollo ${formatSpanishDate(first.developmentStart)}` : ""}</p>
+                <p className="mt-1 text-xs text-zinc-600"><span translate="no">{first.manufacturerGroup} / {first.brand}</span> · {group.items.length} {group.items.length === 1 ? noun : `${noun}s`}</p>
+                <time className="mt-1 block text-xs text-zinc-600" dateTime={first.createdAt}>{formatSpanishDateTime(first.createdAt)}</time>
+                {first.requesterName ? <p className="mt-1 truncate text-xs text-zinc-500">Solicitante: {first.requesterName}</p> : null}
+              </div>
+              <div className="min-w-0">
+                <span className={`inline-flex rounded-full border px-2.5 py-1 text-xs font-semibold ${aggregateStyles[summary.status]}`}>{summary.label}</span>
+                {summary.status !== "pending_approval" && summary.status !== "rejected" ? <>
+                  <p className="mt-2 text-xs text-zinc-700">{summary.description}</p>
+                  <div className="mt-2 max-w-64"><div className="mb-1 flex justify-between text-xs text-zinc-600"><span>Progreso</span><span>{summary.progress}%</span></div><div aria-label={`Progreso de la solicitud ${first.axCode}`} aria-valuemax={100} aria-valuemin={0} aria-valuenow={summary.progress} className="h-2 overflow-hidden rounded-full bg-zinc-200" role="progressbar"><div className="h-full rounded-full bg-sky-600 transition-[width] duration-500" style={{ width: `${summary.progress}%` }} /></div></div>
+                </> : null}
+              </div>
+            </div>
+            <div className="border-t border-zinc-100 px-5 py-3 md:px-6"><RequestActions expanded={expanded} items={group.items} onToggle={() => setToggledGroups((current) => ({ ...current, [group.id]: !expanded }))} onUpdated={updateItem} /></div>
+            {expanded ? <div className="divide-y divide-zinc-200 border-t border-zinc-200 bg-zinc-50/50">
+              {group.items.map((item) => {
             const status = visibleStatus(item);
             const detailState = readerDetails[item.id];
-            return <article className={`min-w-0 px-5 py-5 md:px-6 ${item.requestGroupId === createdId ? "bg-emerald-50/30" : ""}`} key={item.id}>
-              <div className="grid min-w-0 gap-5 md:grid-cols-[1fr_1.4fr_0.8fr_0.8fr] md:items-center">
-              <div className="min-w-0"><h2 className="break-words font-mono text-sm font-semibold text-zinc-950" translate="no">{item.axCode}</h2><time className="mt-1 block text-xs text-zinc-600" dateTime={item.createdAt}>{formatSpanishDateTime(item.createdAt)}</time>{item.requesterName ? <p className="mt-1 truncate text-xs text-zinc-500">Solicitante: {item.requesterName}</p> : null}</div>
+            return <article className={`min-w-0 px-5 py-4 md:px-6`} key={item.id}>
+              <div className="grid min-w-0 gap-5 md:grid-cols-[1.6fr_1fr_auto] md:items-center">
               <div className="min-w-0"><p className="break-words text-sm font-medium text-zinc-900">{item.modelDescription}</p><p className="mt-1 break-words text-xs text-zinc-600"><span translate="no">{item.manufacturerGroup} / {item.brand} · {item.modelCode}</span> · {item.domain}</p></div>
               <div className="min-w-0"><span className={`inline-flex rounded-full border px-2.5 py-1 text-xs font-semibold ${status.style}`}>{status.label}</span>{readerStatusNotice(item) ? <p className="mt-2 text-xs font-medium text-amber-800">{readerStatusNotice(item)}</p> : null}{item.progress !== null && item.progress !== undefined && (item.status === "pending" || item.status === "running") ? <div className="mt-3 max-w-56"><div className="mb-1 flex justify-between text-xs text-zinc-600"><span>Progreso</span><span>{item.progress}%</span></div><div aria-label={`Progreso de ${item.axCode}`} aria-valuemax={100} aria-valuemin={0} aria-valuenow={item.progress} className="h-2 overflow-hidden rounded-full bg-zinc-200" role="progressbar"><div className="h-full rounded-full bg-sky-600 transition-[width] duration-500" style={{ width: `${item.progress}%` }} /></div></div> : null}{item.errorMessage ? <p className="mt-2 break-words text-xs text-red-700">{item.errorMessage}</p> : null}</div>
                 <ExtractionActions item={item} detailsExpanded={openDetailId === item.id} onToggleDetails={(id) => void toggleReaderDetails(id)} onUpdated={updateItem} />
@@ -236,8 +308,10 @@ export function ExtractionHistory({ createdId, draftKey = "extraction-draft-v1",
                 </> : null}
               </section> : null}
             </article>;
-          })}
-        </div>
+              })}
+            </div> : null}
+          </section>;
+        })}
       </div>
     </div>
   );

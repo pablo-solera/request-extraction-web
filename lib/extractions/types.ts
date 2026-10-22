@@ -4,6 +4,9 @@ export type ExtractionListItem = {
   id: string;
   requestGroupId: string;
   axCode: string;
+  imcEdition: string;
+  completion: string;
+  developmentStart: string | null;
   manufacturerGroup: string;
   brand: string;
   modelDescription: string;

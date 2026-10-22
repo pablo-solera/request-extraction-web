@@ -1,5 +1,5 @@
 import { cleanup, render, screen } from "@testing-library/react";
-import { afterEach, describe, expect, it, vi } from "vitest";
+import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 import type { ExtractionListItem } from "@/lib/extractions/types";
 
 const replace = vi.fn();
@@ -16,6 +16,9 @@ function item(overrides: Partial<ExtractionListItem> = {}): ExtractionListItem {
     id: crypto.randomUUID(),
     requestGroupId: crypto.randomUUID(),
     axCode: "AX-100",
+    imcEdition: "05/0",
+    completion: "2026-10-30",
+    developmentStart: "2026-01-15",
     manufacturerGroup: "BMW",
     brand: "BMW",
     modelDescription: "X5 · G05",
@@ -46,7 +49,8 @@ describe("BMW extraction progress in history", () => {
     render(<ExtractionHistory initialItems={[item()]} />);
 
     expect(screen.getByText("En pausa por límite de BMW")).toBeInTheDocument();
-    expect(screen.getByText("45%")).toBeInTheDocument();
+    expect(screen.getAllByText("45%")).toHaveLength(2);
+    expect(screen.getByRole("progressbar", { name: "Progreso de la solicitud AX-100" })).toHaveAttribute("aria-valuenow", "45");
     expect(screen.getByRole("progressbar", { name: "Progreso de AX-100" })).toHaveAttribute("aria-valuenow", "45");
   });
 
@@ -77,7 +81,7 @@ describe("BMW extraction progress in history", () => {
 
     expect(extractionAction).toHaveBeenCalledWith({ id: expect.any(String), action: "cancel", force: false });
     expect(await screen.findByText("Extracción cancelada.")).toBeInTheDocument();
-    expect(screen.getByText("Cancelada")).toBeInTheDocument();
+    expect(screen.getAllByText("Cancelada")).toHaveLength(2);
   });
 
   it("loads authorized per-typekey reader details and offers repeat for terminal rows", async () => {
@@ -92,5 +96,60 @@ describe("BMW extraction progress in history", () => {
     expect(extractionDetail).toHaveBeenCalledWith(expect.any(String));
     expect(await screen.findByRole("region", { name: "Detalle de la extracción AX-100" })).toBeInTheDocument();
     expect(screen.getByText("2785 / 2785")).toBeInTheDocument();
+  });
+});
+
+describe("grouped request history", () => {
+  const group = crypto.randomUUID();
+  const rows = () => [
+    item({ id: "a", requestGroupId: group, modelCode: "11EH", status: "completed", progress: 100, readerStatus: "completed" }),
+    item({ id: "b", requestGroupId: group, modelCode: "12EH", status: "failed", progress: 20, canResume: true }),
+    item({ id: "c", requestGroupId: group, modelCode: "13EH", status: "completed", progress: 100, readerStatus: "completed" }),
+  ];
+
+  beforeEach(() => { extractionAction.mockReset(); });
+
+  it("shows one card per request with the shared data and an aggregate summary", () => {
+    vi.stubGlobal("fetch", vi.fn().mockResolvedValue(Response.json([])));
+    render(<ExtractionHistory initialItems={rows()} />);
+
+    expect(screen.getAllByRole("heading", { level: 2 })).toHaveLength(1);
+    expect(screen.getByText("Completada con incidencias")).toBeInTheDocument();
+    expect(screen.getByText("2 de 3 typekeys completados · 1 fallido")).toBeInTheDocument();
+    expect(screen.getByText(/Edición IMC/)).toHaveTextContent("05/0");
+  });
+
+  it("resumes every failed item of the request and updates the summary", async () => {
+    const user = (await import("@testing-library/user-event")).default.setup();
+    vi.stubGlobal("fetch", vi.fn().mockResolvedValue(Response.json([])));
+    extractionAction.mockResolvedValueOnce({ ok: true, status: "running", readerStatus: "queued" });
+    render(<ExtractionHistory initialItems={rows()} />);
+
+    await user.click(screen.getByRole("button", { name: "Reanudar fallidos" }));
+
+    expect(extractionAction).toHaveBeenCalledTimes(1);
+    expect(extractionAction).toHaveBeenCalledWith({ id: "b", action: "resume" });
+    expect(await screen.findByText("1 extracciones reanudadas.")).toBeInTheDocument();
+    expect(screen.getAllByText("En proceso")).toHaveLength(2);
+    expect(screen.queryByText("Completada con incidencias")).not.toBeInTheDocument();
+  });
+
+  it("cancels only the active items of the request after confirmation", async () => {
+    const user = (await import("@testing-library/user-event")).default.setup();
+    vi.stubGlobal("fetch", vi.fn().mockResolvedValue(Response.json([])));
+    vi.stubGlobal("confirm", vi.fn(() => true));
+    extractionAction.mockResolvedValue({ ok: true, status: "cancelled", readerStatus: "cancelled" });
+    render(<ExtractionHistory initialItems={[
+      item({ id: "x", requestGroupId: group, status: "running", canCancel: true }),
+      item({ id: "y", requestGroupId: group, status: "completed", progress: 100, readerStatus: "completed" }),
+      item({ id: "z", requestGroupId: group, status: "pending", canCancel: true, progress: 0, readerStatus: "queued" }),
+    ]} />);
+
+    await user.click(screen.getByRole("button", { name: "Cancelar solicitud" }));
+
+    expect(extractionAction.mock.calls.map(([call]) => call.id)).toEqual(["x", "z"]);
+    expect(await screen.findByText("2 extracciones canceladas.")).toBeInTheDocument();
+    expect(screen.queryByRole("button", { name: "Cancelar solicitud" })).not.toBeInTheDocument();
+    extractionAction.mockReset();
   });
 });
