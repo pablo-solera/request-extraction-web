@@ -1,12 +1,14 @@
 import { beforeEach, describe, expect, it, vi } from "vitest";
 
-const { returning, set, update, where, database } = vi.hoisted(() => {
+const { returning, set, update, where, database, loaded } = vi.hoisted(() => {
   const returning = vi.fn();
   const where = vi.fn(() => ({ returning }));
   const set = vi.fn(() => ({ where }));
   const update = vi.fn(() => ({ set }));
-  const database = { update, transaction: vi.fn() };
-  return { returning, set, update, where, database };
+  const loaded = vi.fn(async (): Promise<unknown[]> => []);
+  const select = vi.fn(() => ({ from: () => ({ innerJoin: () => ({ where: () => ({ limit: loaded }) }) }) }));
+  const database = { update, select, transaction: vi.fn() };
+  return { returning, set, update, where, database, loaded };
 });
 
 vi.mock("@/db", () => ({ getDb: () => database }));
@@ -22,8 +24,9 @@ describe("claimExtractionSubmission", () => {
   it("returns the claimed row when this caller wins the conditional update", async () => {
     const row = { id: "extraction-1", status: "pending", remoteRequestId: null };
     returning.mockResolvedValueOnce([row]);
+    loaded.mockResolvedValueOnce([{ ...row, axCode: "AX_1" }]);
 
-    await expect(claimExtractionSubmission("extraction-1")).resolves.toEqual(row);
+    await expect(claimExtractionSubmission("extraction-1")).resolves.toEqual({ ...row, axCode: "AX_1" });
     expect(update).toHaveBeenCalledOnce();
     expect(set).toHaveBeenCalledWith(expect.objectContaining({ submittedAt: expect.any(Date) }));
   });
@@ -41,6 +44,7 @@ describe("claimReaderProgressPoll", () => {
   it("atomically claims a progress poll and stamps the per-extraction throttle", async () => {
     const row = { id: "extraction-1", readerPolledAt: new Date() };
     returning.mockResolvedValueOnce([row]);
+    loaded.mockResolvedValueOnce([row]);
 
     await expect(claimReaderProgressPoll("extraction-1", new Date("2026-10-20T12:00:00.000Z"))).resolves.toEqual(row);
     expect(set).toHaveBeenCalledWith({ readerPolledAt: expect.any(Date) });
@@ -53,6 +57,7 @@ describe("insertExtractionsWithCapacity reader persistence", () => {
 
   it("persists BMW series, development code, typekey and development-start metadata without Renault settings", async () => {
     let insertedRows: Array<Record<string, unknown>> = [];
+    let requestValues: Record<string, unknown> = {};
     const transaction = {
       execute: vi.fn(),
       select: () => ({ from: () => ({ where: async () => [{ active: 0 }] }) }),
@@ -61,6 +66,7 @@ describe("insertExtractionsWithCapacity reader persistence", () => {
           insertedRows = value as Array<Record<string, unknown>>;
           return { returning: async () => insertedRows };
         }
+        requestValues = value as Record<string, unknown>;
         return Promise.resolve(value);
       } }),
     };
@@ -75,21 +81,19 @@ describe("insertExtractionsWithCapacity reader persistence", () => {
       vehicles: [{ manufacturerGroup: "BMW", brand: "MINI", series: "F56", developmentCode: "F56", typekey: "11EH", modelDescription: "Cooper S" }],
     }, 50, { status: "approved", coordinatorId: null });
 
+    expect(requestValues).toMatchObject({ manufacturerGroup: "BMW", brand: "MINI", axCode: "AX_123", imcEdition: "05/0", completion: "2026-03-14", developmentStart: "2026-03-14", comments: null });
     expect(insertedRows[0]).toMatchObject({
-      manufacturerGroup: "BMW",
-      brand: "MINI",
       modelCode: "11EH",
       modelDescription: "Cooper S · F56 / F56",
       readerKey: "bmw-labours",
-      imcEdition: "05/0",
-      completion: "2026-03-14",
-      readerParams: { series: "F56", developmentCode: "F56", typekey: "11EH", developmentStart: "2026-03-14" },
+      readerParams: { series: "F56", developmentCode: "F56", typekey: "11EH" },
     });
     expect(transaction.execute).toHaveBeenCalledOnce();
   });
 
   it("stores Renault start date as request metadata rather than a reader filter and allows several families for one brand", async () => {
     let insertedRows: Array<Record<string, unknown>> = [];
+    let requestValues: Record<string, unknown> = {};
     const transaction = {
       execute: vi.fn(),
       select: () => ({ from: () => ({ where: async () => [{ active: 0 }] }) }),
@@ -98,6 +102,7 @@ describe("insertExtractionsWithCapacity reader persistence", () => {
           insertedRows = value as Array<Record<string, unknown>>;
           return { returning: async () => insertedRows };
         }
+        requestValues = value as Record<string, unknown>;
         return Promise.resolve(value);
       } }),
     };
@@ -116,8 +121,9 @@ describe("insertExtractionsWithCapacity reader persistence", () => {
     }, 50, { status: "approved", coordinatorId: null });
 
     expect(insertedRows).toHaveLength(2);
-    expect(insertedRows.map((row) => row.brand)).toEqual(["Dacia", "Dacia"]);
-    expect(insertedRows[0]?.readerParams).toMatchObject({ family: "B52", developmentStart: "2026-03-01" });
+    expect(requestValues).toMatchObject({ brand: "Dacia", developmentStart: "2026-03-01" });
+    expect(insertedRows[0]?.readerParams).toMatchObject({ family: "B52" });
+    expect(insertedRows[0]?.readerParams).not.toHaveProperty("developmentStart");
     expect(insertedRows[0]?.readerParams).not.toHaveProperty("publishedAfter");
   });
 });

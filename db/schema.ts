@@ -45,6 +45,13 @@ export const extractionRequests = pgTable("extraction_requests", {
   requestGroupId: uuid("request_group_id").primaryKey(),
   requesterId: uuid("requester_id").notNull().references(() => users.id, { onDelete: "restrict" }),
   coordinatorId: uuid("coordinator_id").references(() => users.id, { onDelete: "restrict" }),
+  axCode: text("ax_code").notNull(),
+  imcEdition: text("imc_edition").notNull(),
+  completion: date("completion", { mode: "string" }).notNull(),
+  developmentStart: date("development_start", { mode: "string" }),
+  comments: text("comments"),
+  manufacturerGroup: text("manufacturer_group").notNull(),
+  brand: text("brand").notNull(),
   status: extractionRequestStatus("status").default("pending").notNull(),
   decisionComment: text("decision_comment"),
   decidedById: uuid("decided_by_id").references(() => users.id, { onDelete: "set null" }),
@@ -65,12 +72,6 @@ export const extractions = pgTable(
       .notNull()
       .references(() => users.id, { onDelete: "restrict" }),
     requestGroupId: uuid("request_group_id").notNull().references(() => extractionRequests.requestGroupId, { onDelete: "cascade" }),
-    axCode: text("ax_code").notNull(),
-    imcEdition: text("imc_edition").notNull(),
-    completion: date("completion", { mode: "string" }).notNull(),
-    comments: text("comments"),
-    manufacturerGroup: text("manufacturer_group").notNull(),
-    brand: text("brand").notNull(),
     modelDescription: text("model_description").notNull(),
     modelCode: text("model_code").notNull(),
     domain: extractionDomain("domain").notNull(),
@@ -123,7 +124,9 @@ export const extractionActionLogs = pgTable("extraction_action_logs", {
 ]);
 
 export type User = typeof users.$inferSelect;
-export type Extraction = typeof extractions.$inferSelect;
+export type ExtractionRow = typeof extractions.$inferSelect;
+export type ExtractionSharedFields = Pick<ExtractionRequest, "axCode" | "imcEdition" | "completion" | "developmentStart" | "comments" | "manufacturerGroup" | "brand">;
+export type Extraction = ExtractionRow & ExtractionSharedFields;
 export type ExtractionRequest = typeof extractionRequests.$inferSelect;
 export type ExtractionActionLog = typeof extractionActionLogs.$inferSelect;
 export type ExtractionStatus = (typeof extractionStatus.enumValues)[number];

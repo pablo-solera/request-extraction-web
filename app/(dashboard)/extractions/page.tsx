@@ -22,13 +22,13 @@ export default async function ExtractionsPage({ searchParams }: { searchParams: 
         const modelDescription = extraction.modelDescription === modelSuffix ? "" : extraction.modelDescription.endsWith(suffix) ? extraction.modelDescription.slice(0, -suffix.length) : extraction.modelDescription;
         initialValues = {
           group: "BMW" as const,
-          values: { axCode: extraction.axCode, imcEdition: extraction.imcEdition, completion: extraction.completion, laboursDevelopmentStart: params.developmentStart ?? "", comments: extraction.comments ?? "" },
+          values: { axCode: extraction.axCode, imcEdition: extraction.imcEdition, completion: extraction.completion, laboursDevelopmentStart: extraction.developmentStart ?? params.developmentStart ?? "", comments: extraction.comments ?? "" },
           vehicles: [{ manufacturerGroup: "BMW" as const, brand: extraction.brand, series: params.series, developmentCode: params.developmentCode, typekey: params.typekey, modelDescription }],
         };
       } else if (extraction.manufacturerGroup === "Renault" && (extraction.brand === "Renault" || extraction.brand === "Dacia")) {
         initialValues = {
           group: "Renault" as const,
-          values: { axCode: extraction.axCode, imcEdition: extraction.imcEdition, completion: extraction.completion, laboursDevelopmentStart: params.developmentStart ?? params.publishedAfter ?? "", comments: extraction.comments ?? "" },
+          values: { axCode: extraction.axCode, imcEdition: extraction.imcEdition, completion: extraction.completion, laboursDevelopmentStart: extraction.developmentStart ?? params.developmentStart ?? params.publishedAfter ?? "", comments: extraction.comments ?? "" },
           vehicles: [{ manufacturerGroup: "Renault" as const, brand: extraction.brand, modelDescription: extraction.modelDescription, modelCode: params.family ?? extraction.modelCode }],
         };
       }
