@@ -1,0 +1,38 @@
+import { createHash, timingSafeEqual } from "node:crypto";
+import { reconcileActiveExtractions } from "@/lib/extractions/service";
+
+const privateHeaders = { "Cache-Control": "private, no-store, max-age=0" };
+
+function isAuthorized(request: Request) {
+  const secret = process.env.RECONCILE_SECRET;
+  const authorization = request.headers.get("authorization");
+
+  if (!secret || secret.length < 32 || !authorization?.startsWith("Bearer ")) {
+    return false;
+  }
+
+  const provided = authorization.slice("Bearer ".length);
+  const expectedBuffer = createHash("sha256").update(secret).digest();
+  const providedBuffer = createHash("sha256").update(provided).digest();
+  return timingSafeEqual(expectedBuffer, providedBuffer);
+}
+
+export async function POST(request: Request) {
+  if (!isAuthorized(request)) {
+    return Response.json(
+      { error: { code: "UNAUTHORIZED", message: "No autorizado." } },
+      { status: 401, headers: privateHeaders },
+    );
+  }
+
+  try {
+    const synchronized = await reconcileActiveExtractions();
+    return Response.json({ synchronized }, { headers: privateHeaders });
+  } catch (error) {
+    console.error("Extraction reconciliation failed.", error);
+    return Response.json(
+      { error: { code: "RECONCILIATION_FAILED", message: "No se ha podido completar la reconciliación." } },
+      { status: 503, headers: privateHeaders },
+    );
+  }
+}

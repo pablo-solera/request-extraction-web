@@ -1,0 +1,14 @@
+services:
+  postgres-test:
+    image: postgres:18.3
+    environment:
+      POSTGRES_DB: request_extraction_test
+      POSTGRES_USER: request_extraction_test
+      POSTGRES_PASSWORD: request_extraction_test_password
+    ports:
+      - "127.0.0.1::5432"
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U request_extraction_test -d request_extraction_test"]
+      interval: 1s
+      timeout: 5s
+      retries: 30

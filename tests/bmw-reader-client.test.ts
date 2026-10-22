@@ -1,0 +1,129 @@
+import { afterEach, describe, expect, it, vi } from "vitest";
+import { createBmwReaderClient } from "@/lib/readers/bmw/client";
+
+const originalBaseUrl = process.env.BMW_READER_BASE_URL;
+const originalLanguage = process.env.BMW_READER_LANGUAGE;
+
+afterEach(() => {
+  vi.unstubAllGlobals();
+  if (originalBaseUrl === undefined) delete process.env.BMW_READER_BASE_URL;
+  else process.env.BMW_READER_BASE_URL = originalBaseUrl;
+  if (originalLanguage === undefined) delete process.env.BMW_READER_LANGUAGE;
+  else process.env.BMW_READER_LANGUAGE = originalLanguage;
+});
+
+describe("BMW reader client", () => {
+  it("loads and caches the brand's model-series filter", async () => {
+    process.env.BMW_READER_BASE_URL = "http://127.0.0.1:3004";
+    const fetcher = vi.fn().mockResolvedValue(Response.json({ filters: [
+      { name: "developmentCode", values: [{ value: "G70" }] },
+      { name: "modelSeries", values: [{ value: "7", label: "7 Series" }, { value: "X5" }] },
+    ] }));
+    const client = createBmwReaderClient({ fetcher, now: () => 1_000 });
+
+    await expect(client.getSeries("BMW")).resolves.toEqual([{ value: "7", label: "7 Series" }, { value: "X5", label: "X5" }]);
+    await client.getSeries("BMW");
+
+    expect(fetcher).toHaveBeenCalledOnce();
+    expect(fetcher).toHaveBeenCalledWith(new URL("http://127.0.0.1:3004/v1/models/options?brand=BMW&language=en-GB"), expect.objectContaining({ cache: "no-store", redirect: "manual" }));
+  });
+
+  it("loads and caches development codes for a selected series", async () => {
+    process.env.BMW_READER_BASE_URL = "http://127.0.0.1:3004";
+    const fetcher = vi.fn().mockResolvedValue(Response.json({ filters: [
+      { name: "developmentCode", values: [{ value: "G70", label: "G70" }, { value: "G12" }] },
+      { name: "model", values: [{ value: "740I", label: "740i" }] },
+    ] }));
+    const client = createBmwReaderClient({ fetcher, now: () => 1_000 });
+
+    const expected = [{ value: "G70", label: "G70" }, { value: "G12", label: "G12" }];
+    await expect(client.getDevelopmentCodes("BMW", "7'")).resolves.toEqual(expected);
+    await client.getDevelopmentCodes("BMW", "7'");
+
+    expect(fetcher).toHaveBeenCalledOnce();
+    const url = fetcher.mock.calls[0]![0] as URL;
+    expect(url.searchParams.get("brand")).toBe("BMW");
+    expect(url.searchParams.get("modelSeries")).toBe("7'");
+  });
+
+  it("lists all typekeys regardless of validity dates and formats available dates in Spanish", async () => {
+    process.env.BMW_READER_BASE_URL = "http://127.0.0.1:3004";
+    const fetcher = vi.fn().mockResolvedValue(Response.json({ filters: [], models: [
+      { id: "11EH", label: "11EH", attributes: { typekey: "11EH", capacity: "2.998", capacityUnit: "l", power: "210", powerUnit: "kw", validFrom: "2022-07-01T00:00:00Z[UTC]", validUntil: "2026-06-30T00:00:00Z[UTC]" } },
+      { id: "41HZ", label: "41HZ", attributes: { typekey: "41HZ", capacity: "2.998", capacityUnit: "l", power: "210", powerUnit: "kw", validFrom: "2026-07-01T00:00:00Z[UTC]" } },
+      { id: "51HY", label: "51HY", attributes: { typekey: "51HY", validFrom: "2026-11-01T00:00:00Z[UTC]" } },
+      { id: "61HX", label: "61HX", attributes: {} },
+      { id: "71HW", label: "71HW", attributes: { validFrom: "not-a-date", validUntil: "2026-12-31T00:00:00Z[UTC]" } },
+      { id: "invalid", label: "invalid", attributes: {} },
+    ] }));
+    const client = createBmwReaderClient({ fetcher, now: () => Date.UTC(2026, 9, 20, 12) });
+
+    await expect(client.getTypekeys("BMW", "7'", "G70")).resolves.toEqual([
+      { value: "11EH", label: "11EH · 2,998 l · 210 kW · 01/07/2022–30/06/2026", validFrom: "01/07/2022", validUntil: "30/06/2026" },
+      { value: "41HZ", label: "41HZ · 2,998 l · 210 kW · desde 01/07/2026", validFrom: "01/07/2026" },
+      { value: "51HY", label: "51HY · desde 01/11/2026", validFrom: "01/11/2026" },
+      { value: "61HX", label: "61HX" },
+      { value: "71HW", label: "71HW · hasta 31/12/2026", validUntil: "31/12/2026" },
+    ]);
+    const url = fetcher.mock.calls[0]![0] as URL;
+    expect(url.searchParams.get("modelSeries")).toBe("7'");
+    expect(url.searchParams.get("developmentCode")).toBe("G70");
+  });
+
+  it("submits one typekey and converts the common edition format for BMW", async () => {
+    process.env.BMW_READER_BASE_URL = "http://localhost:3004";
+    process.env.BMW_READER_LANGUAGE = "es-ES";
+    const fetcher = vi.fn().mockResolvedValue(Response.json({ requestId: "7be5f2af-879b-4c61-84d5-6e728f438a02", resource: "labours", status: "queued", links: { self: "/v1/labours/7be5f2af-879b-4c61-84d5-6e728f438a02" } }, { status: 202 }));
+    const client = createBmwReaderClient({ fetcher });
+
+    await expect(client.createLabour({ brand: "MINI", series: "F56", developmentCode: "F56", typekey: "11EH", axCode: "AX_123", imcEdition: "05/0", language: "es-ES" })).resolves.toEqual({ requestId: "7be5f2af-879b-4c61-84d5-6e728f438a02", status: "queued" });
+
+    expect(fetcher).toHaveBeenCalledWith(new URL("http://localhost:3004/v1/labours"), expect.objectContaining({ method: "POST", redirect: "manual" }));
+    const init = fetcher.mock.calls[0]![1] as RequestInit;
+    expect(JSON.parse(String(init.body))).toMatchObject({
+      manufacturer: "MINI",
+      axCode: "AX_123",
+      edition: "05_0",
+      language: "es-ES",
+      selection: { series: "F56", typekeys: [{ typekey: "11EH", series: "F56", family: "F56" }] },
+    });
+  });
+
+  it("maps validated reader statuses and rejects non-loopback HTTP", async () => {
+    process.env.BMW_READER_BASE_URL = "https://reader.example.test";
+    const fetcher = vi.fn().mockResolvedValue(Response.json({ requestId: "7be5f2af-879b-4c61-84d5-6e728f438a02", status: "rate_limited", progress: 73 }));
+    const client = createBmwReaderClient({ fetcher });
+    await expect(client.getLabourState("7be5f2af-879b-4c61-84d5-6e728f438a02")).resolves.toMatchObject({ status: "rate_limited", progress: 73 });
+
+    process.env.BMW_READER_BASE_URL = "http://reader.internal:3004";
+    await expect(createBmwReaderClient({ fetcher }).getSeries("BMW")).rejects.toMatchObject({ code: "READER_CONFIGURATION_ERROR" });
+    expect(fetcher).toHaveBeenCalledOnce();
+  });
+
+  it("cancels and resumes through the common v1 labour action routes", async () => {
+    process.env.BMW_READER_BASE_URL = "http://127.0.0.1:3004";
+    const fetcher = vi.fn()
+      .mockResolvedValueOnce(Response.json({ requestId: "7be5f2af-879b-4c61-84d5-6e728f438a02", status: "cancelling" }, { status: 202 }))
+      .mockResolvedValueOnce(Response.json({ requestId: "7be5f2af-879b-4c61-84d5-6e728f438a02", resumedAtTypekey: "41HZ", queue: "bmw-extractions" }, { status: 202 }));
+    const client = createBmwReaderClient({ fetcher });
+    const id = "7be5f2af-879b-4c61-84d5-6e728f438a02";
+
+    await expect(client.cancelLabour(id)).resolves.toEqual({ requestId: id, status: "cancelling" });
+    await expect(client.resumeLabour(id, true)).resolves.toEqual({ requestId: id, resumedAtTypekey: "41HZ", queue: "bmw-extractions", status: "queued" });
+    expect(fetcher.mock.calls.map(([url]) => String(url))).toEqual([
+      `http://127.0.0.1:3004/v1/labours/${id}/cancel`,
+      `http://127.0.0.1:3004/v1/labours/${id}/resume`,
+    ]);
+    expect(JSON.parse(String(fetcher.mock.calls[1]?.[1]?.body))).toEqual({ force: true });
+  });
+
+  it("streams the BMW ZIP archive without following redirects", async () => {
+    process.env.BMW_READER_BASE_URL = "http://127.0.0.1:3004";
+    const archive = new Response(new Uint8Array([80, 75, 3, 4]), { headers: { "content-type": "application/zip" } });
+    const fetcher = vi.fn().mockResolvedValueOnce(archive);
+    const client = createBmwReaderClient({ fetcher });
+
+    await expect(client.downloadLabourArchive("7be5f2af-879b-4c61-84d5-6e728f438a02")).resolves.toBe(archive);
+    expect(fetcher).toHaveBeenCalledWith(expect.any(URL), expect.objectContaining({ redirect: "manual", headers: { Accept: "application/zip" } }));
+  });
+});

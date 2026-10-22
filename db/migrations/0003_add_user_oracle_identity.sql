@@ -1,0 +1,10 @@
+ALTER TABLE "users" ADD COLUMN "oracle_emp_id" integer;
+ALTER TABLE "users" ADD COLUMN "fallback_email" text;
+ALTER TABLE "users" ADD COLUMN "fallback_name" text;
+ALTER TABLE "users" ALTER COLUMN "email" DROP NOT NULL;
+ALTER TABLE "users" ALTER COLUMN "name" DROP NOT NULL;
+DROP INDEX IF EXISTS "users_email_unique";
+DROP INDEX IF EXISTS "users_oracle_emp_id_unique";
+DROP INDEX IF EXISTS "users_fallback_email_unique";
+CREATE UNIQUE INDEX "users_oracle_emp_id_unique" ON "users" USING btree ("oracle_emp_id") WHERE "oracle_emp_id" IS NOT NULL;
+CREATE UNIQUE INDEX "users_fallback_email_unique" ON "users" USING btree ("fallback_email") WHERE "fallback_email" IS NOT NULL;
