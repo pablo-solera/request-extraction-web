@@ -195,6 +195,9 @@ export async function updateExtractionState(id: string, update: {
   const now = new Date();
   const [extraction] = await getDb().update(extractions).set({
     ...update,
+    ...(typeof update.progress === "number" && (update.status === "pending" || update.status === "running")
+      ? { progress: sql`GREATEST(COALESCE(${extractions.progress}, 0), ${update.progress})` }
+      : {}),
     updatedAt: now,
     completedAt: update.status === "completed" || update.status === "failed" || update.status === "cancelled" ? now : null,
   }).where(and(

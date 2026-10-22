@@ -208,7 +208,7 @@ export function ExtractionHistory({ createdId, draftKey = "extraction-draft-v1",
           let changed = false;
           const next = current.map((item) => {
             const updated = byId.get(item.id);
-            if (updated && (updated.status !== item.status || updated.requestStatus !== item.requestStatus || updated.updatedAt !== item.updatedAt || updated.progress !== item.progress || updated.readerStatus !== item.readerStatus || updated.readerStalled !== item.readerStalled || updated.canCancel !== item.canCancel || updated.canResume !== item.canResume || updated.canForceResume !== item.canForceResume || updated.downloadReady !== item.downloadReady)) {
+            if (updated && updated.updatedAt >= item.updatedAt && (updated.status !== item.status || updated.requestStatus !== item.requestStatus || updated.updatedAt !== item.updatedAt || updated.progress !== item.progress || updated.readerStatus !== item.readerStatus || updated.readerStalled !== item.readerStalled || updated.canCancel !== item.canCancel || updated.canResume !== item.canResume || updated.canForceResume !== item.canForceResume || updated.downloadReady !== item.downloadReady)) {
               changed = true;
               return updated;
             }

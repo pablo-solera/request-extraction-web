@@ -221,3 +221,18 @@ describe("request accordion", () => {
     expect(screen.getByRole("progressbar", { name: "Progreso de la solicitud AX-100" }).firstElementChild).not.toHaveClass("motion-safe:animate-pulse");
   });
 });
+
+describe("status polling", () => {
+  it("ignores a polled update older than what is already shown", async () => {
+    const id = crypto.randomUUID();
+    const group = crypto.randomUUID();
+    const current = item({ id, requestGroupId: group, progress: 60, updatedAt: "2026-10-20T12:00:10.000Z" });
+    vi.stubGlobal("fetch", vi.fn().mockResolvedValue(Response.json([{ ...current, progress: 0, updatedAt: "2026-10-20T12:00:05.000Z" }])));
+    render(<ExtractionHistory initialItems={[current]} />);
+    openAll();
+    await vi.waitFor(() => expect(fetch).toHaveBeenCalled());
+    await new Promise((resolve) => setTimeout(resolve, 20));
+    expect(screen.getAllByText("60%").length).toBeGreaterThan(0);
+    expect(screen.queryAllByText("0%")).toHaveLength(0);
+  });
+});
