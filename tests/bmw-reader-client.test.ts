@@ -126,6 +126,18 @@ describe("BMW reader client", () => {
     });
   });
 
+  it("surfaces the reader's NOT_AVAILABLE message and keeps other 4xx answers generic", async () => {
+    process.env.BMW_READER_BASE_URL = "http://localhost:3004";
+    const message = "Typekey YM13 no disponible en BMW Flat Rates (CGWATB0085)";
+    const fetcher = vi.fn()
+      .mockResolvedValueOnce(Response.json({ error: { code: "NOT_AVAILABLE", message, details: { typekeys: [{ typekey: "YM13", code: "CGWATB0085" }] } } }, { status: 422 }))
+      .mockResolvedValueOnce(Response.json({ error: { code: "VALIDATION_ERROR", message: "internal detail" } }, { status: 400 }));
+    const client = createBmwReaderClient({ fetcher });
+    const params = { brand: "BMW" as const, series: "6'", developmentCode: "F13", typekey: "YM13", axCode: "AX_1", imcEdition: "01/0" };
+    await expect(client.createLabour(params)).rejects.toMatchObject({ message, code: "TYPEKEY_NOT_AVAILABLE", retryable: false, status: 422 });
+    await expect(client.createLabour(params)).rejects.toMatchObject({ message: "BMW no ha aceptado la solicitud.", code: "READER_REQUEST_FAILED" });
+  });
+
   it("maps validated reader statuses and rejects non-loopback HTTP", async () => {
     process.env.BMW_READER_BASE_URL = "https://reader.example.test";
     const fetcher = vi.fn().mockResolvedValue(Response.json({ requestId: "7be5f2af-879b-4c61-84d5-6e728f438a02", status: "rate_limited", progress: 73 }));

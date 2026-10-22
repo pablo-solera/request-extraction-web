@@ -68,18 +68,21 @@ async function readJsonBounded(response: Response, maxBytes: number): Promise<un
   return JSON.parse(new TextDecoder().decode(bytes)) as unknown;
 }
 
-async function upstreamMessage(response: Response) {
+async function upstreamError(response: Response): Promise<{ code: string | null; message: string | null }> {
   try {
     const body = await readJsonBounded(response, 16 * 1024);
     if (body && typeof body === "object" && "error" in body) {
       const error = (body as { error?: unknown }).error;
-      if (typeof error === "string") return error;
-      if (error && typeof error === "object" && "message" in error && typeof error.message === "string") return error.message;
+      if (typeof error === "string") return { code: null, message: error };
+      if (error && typeof error === "object") {
+        const { code, message } = error as { code?: unknown; message?: unknown };
+        return { code: typeof code === "string" ? code : null, message: typeof message === "string" ? message : null };
+      }
     }
   } catch {
     // Error details are intentionally discarded; callers receive stable Spanish messages.
   }
-  return null;
+  return { code: null, message: null };
 }
 
 export type BmwLabourParams = {
@@ -153,7 +156,8 @@ export function createBmwReaderClient(options: { fetcher?: typeof fetch; now?: (
     }
     if (response.status >= 300 && response.status < 400) throw new ReaderError("El reader ha devuelto una redirección no permitida.", "INVALID_READER_REDIRECT", false);
     if (!response.ok) {
-      const message = await upstreamMessage(response);
+      const { code, message } = await upstreamError(response);
+      if (response.status === 422 && code === "NOT_AVAILABLE") throw new ReaderError(message ?? "BMW no tiene tiempos disponibles para el typekey solicitado.", "TYPEKEY_NOT_AVAILABLE", false, 422);
       if (response.status === 409) throw new ReaderError(message ?? "La petición no admite esta acción en su estado actual.", "READER_CONFLICT", false, 409);
       if (response.status === 404 && path.startsWith("/v1/models/options")) throw new ReaderError("BMW Reader no ofrece la consulta de series configurada.", "MODEL_OPTIONS_UNAVAILABLE", false, 502);
       if (response.status === 404) throw new ReaderError("El trabajo de BMW ya no está disponible.", "JOB_NOT_FOUND", false, 404);
