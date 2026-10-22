@@ -1,5 +1,5 @@
 import { describe, expect, it } from "vitest";
-import { describeAvailability } from "@/lib/extractions/availability-messages";
+import { describeAvailability, describeSwapOffer } from "@/lib/extractions/availability-messages";
 import type { BmwTypekeyAvailability } from "@/lib/readers/bmw/types";
 
 const unavailable = (overrides: Partial<BmwTypekeyAvailability> = {}): BmwTypekeyAvailability => ({ typekey: "6J02", status: "unavailable", code: "CGWATB0085", suggestedTypekey: null, ...overrides });
@@ -11,7 +11,7 @@ describe("typekey availability messages", () => {
   });
 
   it("reports an unavailable typekey with BMW's code and no base type", () => {
-    expect(describeAvailability(unavailable())).toEqual({ kind: "unavailable", message: "No disponible en BMW Flat Rates (CGWATB0085)." });
+    expect(describeAvailability(unavailable())).toEqual({ kind: "unavailable", message: "No disponible en BMW Flat Rates (CGWATB0085).", baseTypeMessage: "No tiene un tipo base con datos que pueda sustituirlo." });
   });
 
   it("offers the base type only when the reader found it reliable", () => {
@@ -19,21 +19,25 @@ describe("typekey availability messages", () => {
     expect(notice).toMatchObject({ kind: "unavailable", suggestedTypekey: "6J93", baseTypeMessage: "El tipo base 6J93 está disponible y coincide en todas las características." });
   });
 
-  it("lists the differences that make an available base type unsuitable and never suggests it", () => {
-    const notice = describeAvailability(unavailable({ baseType: { typekey: "6J92", status: "available", reliable: false, differences: [
+  it("offers an available base type that differs and lists what changes, leaving the choice to the technician", () => {
+    const availability = unavailable({ baseType: { typekey: "6J92", status: "available", reliable: false, differences: [
       { attribute: "transmission", requested: "AUT", baseType: "MECH" },
       { attribute: "validity", requested: "2015 – 2017", baseType: null },
-    ] } }));
-    expect(notice).toEqual({
+    ] } });
+    expect(describeAvailability(availability)).toEqual({
       kind: "unavailable",
       message: "No disponible en BMW Flat Rates (CGWATB0085).",
-      baseTypeMessage: "Tipo base 6J92 disponible, pero difiere en: cambio (automático → manual), periodo de fabricación (2015 – 2017 → sin dato). No se sugiere.",
+      baseTypeMessage: "El tipo base 6J92 está disponible pero difiere en: cambio (automático → manual), periodo de fabricación (2015 – 2017 → sin dato).",
+      suggestedTypekey: "6J92",
     });
-    expect(notice).not.toHaveProperty("suggestedTypekey");
+    expect(describeSwapOffer(availability)).toEqual({ kind: "swap", baseTypekey: "6J92", identical: false, differences: ["cambio (automático → manual)", "periodo de fabricación (2015 – 2017 → sin dato)"] });
   });
 
-  it("explains when the base type is unavailable or could not be checked", () => {
-    expect(describeAvailability(unavailable({ baseType: { typekey: "YM91", status: "unavailable", reliable: true, differences: [] } }))).toMatchObject({ baseTypeMessage: "El tipo base YM91 tampoco está disponible en BMW Flat Rates." });
-    expect(describeAvailability(unavailable({ baseType: { typekey: "YM91", status: "unknown", reliable: false, differences: [] } }))).toMatchObject({ baseTypeMessage: "No se ha podido comprobar el tipo base YM91." });
+  it("describes swap offers for identical, unavailable, unchecked and missing base types", () => {
+    expect(describeSwapOffer(unavailable({ baseType: { typekey: "6J93", status: "available", reliable: true, differences: [] } }))).toEqual({ kind: "swap", baseTypekey: "6J93", identical: true, differences: [] });
+    expect(describeSwapOffer(unavailable({ baseType: { typekey: "YM91", status: "unavailable", reliable: true, differences: [] } }))).toEqual({ kind: "none", reason: "su tipo base YM91 tampoco tiene datos en BMW" });
+    expect(describeSwapOffer(unavailable({ baseType: { typekey: "YM91", status: "unknown", reliable: false, differences: [] } }))).toEqual({ kind: "none", reason: "no se ha podido comprobar su tipo base YM91" });
+    expect(describeSwapOffer(unavailable())).toEqual({ kind: "none", reason: "no tiene un tipo base con datos que pueda sustituirlo" });
+    expect(describeAvailability(unavailable({ baseType: { typekey: "YM91", status: "unavailable", reliable: true, differences: [] } }))).toMatchObject({ baseTypeMessage: "Su tipo base YM91 tampoco tiene datos en BMW." });
   });
 });

@@ -34,6 +34,7 @@ export function useBmwAvailability(targets: AvailabilityTarget[], enabled: boole
   const [entries, setEntries] = useState<Record<string, AvailabilityEntry>>({});
   const [attempt, setAttempt] = useState(0);
   const requested = useRef(new Set<string>());
+  const known = useRef<Record<string, AvailabilityEntry>>({});
   const signature = targets.map(availabilityKey).join("\n");
 
   useEffect(() => {
@@ -54,6 +55,7 @@ export function useBmwAvailability(targets: AvailabilityTarget[], enabled: boole
         try {
           const entry = await loadAvailability(target, controller.signal);
           finished.add(key);
+          known.current[key] = entry;
           setEntries((current) => ({ ...current, [key]: entry }));
         } catch {
           return;
@@ -71,11 +73,43 @@ export function useBmwAvailability(targets: AvailabilityTarget[], enabled: boole
   const retry = useCallback((target: AvailabilityTarget) => {
     const key = availabilityKey(target);
     requested.current.delete(key);
+    delete known.current[key];
     setEntries((current) => Object.fromEntries(Object.entries(current).filter(([entryKey]) => entryKey !== key)));
     setAttempt((current) => current + 1);
   }, []);
 
+  /** Checks every target now (three at a time) and resolves once all have an answer; answers already known are reused. */
+  const ensure = useCallback(async (wanted: AvailabilityTarget[], onProgress?: (done: number, total: number) => void) => {
+    const unique = [...new Map(wanted.map((target) => [availabilityKey(target), target])).entries()];
+    const results: Record<string, AvailabilityEntry> = {};
+    const todo: Array<[string, AvailabilityTarget]> = [];
+    for (const [key, target] of unique) {
+      const cached = known.current[key];
+      if (cached?.state === "ready") results[key] = cached;
+      else todo.push([key, target]);
+    }
+    let done = unique.length - todo.length;
+    onProgress?.(done, unique.length);
+    let next = 0;
+    async function worker() {
+      while (next < todo.length) {
+        const [key, target] = todo[next++]!;
+        const entry = await loadAvailability(target, new AbortController().signal);
+        results[key] = entry;
+        if (entry.state === "ready") {
+          known.current[key] = entry;
+          requested.current.add(key);
+        }
+        setEntries((current) => ({ ...current, [key]: entry }));
+        onProgress?.(++done, unique.length);
+      }
+    }
+    await Promise.all(Array.from({ length: Math.min(MAX_CONCURRENT_CHECKS, todo.length) }, worker));
+    return results;
+  }, []);
+
   return {
+    ensure,
     entryFor: (target: AvailabilityTarget): AvailabilityEntry => entries[availabilityKey(target)] ?? LOADING,
     retry,
   };

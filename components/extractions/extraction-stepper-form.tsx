@@ -5,6 +5,7 @@ import { z } from "zod";
 import { createExtractionAction, type ExtractionFormState } from "@/app/(dashboard)/extractions/actions";
 import { SubmitButton } from "@/components/common/submit-button";
 import { BmwAvailabilityNotice } from "@/components/extractions/bmw-availability-notice";
+import { BmwSwapReview } from "@/components/extractions/bmw-swap-review";
 import { formatSpanishDate } from "@/lib/date-format";
 import { extractionFormSchema, type ExtractionVehicle } from "@/lib/extractions/validation";
 import { useBmwAvailability, type AvailabilityTarget } from "@/lib/hooks/use-bmw-availability";
@@ -227,6 +228,15 @@ export function ExtractionStepperForm({
     }
   }
   const availability = useBmwAvailability([...availabilityTargets.values()], step === 3 && group === "BMW");
+  const [checking, setChecking] = useState<{ done: number; total: number } | null>(null);
+  const [reviewing, setReviewing] = useState(false);
+  const reviewItems = step === 2 && reviewing ? vehicles.flatMap((vehicle) => {
+    const target = availabilityTargets.get(vehicle.id);
+    const entry = target ? availability.entryFor(target) : null;
+    return target && entry?.state === "ready" && entry.availability.status === "unavailable"
+      ? [{ id: vehicle.id, typekey: target.typekey, series: target.series, developmentCode: target.developmentCode, availability: entry.availability }]
+      : [];
+  }) : [];
   const unavailableTypekeys = step === 3 ? [...availabilityTargets.values()].filter((target) => {
     const entry = availability.entryFor(target);
     return entry.state === "ready" && entry.availability.status === "unavailable";
@@ -326,6 +336,26 @@ export function ExtractionStepperForm({
     clearValidation();
   }
 
+  function removeUnavailableVehicle(id: string) {
+    if (vehicles.length <= 1) setVehicles((current) => current.map((vehicle) => vehicle.id === id && vehicle.manufacturerGroup === "BMW" ? { ...vehicle, typekey: "" } : vehicle));
+    else setVehicles((current) => current.filter((vehicle) => vehicle.id !== id));
+    clearValidation();
+  }
+
+  async function checkAvailabilityThenContinue() {
+    const targets = [...availabilityTargets.values()];
+    setChecking({ done: 0, total: new Set(targets.map((target) => target.typekey)).size });
+    const results = await availability.ensure(targets, (done, total) => setChecking({ done, total }));
+    setChecking(null);
+    if (Object.values(results).some((entry) => entry.state === "ready" && entry.availability.status === "unavailable")) {
+      setReviewing(true);
+      setStepError("Hay typekeys sin datos en BMW. Revisa cada uno para poder continuar.");
+      return;
+    }
+    setReviewing(false);
+    setStep(3);
+  }
+
   function addBlankBmwVehicle() {
     if (group !== "BMW" || (brand !== "BMW" && brand !== "MINI") || vehicles.length >= 50) return;
     setVehicles((current) => [...current, emptyVehicle("BMW", brand, `${formId}-model-${current.length}`)]);
@@ -390,6 +420,10 @@ export function ExtractionStepperForm({
         }
         setLocalErrors(errors);
         setStepError(parsed.error.issues[0]?.message ?? "Selecciona al menos un modelo válido.");
+        return;
+      }
+      if (group === "BMW" && availabilityTargets.size > 0) {
+        void checkAvailabilityThenContinue();
         return;
       }
     }
@@ -457,6 +491,7 @@ export function ExtractionStepperForm({
           </fieldset> : null)}</div>}
           <button className="min-h-11 rounded-lg border border-zinc-300 px-4 py-2 text-sm font-semibold text-zinc-800 hover:bg-zinc-50 disabled:opacity-50" disabled={vehicles.length >= 50} onClick={addBlankBmwVehicle} type="button">Añadir otro typekey</button>
         </> : null}
+        <BmwSwapReview items={reviewItems} onRemove={removeUnavailableVehicle} onSwap={replaceWithBaseType} />
         {stepError ? <p className="text-sm text-red-700" role="alert">{stepError}</p> : null}
       </section> : null}
 
@@ -497,7 +532,7 @@ export function ExtractionStepperForm({
       <input name="vehicles" type="hidden" value={JSON.stringify(vehicles)} />
       <div className="flex flex-col-reverse gap-3 sm:flex-row sm:items-center sm:justify-between">
         <div className="flex items-center gap-2"><button className="min-h-11 rounded-lg px-3 py-2 text-sm font-semibold text-zinc-700 hover:bg-zinc-100 disabled:invisible" disabled={step === 0} onClick={() => { setStep((current) => Math.max(0, current - 1)); clearValidation(); }} type="button">Atrás</button><span className="text-xs text-zinc-500">{draftReady ? draftSaved ? "Borrador guardado" : "Guardando borrador…" : "Cargando borrador…"}</span></div>
-        {step < 3 ? <button className="inline-flex min-h-11 items-center justify-center rounded-lg bg-zinc-950 px-5 py-2 text-sm font-semibold text-white hover:bg-zinc-800 focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-sky-700" onClick={nextStep} type="button">Continuar</button> : <SubmitButton className="sm:min-w-52" disabled={unavailableTypekeys.length > 0} pendingLabel="Iniciando…">Iniciar extracción</SubmitButton>}
+        {step < 3 ? <button className="inline-flex min-h-11 items-center justify-center rounded-lg bg-zinc-950 px-5 py-2 text-sm font-semibold text-white hover:bg-zinc-800 focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-sky-700 disabled:cursor-wait disabled:bg-zinc-700" disabled={checking !== null} onClick={nextStep} type="button">{checking ? `Comprobando disponibilidad (${checking.done}/${checking.total})…` : "Continuar"}</button> : <SubmitButton className="sm:min-w-52" disabled={unavailableTypekeys.length > 0} pendingLabel="Iniciando…">Iniciar extracción</SubmitButton>}
       </div>
     </div>
   </form>;
