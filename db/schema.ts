@@ -22,6 +22,7 @@ export const extractionStatus = pgEnum("extraction_status", [
   "failed",
   "cancelled",
 ]);
+export type TransformerJobStatus = "queued" | "running" | "completed" | "failed";
 export const extractionRequestStatus = pgEnum("extraction_request_status", ["pending", "approved", "rejected"]);
 
 export const users = pgTable(
@@ -53,6 +54,12 @@ export const extractionRequests = pgTable("extraction_requests", {
   manufacturerGroup: text("manufacturer_group").notNull(),
   brand: text("brand").notNull(),
   status: extractionRequestStatus("status").default("pending").notNull(),
+  loadStatus: text("load_status").$type<TransformerJobStatus>(),
+  loadRemoteId: text("load_remote_id"),
+  loadError: text("load_error"),
+  loadAttempts: integer("load_attempts").default(0).notNull(),
+  loadRequestedAt: timestamp("load_requested_at", { withTimezone: true }),
+  loadedAt: timestamp("loaded_at", { withTimezone: true }),
   decisionComment: text("decision_comment"),
   decidedById: uuid("decided_by_id").references(() => users.id, { onDelete: "set null" }),
   decidedAt: timestamp("decided_at", { withTimezone: true }),
@@ -61,6 +68,8 @@ export const extractionRequests = pgTable("extraction_requests", {
   index("extraction_requests_status_idx").on(table.createdAt).where(sql`${table.status} = 'pending'`),
   index("extraction_requests_coordinator_pending_idx").on(table.coordinatorId, table.createdAt).where(sql`${table.status} = 'pending'`),
   index("extraction_requests_requester_idx").on(table.requesterId),
+  index("extraction_requests_load_active_idx").on(table.loadRequestedAt).where(sql`${table.loadStatus} IN ('queued', 'running')`),
+  check("extraction_requests_load_status_check", sql`${table.loadStatus} IS NULL OR ${table.loadStatus} IN ('queued', 'running', 'completed', 'failed')`),
   index("extraction_requests_decided_by_idx").on(table.decidedById),
 ]);
 
@@ -108,6 +117,24 @@ export const extractions = pgTable(
   ],
 );
 
+export const comparisonReports = pgTable("comparison_reports", {
+  id: uuid("id").defaultRandom().primaryKey(),
+  requestGroupId: uuid("request_group_id").notNull().references(() => extractionRequests.requestGroupId, { onDelete: "cascade" }),
+  uploadedById: uuid("uploaded_by_id").notNull().references(() => users.id, { onDelete: "restrict" }),
+  sourceFilename: text("source_filename").notNull(),
+  remoteReportId: text("remote_report_id"),
+  status: text("status").$type<TransformerJobStatus>().default("queued").notNull(),
+  errorMessage: text("error_message"),
+  createdAt: timestamp("created_at", { withTimezone: true }).defaultNow().notNull(),
+  updatedAt: timestamp("updated_at", { withTimezone: true }).defaultNow().notNull(),
+  completedAt: timestamp("completed_at", { withTimezone: true }),
+}, (table) => [
+  index("comparison_reports_request_created_idx").on(table.requestGroupId, table.createdAt),
+  index("comparison_reports_active_idx").on(table.updatedAt).where(sql`${table.status} IN ('queued', 'running')`),
+  index("comparison_reports_uploaded_by_idx").on(table.uploadedById),
+  check("comparison_reports_status_check", sql`${table.status} IN ('queued', 'running', 'completed', 'failed')`),
+]);
+
 export const extractionActionLogs = pgTable("extraction_action_logs", {
   id: uuid("id").defaultRandom().primaryKey(),
   extractionId: uuid("extraction_id").notNull().references(() => extractions.id, { onDelete: "cascade" }),
@@ -127,6 +154,7 @@ export type User = typeof users.$inferSelect;
 export type ExtractionRow = typeof extractions.$inferSelect;
 export type ExtractionSharedFields = Pick<ExtractionRequest, "axCode" | "imcEdition" | "completion" | "developmentStart" | "comments" | "manufacturerGroup" | "brand">;
 export type Extraction = ExtractionRow & ExtractionSharedFields;
+export type ComparisonReport = typeof comparisonReports.$inferSelect;
 export type ExtractionRequest = typeof extractionRequests.$inferSelect;
 export type ExtractionActionLog = typeof extractionActionLogs.$inferSelect;
 export type ExtractionStatus = (typeof extractionStatus.enumValues)[number];
