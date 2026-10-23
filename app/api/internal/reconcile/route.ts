@@ -1,5 +1,6 @@
 import { createHash, timingSafeEqual } from "node:crypto";
 import { reconcileActiveExtractions } from "@/lib/extractions/service";
+import { reconcileTransformer } from "@/lib/transformer/service";
 
 const privateHeaders = { "Cache-Control": "private, no-store, max-age=0" };
 
@@ -27,7 +28,11 @@ export async function POST(request: Request) {
 
   try {
     const synchronized = await reconcileActiveExtractions();
-    return Response.json({ synchronized }, { headers: privateHeaders });
+    const transformer = await reconcileTransformer().catch((error) => {
+      console.error("Transformer reconciliation failed.", error);
+      return { started: 0, updated: 0, failed: true };
+    });
+    return Response.json({ synchronized, transformer }, { headers: privateHeaders });
   } catch (error) {
     console.error("Extraction reconciliation failed.", error);
     return Response.json(
