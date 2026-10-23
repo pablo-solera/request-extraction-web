@@ -43,6 +43,7 @@ Variables principales:
 | `RENAULT_READER_DOWNLOAD_ORIGIN` | Origen HTTPS S3 permitido para redirecciones de descarga. |
 | `BMW_READER_BASE_URL` | URL interna de BMW Reader; HTTP solo se admite por loopback. |
 | `BMW_READER_LANGUAGE` | Idioma de series y etiquetas BMW/MINI; por defecto `en-GB`. |
+| `BMW_TRANSFORMER_BASE_URL` | URL de `bmw-transformer` (HTTP solo por loopback). Sin ella no se cargan datos ni se comparan `.LST`. |
 | `RECONCILE_SECRET` | Token aleatorio de al menos 32 caracteres para el trabajo programado. |
 | `DATABASE_CA_CERT_PATH` | CA pública opcional para PostgreSQL remoto. |
 
@@ -112,3 +113,9 @@ El navegador nunca accede directamente a `renault-reader`. Next.js actúa como B
 El estado del historial permanece en PostgreSQL. La descarga depende de que el estado correspondiente siga disponible en Redis dentro del TTL configurado por `renault-reader`.
 
 Configura un trabajo programado para ejecutar cada minuto `POST /api/internal/reconcile` con `Authorization: Bearer <RECONCILE_SECRET>`. Esta reconciliación actualiza las solicitudes aunque ningún usuario tenga abierto el historial y debe ejecutarse con una frecuencia menor que `STATE_TTL_SECONDS` del reader.
+
+## Carga en BMW_Labour y comparación con el .LST
+
+Cuando **todos** los typekeys de una solicitud BMW/MINI aprobada terminan bien, la reconciliación (`POST /api/internal/reconcile`) envía la solicitud a `bmw-transformer` (`POST /loads`, con la serie y el código de desarrollo de cada typekey y la edición IMC tal cual, p. ej. `05/0`). El transformer crea o reemplaza la tabla `[AxCode]_[Edicion]` en BMW_Labour y guarda el pivote en S3. Una solicitud con incidencias no se carga; "Volver a solicitar" vuelve a extraer todos los typekeys y, al completarse, vuelve a cargar.
+
+En el historial, dentro de cada solicitud, el panel "Carga en BMW_Labour y comparación" muestra el estado de la carga (con "Reintentar carga" si falla). Cuando está cargada, el solicitante, su coordinador y los administradores pueden subir el listado maestro (`.LST` o `.ZIP`, máx. 25 MB) y la web descarga el Excel `DDA contra BMW` a través de `GET /api/comparisons/{id}/download`, sin exponer el almacenamiento interno.

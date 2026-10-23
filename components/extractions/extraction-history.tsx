@@ -3,6 +3,8 @@
 import Link from "next/link";
 import { startTransition, useEffect, useRef, useState } from "react";
 import { useRouter } from "next/navigation";
+import { TransformerPanel } from "@/components/extractions/transformer-panel";
+import type { TransformerRequestInfo } from "@/lib/transformer/info";
 import type { ExtractionListItem, ExtractionReaderDetail } from "@/lib/extractions/types";
 import { formatSpanishDate, formatSpanishDateTime } from "@/lib/date-format";
 import { retryableItems, summarizeRequest, type RequestAggregateStatus } from "@/lib/extractions/request-summary";
@@ -160,7 +162,7 @@ function visibleStatus(item: ExtractionListItem) {
   return { label: statusLabels[item.status], style: statusStyles[item.status] };
 }
 
-export function ExtractionHistory({ createdId, draftKey = "extraction-draft-v1", initialItems }: { createdId?: string; draftKey?: string; initialItems: ExtractionListItem[] }) {
+export function ExtractionHistory({ createdId, draftKey = "extraction-draft-v1", initialItems, initialTransformer = {} }: { createdId?: string; draftKey?: string; initialItems: ExtractionListItem[]; initialTransformer?: Record<string, TransformerRequestInfo> }) {
   const router = useRouter();
   const [items, setItems] = useState(initialItems);
   const [previousInitialItems, setPreviousInitialItems] = useState(initialItems);
@@ -304,6 +306,7 @@ export function ExtractionHistory({ createdId, draftKey = "extraction-draft-v1",
                   <div className="max-w-80"><div className="mb-1 flex justify-between text-xs text-zinc-600"><span>Progreso</span><span>{summary.progress}%</span></div><div aria-label={`Progreso de la solicitud ${first.axCode}`} aria-valuemax={100} aria-valuemin={0} aria-valuenow={summary.progress} className="h-2 overflow-hidden rounded-full bg-zinc-200" role="progressbar"><div className={`h-full rounded-full bg-sky-600 transition-[width] duration-500 ${running ? "motion-safe:animate-pulse" : ""}`} style={{ width: `${summary.progress}%` }} /></div></div>
                 </> : null}
                 <RequestActions items={group.items} onUpdated={updateItem} />
+                {first.manufacturerGroup === "BMW" ? <TransformerPanel allCompleted={group.items.every((item) => item.status === "completed")} initialInfo={initialTransformer[group.id]} requestGroupId={group.id} /> : null}
               </div>
               <div className="divide-y divide-zinc-200 border-t border-zinc-200 bg-zinc-50/50">
               {group.items.map((item) => {
