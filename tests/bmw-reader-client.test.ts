@@ -187,4 +187,19 @@ describe("BMW reader client", () => {
     await expect(client.downloadLabourArchive("7be5f2af-879b-4c61-84d5-6e728f438a02")).resolves.toBe(archive);
     expect(fetcher).toHaveBeenCalledWith(expect.any(URL), expect.objectContaining({ redirect: "manual", headers: { Accept: "application/zip" } }));
   });
+
+  it("distinguishes a missing reader extraction from a generic ZIP failure and logs the reader status", async () => {
+    process.env.BMW_READER_BASE_URL = "http://127.0.0.1:3004";
+    const log = vi.spyOn(console, "error").mockImplementation(() => undefined);
+    const fetcher = vi.fn()
+      .mockResolvedValueOnce(Response.json({ error: { code: "NOT_FOUND" } }, { status: 404 }))
+      .mockResolvedValueOnce(Response.json({ error: { code: "INTERNAL_ERROR" } }, { status: 500 }));
+    const client = createBmwReaderClient({ fetcher });
+    const id = "7be5f2af-879b-4c61-84d5-6e728f438a02";
+
+    await expect(client.downloadLabourArchive(id)).rejects.toMatchObject({ message: "El reader no encuentra esta extracción.", status: 404 });
+    await expect(client.downloadLabourArchive(id)).rejects.toMatchObject({ message: "BMW no ha podido generar el ZIP de la extracción.", status: 500 });
+    expect(log).toHaveBeenCalledWith("BMW Reader archive download failed.", expect.objectContaining({ requestId: id, status: 404 }));
+    log.mockRestore();
+  });
 });

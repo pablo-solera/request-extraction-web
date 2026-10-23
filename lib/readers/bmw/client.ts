@@ -330,8 +330,11 @@ export function createBmwReaderClient(options: { fetcher?: typeof fetch; now?: (
         await response.body?.cancel();
         throw new ReaderError("El ZIP estará disponible cuando la extracción haya terminado.", "JOB_NOT_READY", true, 409);
       }
-      if (!response.ok || response.headers.get("content-type")?.split(";")[0]?.trim() !== "application/zip") {
+      const contentType = response.headers.get("content-type")?.split(";")[0]?.trim();
+      if (!response.ok || contentType !== "application/zip") {
+        console.error("BMW Reader archive download failed.", { requestId: id, status: response.status, contentType });
         await response.body?.cancel();
+        if (response.status === 404) throw new ReaderError("El reader no encuentra esta extracción.", "DOWNLOAD_UNAVAILABLE", false, 404);
         throw new ReaderError("BMW no ha podido generar el ZIP de la extracción.", "DOWNLOAD_UNAVAILABLE", response.status >= 500, response.status >= 400 ? response.status : 502);
       }
       return response;
