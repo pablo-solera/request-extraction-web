@@ -459,8 +459,8 @@ export function ExtractionStepperForm({
         <div className="grid gap-5 md:grid-cols-2">
           <label><span className="field-label">Código AX</span><input aria-invalid={Boolean(localErrors.axCode || state.fieldErrors?.axCode)} autoComplete="off" className="field-control font-mono uppercase" maxLength={4} onChange={(event) => setValues((current) => ({ ...current, axCode: normalizeAxCode(event.target.value) }))} placeholder="Ej.: 1XF" required spellCheck={false} value={values.axCode} /><FieldError>{localErrors.axCode ?? state.fieldErrors?.axCode}</FieldError></label>
           <label><span className="field-label">Edición IMC</span><input aria-invalid={Boolean(localErrors.imcEdition || state.fieldErrors?.imcEdition)} autoComplete="off" className="field-control font-mono" inputMode="numeric" maxLength={4} onChange={(event) => setValues((current) => ({ ...current, imcEdition: event.target.value }))} placeholder="Ej.: 05/0" required spellCheck={false} value={values.imcEdition} /><FieldError>{localErrors.imcEdition ?? state.fieldErrors?.imcEdition}</FieldError></label>
-          <label><span className="field-label">Completion</span><input aria-invalid={Boolean(localErrors.completion || state.fieldErrors?.completion)} autoComplete="off" className="field-control" lang="es-ES" onChange={(event) => setValues((current) => ({ ...current, completion: event.target.value }))} required type="date" value={values.completion} /><FieldError>{localErrors.completion ?? state.fieldErrors?.completion}</FieldError></label>
           <label><span className="field-label">Inicio del desarrollo</span><input aria-invalid={Boolean(localErrors.laboursDevelopmentStart || state.fieldErrors?.laboursDevelopmentStart)} autoComplete="off" className="field-control" lang="es-ES" onChange={(event) => setValues((current) => ({ ...current, laboursDevelopmentStart: event.target.value }))} required type="date" value={values.laboursDevelopmentStart} /><FieldError>{localErrors.laboursDevelopmentStart ?? state.fieldErrors?.laboursDevelopmentStart}</FieldError></label>
+          <label><span className="field-label">Completion</span><input aria-invalid={Boolean(localErrors.completion || state.fieldErrors?.completion)} autoComplete="off" className="field-control" lang="es-ES" onChange={(event) => setValues((current) => ({ ...current, completion: event.target.value }))} required type="date" value={values.completion} /><FieldError>{localErrors.completion ?? state.fieldErrors?.completion}</FieldError></label>
         </div>
       </section> : null}
 
@@ -504,8 +504,8 @@ export function ExtractionStepperForm({
           </div>
           <dl className="grid divide-y divide-zinc-200 text-sm sm:grid-cols-3 sm:divide-x sm:divide-y-0">
             <div className="px-5 py-4"><dt className="text-xs font-medium text-zinc-500">Edición IMC</dt><dd className="mt-1 font-medium text-zinc-900">{values.imcEdition}</dd></div>
-            <div className="px-5 py-4"><dt className="text-xs font-medium text-zinc-500">Completion</dt><dd className="mt-1 font-medium text-zinc-900">{formatSpanishDate(values.completion)}</dd></div>
             <div className="px-5 py-4"><dt className="text-xs font-medium text-zinc-500">Inicio del desarrollo</dt><dd className="mt-1 font-medium text-zinc-900">{formatSpanishDate(values.laboursDevelopmentStart)}</dd></div>
+            <div className="px-5 py-4"><dt className="text-xs font-medium text-zinc-500">Completion</dt><dd className="mt-1 font-medium text-zinc-900">{formatSpanishDate(values.completion)}</dd></div>
           </dl>
         </div>
         <div className="overflow-hidden rounded-xl border border-zinc-200 bg-white">

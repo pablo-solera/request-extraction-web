@@ -51,7 +51,6 @@ export default async function ExtractionsPage({ searchParams }: { searchParams: 
   return (
     <div className="space-y-7">
       <PageHeader>
-        <PageHeader.Eyebrow>Readers de fabricantes</PageHeader.Eyebrow>
         <PageHeader.Title>Nueva extracción</PageHeader.Title>
         <PageHeader.Description>Prepara y realiza una exportación técnica desde un único formulario.</PageHeader.Description>
       </PageHeader>

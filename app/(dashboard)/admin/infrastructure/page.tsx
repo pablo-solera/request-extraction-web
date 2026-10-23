@@ -34,5 +34,5 @@ export default async function InfrastructurePage() {
   await requireAdmin();
   const services = await getInfrastructureStatus();
 
-  return <section className="space-y-7"><div className="flex flex-wrap items-end justify-between gap-4"><PageHeader><PageHeader.Eyebrow>Administración</PageHeader.Eyebrow><PageHeader.Title>Infraestructura</PageHeader.Title><PageHeader.Description>Estado de disponibilidad de readers y transformers.</PageHeader.Description></PageHeader><InfrastructureRefresh /></div><div className="grid gap-4">{services.map((service) => <ServiceCard key={service.key} service={service} />)}</div><p className="text-xs text-zinc-500">La página actualiza los estados automáticamente cada 30 segundos mientras está visible.</p></section>;
+  return <section className="space-y-7"><div className="flex flex-wrap items-end justify-between gap-4"><PageHeader><PageHeader.Title>Infraestructura</PageHeader.Title><PageHeader.Description>Estado de disponibilidad de readers y transformers.</PageHeader.Description></PageHeader><InfrastructureRefresh /></div><div className="grid gap-4">{services.map((service) => <ServiceCard key={service.key} service={service} />)}</div><p className="text-xs text-zinc-500">La página actualiza los estados automáticamente cada 30 segundos mientras está visible.</p></section>;
 }

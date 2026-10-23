@@ -279,9 +279,17 @@ export function ExtractionHistory({ createdId, draftKey = "extraction-draft-v1",
             <h2 className="m-0">
               <button aria-controls={panelId} aria-expanded={expanded} className="flex w-full min-w-0 items-center gap-4 px-5 py-5 text-left hover:bg-zinc-50 focus-visible:outline-2 focus-visible:-outline-offset-2 focus-visible:outline-sky-700 md:px-6" onClick={() => setToggledGroups((current) => ({ ...current, [group.id]: !expanded }))} type="button">
                 <span className="min-w-0 flex-1">
-                  <span className="block break-words font-mono text-sm font-semibold text-zinc-950" translate="no">{first.axCode}</span>
-                  <span className="mt-1 block text-xs font-normal text-zinc-600">Edición IMC <span translate="no">{first.imcEdition}</span> · Finalización {formatSpanishDate(first.completion)}{first.developmentStart ? ` · Inicio de desarrollo ${formatSpanishDate(first.developmentStart)}` : ""}</span>
-                  <span className="mt-1 block text-xs font-normal text-zinc-600"><span translate="no">{first.manufacturerGroup} / {first.brand}</span> · {group.items.length} {group.items.length === 1 ? noun : `${noun}s`} · <time dateTime={first.createdAt}>{formatSpanishDateTime(first.createdAt)}</time>{first.requesterName ? ` · ${first.requesterName}` : ""}</span>
+                  <span className="flex flex-wrap items-center gap-2">
+                    <span className="break-words font-mono text-base font-semibold text-zinc-950" translate="no">{first.axCode}</span>
+                    <span className="rounded-full border border-sky-200 bg-sky-50 px-2.5 py-0.5 text-xs font-semibold text-sky-900" translate="no">{first.manufacturerGroup === first.brand ? first.brand : `${first.manufacturerGroup} / ${first.brand}`}</span>
+                  </span>
+                  <span className="mt-3 grid grid-cols-2 gap-x-6 gap-y-3 md:grid-cols-4">
+                    <span className="block"><span className="block text-xs font-normal text-zinc-500">Edición IMC</span><span className="mt-0.5 block text-sm font-medium text-zinc-900" translate="no">{first.imcEdition}</span></span>
+                    <span className="block"><span className="block text-xs font-normal text-zinc-500">Inicio del desarrollo</span><span className="mt-0.5 block text-sm font-medium text-zinc-900">{first.developmentStart ? formatSpanishDate(first.developmentStart) : "—"}</span></span>
+                    <span className="block"><span className="block text-xs font-normal text-zinc-500">Completion</span><span className="mt-0.5 block text-sm font-medium text-zinc-900">{formatSpanishDate(first.completion)}</span></span>
+                    <span className="block"><span className="block text-xs font-normal text-zinc-500">{noun === "familia" ? "Familias" : "Typekeys"}</span><span className="mt-0.5 block text-sm font-medium text-zinc-900">{group.items.length}</span></span>
+                  </span>
+                  <span className="mt-3 block text-xs font-normal text-zinc-500">Solicitada el <time dateTime={first.createdAt}>{formatSpanishDateTime(first.createdAt)}</time>{first.requesterName ? ` · ${first.requesterName}` : ""}</span>
                 </span>
                 <span className="flex shrink-0 items-center gap-3">
                   <span className={`inline-flex rounded-full border px-2.5 py-1 text-xs font-semibold ${aggregateStyles[summary.status]}`}>{summary.label}{running ? ` · ${summary.progress} %` : ""}</span>

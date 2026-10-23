@@ -125,7 +125,9 @@ describe("grouped request history", () => {
     expect(screen.getAllByRole("heading", { level: 2 })).toHaveLength(1);
     expect(screen.getByText("Completada con incidencias")).toBeInTheDocument();
     expect(screen.getByText("2 de 3 typekeys completados · 1 fallido")).toBeInTheDocument();
-    expect(screen.getByText(/Edición IMC/)).toHaveTextContent("05/0");
+    expect(screen.getByText("Edición IMC").parentElement).toHaveTextContent("05/0");
+    expect(screen.getByText("Inicio del desarrollo")).toBeInTheDocument();
+    expect(screen.getByText("Completion")).toBeInTheDocument();
   });
 
   it("offers repeating only when failed or cancelled items exist, linking to the request", () => {

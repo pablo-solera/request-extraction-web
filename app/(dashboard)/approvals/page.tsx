@@ -24,7 +24,7 @@ export default async function ApprovalsPage() {
   const groups = [...rowsByGroup.entries()].map(([requestGroupId, requestRows]) => ({ requestGroupId, rows: requestRows, ...requestRows[0] }));
   const identities = await resolveUserIdentities(rows.map((row) => row.requester));
   return <div className="space-y-7">
-    <PageHeader><PageHeader.Eyebrow>Control de solicitudes</PageHeader.Eyebrow><PageHeader.Title>Aprobaciones</PageHeader.Title><PageHeader.Description>Revisa solicitudes completas antes de enviarlas al reader.</PageHeader.Description></PageHeader>
+    <PageHeader><PageHeader.Title>Aprobaciones</PageHeader.Title><PageHeader.Description>Revisa solicitudes completas antes de enviarlas al reader.</PageHeader.Description></PageHeader>
     {groups.length === 0 ? <div className="rounded-2xl border border-dashed border-zinc-300 bg-white px-6 py-16 text-center text-sm text-zinc-600"><p>No hay solicitudes pendientes.</p><a className="mt-3 inline-flex min-h-11 items-center text-zinc-900 underline" href="/history">Consultar el historial</a></div> : <div className="space-y-4">{groups.map((row) => {
       const requestRows = row.rows;
       return <article className="rounded-2xl border border-zinc-200 bg-white p-6 shadow-sm" key={row.request.requestGroupId}>

@@ -7,7 +7,7 @@ function PageHeaderEyebrow({ children }: { children: React.ReactNode }) {
 }
 
 function PageHeaderTitle({ children }: { children: React.ReactNode }) {
-  return <h1 className="mt-1 text-3xl font-semibold text-zinc-950 [text-wrap:balance]">{children}</h1>;
+  return <h1 className="text-3xl font-semibold text-zinc-950 [text-wrap:balance]">{children}</h1>;
 }
 
 function PageHeaderDescription({ children }: { children: React.ReactNode }) {

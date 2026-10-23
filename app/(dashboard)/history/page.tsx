@@ -29,7 +29,6 @@ export default async function HistoryPage({
   return (
     <div className="space-y-7">
       <PageHeader>
-        <PageHeader.Eyebrow>Seguimiento</PageHeader.Eyebrow>
         <PageHeader.Title>Historial de extracciones</PageHeader.Title>
        <PageHeader.Description>Consulta y administra las solicitudes que tienes permiso para gestionar.</PageHeader.Description>
       </PageHeader>
