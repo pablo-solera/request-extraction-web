@@ -11,6 +11,7 @@ import {
 import type { TransformerRequestInfo } from "@/lib/transformer/info";
 import type { TransformerState } from "@/lib/transformer/types";
 import type { UserRole } from "@/lib/auth/session";
+import { notifyComparisonFailed, notifyLoadCompleted, notifyLoadFailed } from "@/lib/mail/notifications";
 
 type Actor = { id: string; oracleEmpId: number | null; role: UserRole };
 
@@ -28,6 +29,11 @@ const failureMessage = (state: TransformerState, fallback: string) => state.erro
 
 type ReadyRequest = Awaited<ReturnType<typeof listRequestsReadyForLoad>>[number];
 
+async function failToStart(requestGroupId: string, message: string) {
+  const failed = await markLoadFailedToStart(requestGroupId, message);
+  if (failed) await notifyLoadFailed(requestGroupId, `start-${failed.loadAttempts}`, message);
+}
+
 /** Sends one request to the transformer. Returns true when the load was queued; the claim in markLoadRequested keeps a request from being loaded twice. */
 async function startLoad(client: TransformerClient, { request, items }: ReadyRequest) {
   const typekeys = items.flatMap((item) => {
@@ -36,7 +42,7 @@ async function startLoad(client: TransformerClient, { request, items }: ReadyReq
   });
   const brand = request.brand === "MINI" ? "MINI" : request.brand === "BMW" ? "BMW" : null;
   if (!brand || typekeys.length !== items.length) {
-    await markLoadFailedToStart(request.requestGroupId, "La solicitud no tiene los datos necesarios para cargarla.");
+    await failToStart(request.requestGroupId, "La solicitud no tiene los datos necesarios para cargarla.");
     return false;
   }
   try {
@@ -44,7 +50,7 @@ async function startLoad(client: TransformerClient, { request, items }: ReadyReq
     return Boolean(await markLoadRequested(request.requestGroupId, loadId));
   } catch (error) {
     if (error instanceof ReaderError && error.retryable) return false;
-    await markLoadFailedToStart(request.requestGroupId, error instanceof ReaderError ? error.message : "No se ha podido iniciar la carga.");
+    await failToStart(request.requestGroupId, error instanceof ReaderError ? error.message : "No se ha podido iniciar la carga.");
     return false;
   }
 }
@@ -70,11 +76,15 @@ async function pollLoad(client: TransformerClient, request: ActiveLoad) {
     const state = await client.getLoad(request.loadRemoteId!);
     const status = mapStatus(state);
     if (status === request.loadStatus) return false;
-    return Boolean(await updateLoadState(request.requestGroupId, request.loadRemoteId!, { status, error: failureMessage(state, "La carga ha fallado.") }));
+    const error = failureMessage(state, "La carga ha fallado.");
+    const updated = await updateLoadState(request.requestGroupId, request.loadRemoteId!, { status, error });
+    if (updated && status === "completed") await notifyLoadCompleted(request.requestGroupId, request.loadRemoteId!);
+    if (updated && status === "failed") await notifyLoadFailed(request.requestGroupId, request.loadRemoteId!, error);
+    return Boolean(updated);
   } catch (error) {
     if (error instanceof ReaderError && error.retryable) return false;
     const message = error instanceof ReaderError ? error.message : "No se ha podido consultar la carga.";
-    await updateLoadState(request.requestGroupId, request.loadRemoteId!, { status: "failed", error: message });
+    if (await updateLoadState(request.requestGroupId, request.loadRemoteId!, { status: "failed", error: message })) await notifyLoadFailed(request.requestGroupId, request.loadRemoteId!, message);
     return false;
   }
 }
@@ -84,10 +94,14 @@ async function pollComparison(client: TransformerClient, comparison: ActiveCompa
     const state = await client.getReport(comparison.remoteReportId!);
     const status = mapStatus(state);
     if (status === comparison.status) return false;
-    return Boolean(await updateComparisonState(comparison.id, { status, error: failureMessage(state, "La comparación ha fallado.") }));
+    const error = failureMessage(state, "La comparación ha fallado.");
+    const updated = await updateComparisonState(comparison.id, { status, error });
+    if (updated && status === "failed") await notifyComparisonFailed(comparison.requestGroupId, comparison.id, error);
+    return Boolean(updated);
   } catch (error) {
     if (error instanceof ReaderError && error.retryable) return false;
-    await updateComparisonState(comparison.id, { status: "failed", error: error instanceof ReaderError ? error.message : "No se ha podido consultar la comparación." });
+    const message = error instanceof ReaderError ? error.message : "No se ha podido consultar la comparación.";
+    if (await updateComparisonState(comparison.id, { status: "failed", error: message })) await notifyComparisonFailed(comparison.requestGroupId, comparison.id, message);
     return false;
   }
 }
@@ -162,7 +176,8 @@ export async function uploadComparison(requestGroupId: string, actor: Actor, fil
     const { reportId } = await client.createComparison(request.loadRemoteId, file);
     await attachComparisonRemote(comparison.id, reportId);
   } catch (error) {
-    await failComparison(comparison.id, error instanceof ReaderError ? error.message : "No se ha podido iniciar la comparación.");
+    const message = error instanceof ReaderError ? error.message : "No se ha podido iniciar la comparación.";
+    if (await failComparison(comparison.id, message)) await notifyComparisonFailed(requestGroupId, comparison.id, message);
     throw error;
   }
   return comparison.id;

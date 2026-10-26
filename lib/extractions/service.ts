@@ -1,6 +1,7 @@
 import "server-only";
 
 import { startLoadForRequest } from "@/lib/transformer/service";
+import { notifyExtractionFailures } from "@/lib/mail/notifications";
 import { retryableItems } from "@/lib/extractions/request-summary";
 import type { Extraction, ExtractionStatus } from "@/db/schema";
 import {
@@ -48,10 +49,12 @@ async function submitExtraction(extraction: Extraction, context?: Awaited<Return
   } catch (error) {
     const readerError = error instanceof ReaderError ? error : null;
     if (error instanceof ReaderError && error.code === "READER_CONFIGURATION_ERROR") console.error("Reader integration configuration is invalid.", error);
-    return (await markSubmissionFailed(claimed.id, claimed.submittedAt!, {
+    const failed = await markSubmissionFailed(claimed.id, claimed.submittedAt!, {
       errorCode: readerError?.code ?? "INTERNAL_ERROR",
       errorMessage: readerError?.message ?? "No se ha podido iniciar la extracción.",
-    })) ?? claimed;
+    });
+    if (failed) await notifyExtractionFailures(claimed.requestGroupId);
+    return failed ?? claimed;
   }
 }
 
@@ -121,11 +124,14 @@ async function syncExtraction(extraction: Extraction) {
     if (status === "completed") {
       await startLoadForRequest(extraction.requestGroupId).catch((error) => console.error("Transformer load could not be started.", error));
     }
+    if (status === "failed") await notifyExtractionFailures(extraction.requestGroupId);
     return updated;
   } catch (error) {
     if (error instanceof ReaderError && error.retryable) return extraction;
     const readerError = error instanceof ReaderError ? error : null;
-    return updateExtractionState(extraction.id, { status: "failed", errorCode: readerError?.code ?? "STATUS_SYNC_FAILED", errorMessage: "No se ha podido recuperar el estado de la extracción." });
+    const failed = await updateExtractionState(extraction.id, { status: "failed", errorCode: readerError?.code ?? "STATUS_SYNC_FAILED", errorMessage: "No se ha podido recuperar el estado de la extracción." });
+    await notifyExtractionFailures(extraction.requestGroupId);
+    return failed;
   }
 }
 

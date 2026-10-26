@@ -44,6 +44,13 @@ Variables principales:
 | `BMW_READER_BASE_URL` | URL interna de BMW Reader; HTTP solo se admite por loopback. |
 | `BMW_READER_LANGUAGE` | Idioma de series y etiquetas BMW/MINI; por defecto `en-GB`. |
 | `BMW_TRANSFORMER_BASE_URL` | URL de `bmw-transformer` (HTTP solo por loopback). Sin ella no se cargan datos ni se comparan `.LST`. |
+| `MAIL_ENABLED` | `true` para enviar correos; por defecto no se envía ninguno. |
+| `SMTP_HOST`, `SMTP_PORT` | Relay SMTP interno (puerto 25 por defecto, sin usuario ni contraseña; se usa STARTTLS si el servidor lo ofrece). |
+| `SMTP_SECURE` | `true` solo para TLS implícito (puerto 465). |
+| `SMTP_FROM` | Remitente; por defecto `extracciones@audatex.es`. |
+| `MAIL_SUPPORT_TO` | Buzón de soporte que recibe los avisos de fallo; por defecto `DL-ESMA-D-Acciona@audatexdatos.es`. |
+| `MAIL_REDIRECT_TO` | Solo en desarrollo: todos los correos llegan a esta dirección, con el destinatario real en el asunto. |
+| `APP_BASE_URL` | URL pública de la web para los enlaces de los correos (`request-extraction-peuwaxprvdacc03.axadmin.net`; si no lleva `http(s)://` se añade `https://`). |
 | `RECONCILE_SECRET` | Token aleatorio de al menos 32 caracteres para el trabajo programado. |
 | `DATABASE_CA_CERT_PATH` | CA pública opcional para PostgreSQL remoto. |
 
@@ -119,3 +126,12 @@ Configura un trabajo programado para ejecutar cada minuto `POST /api/internal/re
 Cuando **todos** los typekeys de una solicitud BMW/MINI aprobada terminan bien, la web envía la solicitud en el mismo instante en que se detecta el último "Completada" (al sincronizar el estado, ya sea desde el historial o desde la reconciliación). La reconciliación (`POST /api/internal/reconcile`) queda como red de seguridad y reintenta las que no se pudieron enviar (por ejemplo, si el transformer estaba caído). Cada solicitud se envía una sola vez: el estado de carga pasa de vacío a `queued`/`running`/`completed`/`failed` y solo vuelve a vacío con "Reintentar carga". La web envía la solicitud a `bmw-transformer` (`POST /loads`, con la serie y el código de desarrollo de cada typekey y la edición IMC tal cual, p. ej. `05/0`). El transformer crea o reemplaza la tabla `[AxCode]_[Edicion]` en BMW_Labour y guarda el pivote en S3. Una solicitud con incidencias no se carga; "Volver a solicitar" vuelve a extraer todos los typekeys y, al completarse, vuelve a cargar.
 
 En el historial, dentro de cada solicitud, el panel "Carga en BMW_Labour y comparación" muestra el estado de la carga (con "Reintentar carga" si falla). Cuando está cargada, el solicitante, su coordinador y los administradores pueden subir el listado maestro (`.LST` o `.ZIP`, máx. 25 MB) y la web descarga el Excel `DDA contra BMW` a través de `GET /api/comparisons/{id}/download`, sin exponer el almacenamiento interno.
+
+## Correos
+
+Con `MAIL_ENABLED=true` la web envía, a través del relay SMTP interno (mismo modelo que `work-from-home`):
+
+- **Al solicitante**, cuando la extracción termina y sus datos ya están cargados en BMW_Labour: "ya puedes generar la comparativa", con un enlace a `/history?request=<id>` que abre esa solicitud para subir el `.LST`.
+- **A soporte** (`MAIL_SUPPORT_TO`), cuando algo falla: typekeys fallidos cuando la solicitud ya ha terminado, la carga en BMW_Labour o la comparación con el `.LST`.
+
+Cada aviso se envía una sola vez por evento (tabla `mail_notifications`, reserva atómica en Postgres), aunque el historial y la reconciliación lo detecten a la vez. Si el servidor SMTP falla, se reintenta en la siguiente detección, hasta 3 veces; los errores se registran sin direcciones de correo. Recargar los datos o repetir la solicitud genera avisos nuevos. Para probar sin escribir a nadie real, usa `MAIL_REDIRECT_TO`.

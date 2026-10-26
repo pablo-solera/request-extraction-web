@@ -238,3 +238,18 @@ describe("status polling", () => {
     expect(screen.queryAllByText("0%")).toHaveLength(0);
   });
 });
+
+describe("opening a request from a link", () => {
+  it("expands the request named by the link even when it is completed", () => {
+    vi.stubGlobal("fetch", vi.fn().mockResolvedValue(Response.json([])));
+    const target = crypto.randomUUID();
+    const other = crypto.randomUUID();
+    render(<ExtractionHistory openId={target} initialItems={[
+      item({ id: "t", requestGroupId: target, status: "completed", progress: 100, readerStatus: "completed" }),
+      item({ id: "o", requestGroupId: other, axCode: "AX-OTHER", status: "completed", progress: 100, readerStatus: "completed" }),
+    ]} />);
+    expect(screen.getByRole("button", { name: /^AX-100/ })).toHaveAttribute("aria-expanded", "true");
+    expect(screen.getByRole("button", { name: /^AX-OTHER/ })).toHaveAttribute("aria-expanded", "false");
+    expect(document.getElementById(`request-${target}`)).not.toBeNull();
+  });
+});

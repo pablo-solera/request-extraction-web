@@ -137,6 +137,22 @@ export const comparisonReports = pgTable("comparison_reports", {
   check("comparison_reports_status_check", sql`${table.status} IN ('queued', 'running', 'completed', 'failed')`),
 ]);
 
+export type MailNotificationStatus = "sending" | "sent" | "failed";
+export const mailNotifications = pgTable("mail_notifications", {
+  id: uuid("id").defaultRandom().primaryKey(),
+  requestGroupId: uuid("request_group_id").notNull().references(() => extractionRequests.requestGroupId, { onDelete: "cascade" }),
+  kind: text("kind").notNull(),
+  ref: text("ref").notNull(),
+  status: text("status").$type<MailNotificationStatus>().default("sending").notNull(),
+  attempts: integer("attempts").default(1).notNull(),
+  createdAt: timestamp("created_at", { withTimezone: true }).defaultNow().notNull(),
+  sentAt: timestamp("sent_at", { withTimezone: true }),
+}, (table) => [
+  uniqueIndex("mail_notifications_event_unique").on(table.requestGroupId, table.kind, table.ref),
+  check("mail_notifications_status_check", sql`${table.status} IN ('sending', 'sent', 'failed')`),
+  check("mail_notifications_attempts_check", sql`${table.attempts} >= 1`),
+]);
+
 export const extractionActionLogs = pgTable("extraction_action_logs", {
   id: uuid("id").defaultRandom().primaryKey(),
   extractionId: uuid("extraction_id").notNull().references(() => extractions.id, { onDelete: "cascade" }),

@@ -162,7 +162,7 @@ function visibleStatus(item: ExtractionListItem) {
   return { label: statusLabels[item.status], style: statusStyles[item.status] };
 }
 
-export function ExtractionHistory({ createdId, draftKey = "extraction-draft-v1", initialItems, initialTransformer = {} }: { createdId?: string; draftKey?: string; initialItems: ExtractionListItem[]; initialTransformer?: Record<string, TransformerRequestInfo> }) {
+export function ExtractionHistory({ createdId, openId, draftKey = "extraction-draft-v1", initialItems, initialTransformer = {} }: { createdId?: string; openId?: string; draftKey?: string; initialItems: ExtractionListItem[]; initialTransformer?: Record<string, TransformerRequestInfo> }) {
   const router = useRouter();
   const [items, setItems] = useState(initialItems);
   const [previousInitialItems, setPreviousInitialItems] = useState(initialItems);
@@ -176,6 +176,10 @@ export function ExtractionHistory({ createdId, draftKey = "extraction-draft-v1",
   }
   const refreshIds = items.filter((item) => item.status === "pending" || item.status === "running").map((item) => item.id);
   const activeKey = refreshIds.toSorted().join(",");
+
+  useEffect(() => {
+    if (openId) document.getElementById(`request-${openId}`)?.scrollIntoView?.({ block: "start" });
+  }, [openId]);
 
   useEffect(() => {
     if (createdId) {
@@ -273,11 +277,11 @@ export function ExtractionHistory({ createdId, draftKey = "extraction-draft-v1",
           const first = group.items[0]!;
           const noun = first.manufacturerGroup === "Renault" ? "familia" : "typekey";
           const summary = summarizeRequest(first.requestStatus, group.items, noun);
-          const expanded = toggledGroups[group.id] ?? group.id === createdId;
+          const expanded = toggledGroups[group.id] ?? (group.id === createdId || group.id === openId);
           const panelId = `request-panel-${group.id}`;
           const hasProgress = summary.status !== "pending_approval" && summary.status !== "rejected";
           const running = summary.status === "running";
-          return <section aria-label={`Solicitud ${first.axCode}`} className={`overflow-hidden rounded-2xl border bg-white shadow-sm ${group.id === createdId ? "border-emerald-300" : "border-zinc-200"}`} key={group.id}>
+          return <section aria-label={`Solicitud ${first.axCode}`} id={`request-${group.id}`} className={`overflow-hidden rounded-2xl border bg-white shadow-sm ${group.id === createdId ? "border-emerald-300" : "border-zinc-200"}`} key={group.id}>
             <h2 className="m-0">
               <button aria-controls={panelId} aria-expanded={expanded} className="flex w-full min-w-0 items-center gap-4 px-5 py-5 text-left hover:bg-zinc-50 focus-visible:outline-2 focus-visible:-outline-offset-2 focus-visible:outline-sky-700 md:px-6" onClick={() => setToggledGroups((current) => ({ ...current, [group.id]: !expanded }))} type="button">
                 <span className="min-w-0 flex-1">

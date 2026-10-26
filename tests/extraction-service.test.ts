@@ -42,6 +42,8 @@ vi.mock("@/lib/readers/renault/client", async () => ({ getRenaultLabourFamilies:
 const organization = vi.hoisted(() => ({ findCoordinatorUser: vi.fn(), findCoordinatorTeamUserIds: vi.fn(), isUserInCoordinatorTeam: vi.fn() }));
 vi.mock("@/lib/employees/org-service", () => organization);
 const transformer = vi.hoisted(() => ({ startLoadForRequest: vi.fn() }));
+const notifications = vi.hoisted(() => ({ notifyExtractionFailures: vi.fn() }));
+vi.mock("@/lib/mail/notifications", () => notifications);
 vi.mock("@/lib/transformer/service", () => transformer);
 
 import { createExtraction, extractionDto, reconcileActiveExtractions, submitNewApprovedRequest } from "@/lib/extractions/service";
@@ -156,6 +158,23 @@ describe("reader registry extraction flow", () => {
     reader.mapStatus.mockReturnValueOnce("running");
     await reconcileActiveExtractions();
     expect(transformer.startLoadForRequest).not.toHaveBeenCalled();
+  });
+
+  it("asks for the failure email when a typekey fails and not when it is still running", async () => {
+    repository.updateExtractionState.mockResolvedValue({ ...extraction, status: "failed" });
+    const bmw = { ...extraction, readerKey: "bmw-labours", status: "running", remoteRequestId: "remote-1" };
+    repository.listActiveExtractions.mockResolvedValueOnce([bmw]);
+    reader.getState.mockResolvedValueOnce({ status: "failed", error: { message: "x" } });
+    reader.mapStatus.mockReturnValueOnce("failed");
+    await reconcileActiveExtractions();
+    expect(notifications.notifyExtractionFailures).toHaveBeenCalledWith("g1");
+
+    notifications.notifyExtractionFailures.mockClear();
+    repository.listActiveExtractions.mockResolvedValueOnce([bmw]);
+    reader.getState.mockResolvedValueOnce({ status: "running", progress: 10, error: null });
+    reader.mapStatus.mockReturnValueOnce("running");
+    await reconcileActiveExtractions();
+    expect(notifications.notifyExtractionFailures).not.toHaveBeenCalled();
   });
 
   it("keeps the extraction completed when the transformer cannot be reached", async () => {

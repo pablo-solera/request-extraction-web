@@ -12,10 +12,10 @@ export const metadata: Metadata = { title: "Historial" };
 export default async function HistoryPage({
   searchParams,
 }: {
-  searchParams: Promise<{ created?: string }>;
+  searchParams: Promise<{ created?: string; request?: string }>;
 }) {
   const user = await requireUser();
-  const [{ created }, extractions] = await Promise.all([
+  const [{ created, request }, extractions] = await Promise.all([
     searchParams,
     listExtractionsVisibleToUser(user),
   ]);
@@ -28,13 +28,15 @@ export default async function HistoryPage({
     ? created
     : undefined;
 
+  const openId = z.uuid().safeParse(request).success && extractions.some((item) => item.extraction.requestGroupId === request) ? request : undefined;
+
   return (
     <div className="space-y-7">
       <PageHeader>
         <PageHeader.Title>Historial de extracciones</PageHeader.Title>
        <PageHeader.Description>Consulta y administra las solicitudes que tienes permiso para gestionar.</PageHeader.Description>
       </PageHeader>
-      <ExtractionHistory createdId={createdId} initialTransformer={transformer} draftKey={`extraction-draft-v1-${user.id}`} initialItems={extractions.map((item) => extractionDto(item.extraction, item.requestStatus, identities.get(item.requester.id)?.name ?? item.requester.fallbackName ?? item.requester.fallbackEmail, capabilities.get(item.extraction.readerKey)))} />
+      <ExtractionHistory createdId={createdId} openId={openId} initialTransformer={transformer} draftKey={`extraction-draft-v1-${user.id}`} initialItems={extractions.map((item) => extractionDto(item.extraction, item.requestStatus, identities.get(item.requester.id)?.name ?? item.requester.fallbackName ?? item.requester.fallbackEmail, capabilities.get(item.extraction.readerKey)))} />
     </div>
   );
 }

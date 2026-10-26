@@ -7,6 +7,8 @@ const repository = vi.hoisted(() => Object.fromEntries([
 ].map((name) => [name, vi.fn()])));
 const organization = vi.hoisted(() => ({ isUserInCoordinatorTeam: vi.fn() }));
 
+const notifications = vi.hoisted(() => ({ notifyLoadCompleted: vi.fn(), notifyLoadFailed: vi.fn(), notifyComparisonFailed: vi.fn() }));
+vi.mock("@/lib/mail/notifications", () => notifications);
 vi.mock("@/lib/transformer/repository", () => repository);
 vi.mock("@/lib/employees/org-service", () => organization);
 vi.mock("@/lib/transformer/client", () => ({ getTransformerClient: vi.fn(), MAX_LST_BYTES: 25 * 1024 * 1024 }));
@@ -54,6 +56,7 @@ describe("transformer reconciliation", () => {
       { request: request({ requestGroupId: "b" }), items: [item("11EH")] },
       { request: request({ requestGroupId: "c" }), items: [{ requestGroupId: "c", modelCode: "X", readerParams: { typekey: "X" } }] },
     ]);
+    repository.markLoadFailedToStart.mockResolvedValue({ loadAttempts: 1 });
     client.createLoad
       .mockRejectedValueOnce(new ReaderError("down", "TRANSFORMER_UNAVAILABLE", true))
       .mockRejectedValueOnce(new ReaderError("Typekeys duplicados", "TRANSFORMER_REQUEST_FAILED", false));
@@ -61,6 +64,8 @@ describe("transformer reconciliation", () => {
     await reconcileTransformer(client);
 
     expect(repository.markLoadFailedToStart).toHaveBeenCalledTimes(2);
+    expect(notifications.notifyLoadFailed).toHaveBeenCalledWith("b", "start-1", "Typekeys duplicados");
+    expect(notifications.notifyLoadFailed).toHaveBeenCalledTimes(2);
     expect(repository.markLoadFailedToStart).toHaveBeenCalledWith("b", "Typekeys duplicados");
     expect(repository.markLoadFailedToStart).toHaveBeenCalledWith("c", "La solicitud no tiene los datos necesarios para cargarla.");
     expect(repository.markLoadRequested).not.toHaveBeenCalled();
@@ -179,6 +184,30 @@ describe("live transformer state", () => {
     expect(repository.updateLoadState).not.toHaveBeenCalled();
     expect(repository.claimComparisonPoll).toHaveBeenCalledTimes(1);
     expect(repository.updateComparisonState).toHaveBeenCalledWith("c1", { status: "completed", error: expect.any(String) });
+  });
+
+  it("emails the requester when a load completes and support when a load or comparison fails", async () => {
+    repository.listRequestsByIds.mockResolvedValueOnce([running({ requestGroupId: "a" }), running({ requestGroupId: "b", loadRemoteId: "load-b" })]);
+    repository.claimLoadPoll.mockResolvedValueOnce(running({ requestGroupId: "a" })).mockResolvedValueOnce(running({ requestGroupId: "b", loadRemoteId: "load-b" }));
+    client.getLoad.mockResolvedValueOnce({ requestId: "load-1", status: "completed" }).mockResolvedValueOnce({ requestId: "load-b", status: "failed", error: "SQL no disponible" });
+    repository.listComparisonsForRequests.mockResolvedValueOnce([{ id: "c1", requestGroupId: "a", status: "queued", remoteReportId: "r1" }]);
+    repository.claimComparisonPoll.mockResolvedValueOnce({ id: "c1", requestGroupId: "a", status: "queued", remoteReportId: "r1" });
+    client.getReport.mockResolvedValueOnce({ requestId: "r1", status: "failed", error: "LST no válido" });
+
+    await syncTransformerStates(["a", "b"], client);
+
+    expect(notifications.notifyLoadCompleted).toHaveBeenCalledWith("a", "load-1");
+    expect(notifications.notifyLoadFailed).toHaveBeenCalledWith("b", "load-b", "SQL no disponible");
+    expect(notifications.notifyComparisonFailed).toHaveBeenCalledWith("a", "c1", "LST no válido");
+  });
+
+  it("does not email again when another viewer already recorded the transition", async () => {
+    repository.listRequestsByIds.mockResolvedValueOnce([running()]);
+    repository.claimLoadPoll.mockResolvedValueOnce(running());
+    client.getLoad.mockResolvedValueOnce({ requestId: "load-1", status: "completed" });
+    repository.updateLoadState.mockResolvedValueOnce(null);
+    await syncTransformerStates(["g1"], client);
+    expect(notifications.notifyLoadCompleted).not.toHaveBeenCalled();
   });
 
   it("does nothing when the transformer is not configured", async () => {
