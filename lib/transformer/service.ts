@@ -5,7 +5,7 @@ import { isUserInCoordinatorTeam } from "@/lib/employees/org-service";
 import { ReaderError } from "@/lib/readers/errors";
 import { getTransformerClient, MAX_LST_BYTES, type TransformerClient } from "@/lib/transformer/client";
 import {
-  attachComparisonRemote, failComparison, getComparison, getRequestWithRequester, insertComparison, listActiveComparisons, listActiveLoads,
+  attachComparisonRemote, claimComparisonPoll, claimLoadPoll, failComparison, getComparison, getRequestWithRequester, insertComparison, listActiveComparisons, listActiveLoads,
   listComparisonsForRequests, listRequestsByIds, listRequestsReadyForLoad, markLoadFailedToStart, markLoadRequested, resetFailedLoad, updateComparisonState, updateLoadState,
 } from "@/lib/transformer/repository";
 import type { TransformerRequestInfo } from "@/lib/transformer/info";
@@ -62,35 +62,69 @@ export async function startLoadForRequest(requestGroupId: string, client: Transf
   return ready ? startLoad(client, ready) : false;
 }
 
+type ActiveLoad = Awaited<ReturnType<typeof listActiveLoads>>[number];
+type ActiveComparison = Awaited<ReturnType<typeof listActiveComparisons>>[number];
+
+async function pollLoad(client: TransformerClient, request: ActiveLoad) {
+  try {
+    const state = await client.getLoad(request.loadRemoteId!);
+    const status = mapStatus(state);
+    if (status === request.loadStatus) return false;
+    return Boolean(await updateLoadState(request.requestGroupId, request.loadRemoteId!, { status, error: failureMessage(state, "La carga ha fallado.") }));
+  } catch (error) {
+    if (error instanceof ReaderError && error.retryable) return false;
+    const message = error instanceof ReaderError ? error.message : "No se ha podido consultar la carga.";
+    await updateLoadState(request.requestGroupId, request.loadRemoteId!, { status: "failed", error: message });
+    return false;
+  }
+}
+
+async function pollComparison(client: TransformerClient, comparison: ActiveComparison) {
+  try {
+    const state = await client.getReport(comparison.remoteReportId!);
+    const status = mapStatus(state);
+    if (status === comparison.status) return false;
+    return Boolean(await updateComparisonState(comparison.id, { status, error: failureMessage(state, "La comparación ha fallado.") }));
+  } catch (error) {
+    if (error instanceof ReaderError && error.retryable) return false;
+    await updateComparisonState(comparison.id, { status: "failed", error: error instanceof ReaderError ? error.message : "No se ha podido consultar la comparación." });
+    return false;
+  }
+}
+
 async function pollLoads(client: TransformerClient) {
   let updated = 0;
-  for (const request of await listActiveLoads()) {
-    try {
-      const state = await client.getLoad(request.loadRemoteId!);
-      const status = mapStatus(state);
-      if (status === request.loadStatus) continue;
-      if (await updateLoadState(request.requestGroupId, request.loadRemoteId!, { status, error: failureMessage(state, "La carga ha fallado.") })) updated++;
-    } catch (error) {
-      if (error instanceof ReaderError && error.retryable) continue;
-      const message = error instanceof ReaderError ? error.message : "No se ha podido consultar la carga.";
-      await updateLoadState(request.requestGroupId, request.loadRemoteId!, { status: "failed", error: message });
-    }
-  }
+  for (const request of await listActiveLoads()) if (await pollLoad(client, request)) updated++;
   return updated;
 }
 
 async function pollComparisons(client: TransformerClient) {
   let updated = 0;
-  for (const comparison of await listActiveComparisons()) {
-    try {
-      const state = await client.getReport(comparison.remoteReportId!);
-      const status = mapStatus(state);
-      if (status === comparison.status) continue;
-      if (await updateComparisonState(comparison.id, { status, error: failureMessage(state, "La comparación ha fallado.") })) updated++;
-    } catch (error) {
-      if (error instanceof ReaderError && error.retryable) continue;
-      await updateComparisonState(comparison.id, { status: "failed", error: error instanceof ReaderError ? error.message : "No se ha podido consultar la comparación." });
-    }
+  for (const comparison of await listActiveComparisons()) if (await pollComparison(client, comparison)) updated++;
+  return updated;
+}
+
+export const TRANSFORMER_POLL_INTERVAL_MS = 5_000;
+
+/**
+ * Asks the transformer about the loads and comparisons of the given requests that are still running, so a technician
+ * looking at the history sees the result without waiting for the scheduled reconciliation. Each job is queried at most
+ * once per interval, however many people are watching.
+ */
+export async function syncTransformerStates(requestGroupIds: string[], client: TransformerClient = getTransformerClient(), intervalMs = TRANSFORMER_POLL_INTERVAL_MS) {
+  if (!isTransformerConfigured() || requestGroupIds.length === 0) return 0;
+  const staleBefore = new Date(Date.now() - intervalMs);
+  let updated = 0;
+  const requests = await listRequestsByIds(requestGroupIds);
+  for (const request of requests) {
+    if (request.loadStatus !== "queued" && request.loadStatus !== "running") continue;
+    const claimed = await claimLoadPoll(request.requestGroupId, staleBefore);
+    if (claimed && await pollLoad(client, claimed as ActiveLoad)) updated++;
+  }
+  for (const comparison of await listComparisonsForRequests(requests.map((request) => request.requestGroupId))) {
+    if (comparison.status !== "queued" && comparison.status !== "running") continue;
+    const claimed = await claimComparisonPoll(comparison.id, staleBefore);
+    if (claimed && await pollComparison(client, claimed as ActiveComparison)) updated++;
   }
   return updated;
 }
@@ -150,9 +184,17 @@ export async function getTransformerInfo(requestGroupIds: string[], actor: Actor
   for (const request of requests) {
     try { await requireManageableRequest(request.requestGroupId, actor); visible.push(request); } catch { /* not visible to this actor */ }
   }
-  const comparisons = await listComparisonsForRequests(visible.map((request) => request.requestGroupId));
+  const visibleIds = visible.map((request) => request.requestGroupId);
   const configured = isTransformerConfigured();
-  return Object.fromEntries(visible.map((request) => [request.requestGroupId, {
+  let current = visible;
+  let comparisons = await listComparisonsForRequests(visibleIds);
+  const running = (status: string | null) => status === "queued" || status === "running";
+  if (configured && (current.some((request) => running(request.loadStatus)) || comparisons.some((comparison) => running(comparison.status)))) {
+    await syncTransformerStates(visibleIds).catch((error) => console.error("Transformer state sync failed.", error));
+    current = await listRequestsByIds(visibleIds);
+    comparisons = await listComparisonsForRequests(visibleIds);
+  }
+  return Object.fromEntries(current.map((request) => [request.requestGroupId, {
     requestGroupId: request.requestGroupId,
     applicable: configured && request.manufacturerGroup === "BMW" && request.status === "approved",
     loadStatus: request.loadStatus,

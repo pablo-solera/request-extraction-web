@@ -4,7 +4,7 @@ import { useCallback, useEffect, useRef, useState } from "react";
 import { formatSpanishDateTime } from "@/lib/date-format";
 import type { TransformerComparisonInfo, TransformerRequestInfo } from "@/lib/transformer/info";
 
-const POLL_MS = 10_000;
+const POLL_MS = 5_000;
 const comparisonLabels = { queued: "En cola", running: "Comparando", completed: "Lista", failed: "Fallida" } as const;
 const comparisonStyles = {
   queued: "border-amber-200 bg-amber-50 text-amber-800",

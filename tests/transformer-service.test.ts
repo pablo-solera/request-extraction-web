@@ -2,7 +2,7 @@ import { beforeEach, describe, expect, it, vi } from "vitest";
 import { ReaderError } from "@/lib/readers/errors";
 
 const repository = vi.hoisted(() => Object.fromEntries([
-  "attachComparisonRemote", "failComparison", "getComparison", "getRequestWithRequester", "insertComparison", "listActiveComparisons", "listActiveLoads",
+  "attachComparisonRemote", "claimComparisonPoll", "claimLoadPoll", "failComparison", "getComparison", "getRequestWithRequester", "insertComparison", "listActiveComparisons", "listActiveLoads",
   "listComparisonsForRequests", "listRequestsByIds", "listRequestsReadyForLoad", "markLoadFailedToStart", "markLoadRequested", "resetFailedLoad", "updateComparisonState", "updateLoadState",
 ].map((name) => [name, vi.fn()])));
 const organization = vi.hoisted(() => ({ isUserInCoordinatorTeam: vi.fn() }));
@@ -11,7 +11,8 @@ vi.mock("@/lib/transformer/repository", () => repository);
 vi.mock("@/lib/employees/org-service", () => organization);
 vi.mock("@/lib/transformer/client", () => ({ getTransformerClient: vi.fn(), MAX_LST_BYTES: 25 * 1024 * 1024 }));
 
-import { downloadComparison, getTransformerInfo, reconcileTransformer, retryRequestLoad, startLoadForRequest, uploadComparison } from "@/lib/transformer/service";
+import { getTransformerClient } from "@/lib/transformer/client";
+import { downloadComparison, getTransformerInfo, reconcileTransformer, retryRequestLoad, startLoadForRequest, syncTransformerStates, uploadComparison } from "@/lib/transformer/service";
 
 const client = { createLoad: vi.fn(), getLoad: vi.fn(), createComparison: vi.fn(), getReport: vi.fn(), downloadReport: vi.fn() };
 const owner = { id: "owner", oracleEmpId: 1, role: "employee" as const };
@@ -130,6 +131,77 @@ describe("starting a load when the last typekey completes", () => {
     client.createLoad.mockRejectedValueOnce(new ReaderError("down", "TRANSFORMER_UNAVAILABLE", true));
     expect(await startLoadForRequest("g1", client)).toBe(false);
     expect(repository.markLoadFailedToStart).not.toHaveBeenCalled();
+  });
+});
+
+describe("live transformer state", () => {
+  beforeEach(() => {
+    vi.clearAllMocks();
+    process.env.BMW_TRANSFORMER_BASE_URL = "http://localhost:3005";
+    repository.listComparisonsForRequests.mockResolvedValue([]);
+    repository.updateLoadState.mockResolvedValue({});
+    repository.updateComparisonState.mockResolvedValue({});
+  });
+  const running = (overrides: Record<string, unknown> = {}) => request({ loadStatus: "running", loadRemoteId: "load-1", ...overrides });
+
+  it("moves a finished load to completed so the LST can be uploaded", async () => {
+    repository.listRequestsByIds.mockResolvedValueOnce([running()]);
+    repository.claimLoadPoll.mockResolvedValueOnce(running());
+    client.getLoad.mockResolvedValueOnce({ requestId: "load-1", status: "completed", pivotKey: "k" });
+
+    expect(await syncTransformerStates(["g1"], client)).toBe(1);
+    expect(repository.claimLoadPoll).toHaveBeenCalledWith("g1", expect.any(Date));
+    expect(repository.updateLoadState).toHaveBeenCalledWith("g1", "load-1", { status: "completed", error: expect.any(String) });
+  });
+
+  it("asks the transformer at most once per interval", async () => {
+    repository.listRequestsByIds.mockResolvedValueOnce([running()]);
+    repository.claimLoadPoll.mockResolvedValueOnce(null);
+    expect(await syncTransformerStates(["g1"], client, 5000)).toBe(0);
+    expect(client.getLoad).not.toHaveBeenCalled();
+    const [, staleBefore] = repository.claimLoadPoll.mock.calls[0] as [string, Date];
+    expect(Date.now() - staleBefore.getTime()).toBeGreaterThanOrEqual(4900);
+  });
+
+  it("follows running comparisons, skips finished work and keeps transient errors pending", async () => {
+    repository.listRequestsByIds.mockResolvedValueOnce([running({ requestGroupId: "a" }), request({ requestGroupId: "b", loadStatus: "completed", loadRemoteId: "lb" })]);
+    repository.claimLoadPoll.mockResolvedValueOnce(running({ requestGroupId: "a" }));
+    client.getLoad.mockRejectedValueOnce(new ReaderError("down", "TRANSFORMER_UNAVAILABLE", true));
+    repository.listComparisonsForRequests.mockResolvedValueOnce([
+      { id: "c1", requestGroupId: "b", status: "queued", remoteReportId: "r1" },
+      { id: "c2", requestGroupId: "b", status: "completed", remoteReportId: "r2" },
+    ]);
+    repository.claimComparisonPoll.mockResolvedValueOnce({ id: "c1", status: "queued", remoteReportId: "r1" });
+    client.getReport.mockResolvedValueOnce({ requestId: "r1", status: "completed" });
+
+    expect(await syncTransformerStates(["a", "b"], client)).toBe(1);
+    expect(repository.claimLoadPoll).toHaveBeenCalledTimes(1);
+    expect(repository.updateLoadState).not.toHaveBeenCalled();
+    expect(repository.claimComparisonPoll).toHaveBeenCalledTimes(1);
+    expect(repository.updateComparisonState).toHaveBeenCalledWith("c1", { status: "completed", error: expect.any(String) });
+  });
+
+  it("does nothing when the transformer is not configured", async () => {
+    delete process.env.BMW_TRANSFORMER_BASE_URL;
+    expect(await syncTransformerStates(["g1"], client)).toBe(0);
+    expect(repository.listRequestsByIds).not.toHaveBeenCalled();
+  });
+
+  it("returns the refreshed state from the history info while a load was running", async () => {
+    organization.isUserInCoordinatorTeam.mockResolvedValue(false);
+    repository.getRequestWithRequester.mockResolvedValue({ request: running(), requester: { id: "owner", oracleEmpId: 1 } });
+    repository.listRequestsByIds
+      .mockResolvedValueOnce([running()])
+      .mockResolvedValueOnce([running()])
+      .mockResolvedValueOnce([request({ loadStatus: "completed", loadRemoteId: "load-1", loadedAt: new Date("2026-10-26T14:21:00Z") })]);
+    repository.claimLoadPoll.mockResolvedValueOnce(running());
+    client.getLoad.mockResolvedValueOnce({ requestId: "load-1", status: "completed" });
+    vi.mocked(getTransformerClient).mockReturnValue(client as never);
+
+    const info = await getTransformerInfo(["g1"], owner);
+    expect(client.getLoad).toHaveBeenCalledWith("load-1");
+    expect(repository.updateLoadState).toHaveBeenCalledWith("g1", "load-1", { status: "completed", error: expect.any(String) });
+    expect(info.g1).toMatchObject({ loadStatus: "completed", canUpload: true });
   });
 });
 

@@ -60,6 +60,7 @@ export const extractionRequests = pgTable("extraction_requests", {
   loadAttempts: integer("load_attempts").default(0).notNull(),
   loadRequestedAt: timestamp("load_requested_at", { withTimezone: true }),
   loadedAt: timestamp("loaded_at", { withTimezone: true }),
+  loadPolledAt: timestamp("load_polled_at", { withTimezone: true }),
   decisionComment: text("decision_comment"),
   decidedById: uuid("decided_by_id").references(() => users.id, { onDelete: "set null" }),
   decidedAt: timestamp("decided_at", { withTimezone: true }),
@@ -128,6 +129,7 @@ export const comparisonReports = pgTable("comparison_reports", {
   createdAt: timestamp("created_at", { withTimezone: true }).defaultNow().notNull(),
   updatedAt: timestamp("updated_at", { withTimezone: true }).defaultNow().notNull(),
   completedAt: timestamp("completed_at", { withTimezone: true }),
+  polledAt: timestamp("polled_at", { withTimezone: true }),
 }, (table) => [
   index("comparison_reports_request_created_idx").on(table.requestGroupId, table.createdAt),
   index("comparison_reports_active_idx").on(table.updatedAt).where(sql`${table.status} IN ('queued', 'running')`),

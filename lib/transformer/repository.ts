@@ -1,6 +1,6 @@
 import "server-only";
 
-import { and, desc, eq, inArray, isNull, sql } from "drizzle-orm";
+import { and, desc, eq, inArray, isNull, lte, or, sql } from "drizzle-orm";
 import { getDb } from "@/db";
 import { comparisonReports, extractionRequests, extractions, users, type TransformerJobStatus } from "@/db/schema";
 
@@ -54,6 +54,27 @@ export async function updateLoadState(requestGroupId: string, remoteId: string, 
     inArray(extractionRequests.loadStatus, ["queued", "running"]),
   )).returning();
   return request ?? null;
+}
+
+/** Reserves the right to ask the transformer about a load, so concurrent viewers do not all query it. */
+export async function claimLoadPoll(requestGroupId: string, staleBefore: Date) {
+  const [request] = await getDb().update(extractionRequests).set({ loadPolledAt: new Date() }).where(and(
+    eq(extractionRequests.requestGroupId, requestGroupId),
+    inArray(extractionRequests.loadStatus, ["queued", "running"]),
+    sql`${extractionRequests.loadRemoteId} IS NOT NULL`,
+    or(isNull(extractionRequests.loadPolledAt), lte(extractionRequests.loadPolledAt, staleBefore)),
+  )).returning();
+  return request ?? null;
+}
+
+export async function claimComparisonPoll(id: string, staleBefore: Date) {
+  const [row] = await getDb().update(comparisonReports).set({ polledAt: new Date() }).where(and(
+    eq(comparisonReports.id, id),
+    inArray(comparisonReports.status, ["queued", "running"]),
+    sql`${comparisonReports.remoteReportId} IS NOT NULL`,
+    or(isNull(comparisonReports.polledAt), lte(comparisonReports.polledAt, staleBefore)),
+  )).returning();
+  return row ?? null;
 }
 
 /** Lets the technician send a failed load again; the next reconciliation picks it up. */
