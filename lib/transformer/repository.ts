@@ -7,11 +7,12 @@ import { comparisonReports, extractionRequests, extractions, users, type Transfo
 const requesterColumns = { id: users.id, oracleEmpId: users.oracleEmpId, fallbackName: users.fallbackName, fallbackEmail: users.fallbackEmail };
 
 /** Approved BMW requests whose typekeys have all completed and that have not been sent to the transformer yet. */
-export async function listRequestsReadyForLoad(limit = 20) {
+export async function listRequestsReadyForLoad(limit = 20, requestGroupId?: string) {
   const requests = await getDb().select().from(extractionRequests).where(and(
     eq(extractionRequests.status, "approved"),
     eq(extractionRequests.manufacturerGroup, "BMW"),
     isNull(extractionRequests.loadStatus),
+    requestGroupId ? eq(extractionRequests.requestGroupId, requestGroupId) : undefined,
     sql`EXISTS (SELECT 1 FROM ${extractions} WHERE ${extractions.requestGroupId} = ${extractionRequests.requestGroupId})`,
     sql`NOT EXISTS (SELECT 1 FROM ${extractions} WHERE ${extractions.requestGroupId} = ${extractionRequests.requestGroupId} AND ${extractions.status} <> 'completed')`,
   )).orderBy(extractionRequests.createdAt).limit(limit);

@@ -1,5 +1,6 @@
 import "server-only";
 
+import { startLoadForRequest } from "@/lib/transformer/service";
 import { retryableItems } from "@/lib/extractions/request-summary";
 import type { Extraction, ExtractionStatus } from "@/db/schema";
 import {
@@ -109,7 +110,7 @@ async function syncExtraction(extraction: Extraction) {
     const reader = getExtractionReader(extraction.readerKey);
     const remote = await reader.getState(extraction.remoteRequestId);
     const status = reader.mapStatus(remote);
-    return updateExtractionState(extraction.id, {
+    const updated = await updateExtractionState(extraction.id, {
       status,
       errorCode: status === "failed" ? "JOB_FAILED" : null,
       errorMessage: status === "failed" ? reader.failureMessage(remote) : null,
@@ -117,6 +118,10 @@ async function syncExtraction(extraction: Extraction) {
       readerStatus: remote.status,
       readerStalled: remote.readerStalled ?? false,
     });
+    if (status === "completed") {
+      await startLoadForRequest(extraction.requestGroupId).catch((error) => console.error("Transformer load could not be started.", error));
+    }
+    return updated;
   } catch (error) {
     if (error instanceof ReaderError && error.retryable) return extraction;
     const readerError = error instanceof ReaderError ? error : null;

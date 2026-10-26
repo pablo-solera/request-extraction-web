@@ -41,6 +41,8 @@ vi.mock("@/lib/readers/bmw/client", () => bmwReader);
 vi.mock("@/lib/readers/renault/client", async () => ({ getRenaultLabourFamilies: bmwReader.getRenaultLabourFamilies }));
 const organization = vi.hoisted(() => ({ findCoordinatorUser: vi.fn(), findCoordinatorTeamUserIds: vi.fn(), isUserInCoordinatorTeam: vi.fn() }));
 vi.mock("@/lib/employees/org-service", () => organization);
+const transformer = vi.hoisted(() => ({ startLoadForRequest: vi.fn() }));
+vi.mock("@/lib/transformer/service", () => transformer);
 
 import { createExtraction, extractionDto, reconcileActiveExtractions, submitNewApprovedRequest } from "@/lib/extractions/service";
 
@@ -134,6 +136,40 @@ describe("reader registry extraction flow", () => {
     expect(registry.getExtractionReader).toHaveBeenCalledWith("bmw-labours");
     expect(reader.getState).toHaveBeenCalledWith("remote-1");
     expect(repository.updateExtractionState).toHaveBeenCalledWith("e1", { status: "running", errorCode: null, errorMessage: null, progress: 42, readerStatus: "rate_limited", readerStalled: false });
+  });
+
+  it("starts the BMW_Labour load as soon as a typekey completes, and only then", async () => {
+    transformer.startLoadForRequest.mockResolvedValue(true);
+    repository.updateExtractionState.mockResolvedValue({ ...extraction, status: "completed" });
+    const bmw = { ...extraction, readerKey: "bmw-labours", status: "running", remoteRequestId: "remote-1" };
+    repository.listActiveExtractions.mockResolvedValueOnce([bmw]);
+    reader.getState.mockResolvedValueOnce({ status: "completed", progress: 100, error: null });
+    reader.mapStatus.mockReturnValueOnce("completed");
+
+    await reconcileActiveExtractions();
+    expect(transformer.startLoadForRequest).toHaveBeenCalledTimes(1);
+    expect(transformer.startLoadForRequest).toHaveBeenCalledWith("g1");
+
+    transformer.startLoadForRequest.mockClear();
+    repository.listActiveExtractions.mockResolvedValueOnce([bmw]);
+    reader.getState.mockResolvedValueOnce({ status: "running", progress: 40, error: null });
+    reader.mapStatus.mockReturnValueOnce("running");
+    await reconcileActiveExtractions();
+    expect(transformer.startLoadForRequest).not.toHaveBeenCalled();
+  });
+
+  it("keeps the extraction completed when the transformer cannot be reached", async () => {
+    transformer.startLoadForRequest.mockRejectedValueOnce(new Error("transformer down"));
+    repository.updateExtractionState.mockResolvedValue({ ...extraction, status: "completed" });
+    const bmw = { ...extraction, readerKey: "bmw-labours", status: "running", remoteRequestId: "remote-1" };
+    repository.listActiveExtractions.mockResolvedValueOnce([bmw]);
+    reader.getState.mockResolvedValueOnce({ status: "completed", progress: 100, error: null });
+    reader.mapStatus.mockReturnValueOnce("completed");
+    const log = vi.spyOn(console, "error").mockImplementation(() => undefined);
+
+    await expect(reconcileActiveExtractions()).resolves.toBe(1);
+    expect(log).toHaveBeenCalled();
+    log.mockRestore();
   });
 
   it("polls live progress only for BMW rows and leaves Renault on the scheduled reconciliation", async () => {

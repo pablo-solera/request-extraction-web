@@ -26,27 +26,40 @@ function mapStatus(state: TransformerState): TransformerJobStatus {
 
 const failureMessage = (state: TransformerState, fallback: string) => state.error?.slice(0, 500) || fallback;
 
+type ReadyRequest = Awaited<ReturnType<typeof listRequestsReadyForLoad>>[number];
+
+/** Sends one request to the transformer. Returns true when the load was queued; the claim in markLoadRequested keeps a request from being loaded twice. */
+async function startLoad(client: TransformerClient, { request, items }: ReadyRequest) {
+  const typekeys = items.flatMap((item) => {
+    const { typekey, series, developmentCode } = item.readerParams;
+    return typekey && series && developmentCode ? [{ typekey, series, family: developmentCode }] : [];
+  });
+  const brand = request.brand === "MINI" ? "MINI" : request.brand === "BMW" ? "BMW" : null;
+  if (!brand || typekeys.length !== items.length) {
+    await markLoadFailedToStart(request.requestGroupId, "La solicitud no tiene los datos necesarios para cargarla.");
+    return false;
+  }
+  try {
+    const { loadId } = await client.createLoad({ axCode: request.axCode, imcEdition: request.imcEdition, brand, typekeys });
+    return Boolean(await markLoadRequested(request.requestGroupId, loadId));
+  } catch (error) {
+    if (error instanceof ReaderError && error.retryable) return false;
+    await markLoadFailedToStart(request.requestGroupId, error instanceof ReaderError ? error.message : "No se ha podido iniciar la carga.");
+    return false;
+  }
+}
+
 async function startLoads(client: TransformerClient) {
   let started = 0;
-  for (const { request, items } of await listRequestsReadyForLoad()) {
-    const typekeys = items.flatMap((item) => {
-      const { typekey, series, developmentCode } = item.readerParams;
-      return typekey && series && developmentCode ? [{ typekey, series, family: developmentCode }] : [];
-    });
-    const brand = request.brand === "MINI" ? "MINI" : request.brand === "BMW" ? "BMW" : null;
-    if (!brand || typekeys.length !== items.length) {
-      await markLoadFailedToStart(request.requestGroupId, "La solicitud no tiene los datos necesarios para cargarla.");
-      continue;
-    }
-    try {
-      const { loadId } = await client.createLoad({ axCode: request.axCode, imcEdition: request.imcEdition, brand, typekeys });
-      if (await markLoadRequested(request.requestGroupId, loadId)) started++;
-    } catch (error) {
-      if (error instanceof ReaderError && error.retryable) continue;
-      await markLoadFailedToStart(request.requestGroupId, error instanceof ReaderError ? error.message : "No se ha podido iniciar la carga.");
-    }
-  }
+  for (const ready of await listRequestsReadyForLoad()) if (await startLoad(client, ready)) started++;
   return started;
+}
+
+/** Called when a typekey completes: loads the request right away if that was its last one. Safe to call for any request. */
+export async function startLoadForRequest(requestGroupId: string, client: TransformerClient = getTransformerClient()) {
+  if (!isTransformerConfigured()) return false;
+  const [ready] = await listRequestsReadyForLoad(1, requestGroupId);
+  return ready ? startLoad(client, ready) : false;
 }
 
 async function pollLoads(client: TransformerClient) {

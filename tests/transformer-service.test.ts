@@ -11,7 +11,7 @@ vi.mock("@/lib/transformer/repository", () => repository);
 vi.mock("@/lib/employees/org-service", () => organization);
 vi.mock("@/lib/transformer/client", () => ({ getTransformerClient: vi.fn(), MAX_LST_BYTES: 25 * 1024 * 1024 }));
 
-import { downloadComparison, getTransformerInfo, reconcileTransformer, retryRequestLoad, uploadComparison } from "@/lib/transformer/service";
+import { downloadComparison, getTransformerInfo, reconcileTransformer, retryRequestLoad, startLoadForRequest, uploadComparison } from "@/lib/transformer/service";
 
 const client = { createLoad: vi.fn(), getLoad: vi.fn(), createComparison: vi.fn(), getReport: vi.fn(), downloadReport: vi.fn() };
 const owner = { id: "owner", oracleEmpId: 1, role: "employee" as const };
@@ -90,6 +90,46 @@ describe("transformer reconciliation", () => {
     expect(repository.updateLoadState).not.toHaveBeenCalledWith("c", expect.anything(), expect.anything());
     expect(repository.updateComparisonState).toHaveBeenCalledWith("cmp", { status: "completed", error: expect.any(String) });
     expect(result.updated).toBe(3);
+  });
+});
+
+describe("starting a load when the last typekey completes", () => {
+  beforeEach(() => {
+    vi.clearAllMocks();
+    process.env.BMW_TRANSFORMER_BASE_URL = "http://localhost:3005";
+  });
+
+  it("loads only that request and queues it once", async () => {
+    repository.listRequestsReadyForLoad.mockResolvedValueOnce([{ request: request(), items: [item("11EH")] }]);
+    client.createLoad.mockResolvedValueOnce({ loadId: "load-1", reused: false });
+    repository.markLoadRequested.mockResolvedValueOnce({});
+
+    expect(await startLoadForRequest("g1", client)).toBe(true);
+    expect(repository.listRequestsReadyForLoad).toHaveBeenCalledWith(1, "g1");
+    expect(client.createLoad).toHaveBeenCalledTimes(1);
+  });
+
+  it("does nothing while other typekeys are pending, when already requested or when the transformer is not configured", async () => {
+    repository.listRequestsReadyForLoad.mockResolvedValueOnce([]);
+    expect(await startLoadForRequest("g1", client)).toBe(false);
+    expect(client.createLoad).not.toHaveBeenCalled();
+
+    repository.listRequestsReadyForLoad.mockResolvedValueOnce([{ request: request(), items: [item("11EH")] }]);
+    client.createLoad.mockResolvedValueOnce({ loadId: "load-1", reused: true });
+    repository.markLoadRequested.mockResolvedValueOnce(null);
+    expect(await startLoadForRequest("g1", client)).toBe(false);
+
+    delete process.env.BMW_TRANSFORMER_BASE_URL;
+    repository.listRequestsReadyForLoad.mockClear();
+    expect(await startLoadForRequest("g1", client)).toBe(false);
+    expect(repository.listRequestsReadyForLoad).not.toHaveBeenCalled();
+  });
+
+  it("leaves the request for the next reconciliation when the transformer is unavailable", async () => {
+    repository.listRequestsReadyForLoad.mockResolvedValueOnce([{ request: request(), items: [item("11EH")] }]);
+    client.createLoad.mockRejectedValueOnce(new ReaderError("down", "TRANSFORMER_UNAVAILABLE", true));
+    expect(await startLoadForRequest("g1", client)).toBe(false);
+    expect(repository.markLoadFailedToStart).not.toHaveBeenCalled();
   });
 });
 
