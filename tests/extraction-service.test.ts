@@ -177,6 +177,25 @@ describe("reader registry extraction flow", () => {
     expect(notifications.notifyExtractionFailures).not.toHaveBeenCalled();
   });
 
+  it("checks for failures on every final transition, including a cancellation", async () => {
+    const actor = { id: "employee-1", oracleEmpId: 321, role: "employee" as const };
+    const { performExtractionAction } = await import("@/lib/extractions/service");
+    notifications.notifyExtractionFailures.mockClear();
+    repository.getExtractionWithRequester.mockResolvedValueOnce({ extraction: { ...extraction, userId: actor.id }, requestStatus: "approved", requester: { id: actor.id, oracleEmpId: 321 } });
+    repository.cancelUnsubmittedExtraction.mockResolvedValueOnce({ ...extraction, status: "cancelled" });
+    await performExtractionAction("e1", "cancel", actor);
+    expect(notifications.notifyExtractionFailures).toHaveBeenCalledWith("g1");
+
+    notifications.notifyExtractionFailures.mockClear();
+    repository.updateExtractionState.mockResolvedValue({ ...extraction, status: "completed" });
+    const bmw = { ...extraction, readerKey: "bmw-labours", status: "running", remoteRequestId: "remote-1" };
+    repository.listActiveExtractions.mockResolvedValueOnce([bmw]);
+    reader.getState.mockResolvedValueOnce({ status: "completed", progress: 100, error: null });
+    reader.mapStatus.mockReturnValueOnce("completed");
+    await reconcileActiveExtractions();
+    expect(notifications.notifyExtractionFailures).toHaveBeenCalledWith("g1");
+  });
+
   it("keeps the extraction completed when the transformer cannot be reached", async () => {
     transformer.startLoadForRequest.mockRejectedValueOnce(new Error("transformer down"));
     repository.updateExtractionState.mockResolvedValue({ ...extraction, status: "completed" });

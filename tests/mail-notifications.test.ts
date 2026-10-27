@@ -1,12 +1,17 @@
 import { beforeEach, describe, expect, it, vi } from "vitest";
 
 const mocks = vi.hoisted(() => ({
-  claimNotification: vi.fn(), markNotificationSent: vi.fn(), markNotificationFailed: vi.fn(),
+  claimNotification: vi.fn(), markNotificationSent: vi.fn(), markNotificationFailed: vi.fn(), markNotificationSkipped: vi.fn(), listRetryableNotifications: vi.fn(),
+  getRequestWithRequester: vi.fn(), getComparison: vi.fn(),
   listRequestExtractions: vi.fn(), resolveUserIdentities: vi.fn(),
   isMailEnabled: vi.fn(), sendMail: vi.fn(),
 }));
 
-vi.mock("@/lib/mail/repository", () => ({ claimNotification: mocks.claimNotification, markNotificationSent: mocks.markNotificationSent, markNotificationFailed: mocks.markNotificationFailed }));
+vi.mock("@/lib/mail/repository", () => ({
+  claimNotification: mocks.claimNotification, markNotificationSent: mocks.markNotificationSent, markNotificationFailed: mocks.markNotificationFailed,
+  markNotificationSkipped: mocks.markNotificationSkipped, listRetryableNotifications: mocks.listRetryableNotifications,
+}));
+vi.mock("@/lib/transformer/repository", () => ({ getRequestWithRequester: mocks.getRequestWithRequester, getComparison: mocks.getComparison }));
 vi.mock("@/lib/extractions/repository", () => ({ listRequestExtractions: mocks.listRequestExtractions }));
 vi.mock("@/lib/employees/identity-service", () => ({ resolveUserIdentities: mocks.resolveUserIdentities }));
 vi.mock("@/lib/mail/mailer", () => ({
@@ -15,7 +20,7 @@ vi.mock("@/lib/mail/mailer", () => ({
   applicationUrl: (path: string) => `https://app.example${path}`,
 }));
 
-import { notifyComparisonFailed, notifyExtractionFailures, notifyLoadCompleted, notifyLoadFailed } from "@/lib/mail/notifications";
+import { notifyComparisonFailed, notifyExtractionFailures, notifyLoadCompleted, notifyLoadFailed, retryPendingNotifications } from "@/lib/mail/notifications";
 
 const requester = { id: "u1", oracleEmpId: 1, fallbackName: null, fallbackEmail: null };
 const row = (modelCode: string, status: string, extra: Record<string, unknown> = {}, requestStatus = "approved") => ({
@@ -30,6 +35,7 @@ describe("mail notifications", () => {
     mocks.claimNotification.mockResolvedValue({ id: "n1" });
     mocks.markNotificationFailed.mockResolvedValue(undefined);
     mocks.markNotificationSent.mockResolvedValue(undefined);
+    mocks.markNotificationSkipped.mockResolvedValue(undefined);
     mocks.sendMail.mockResolvedValue(true);
     mocks.listRequestExtractions.mockResolvedValue([row("31BB", "completed")]);
     mocks.resolveUserIdentities.mockResolvedValue(new Map([["u1", { name: "Ana Pérez", email: "ana@audatex.es", wdNumber: null }]]));
@@ -73,7 +79,8 @@ describe("mail notifications", () => {
     mocks.resolveUserIdentities.mockResolvedValueOnce(new Map([["u1", { name: "Ana", email: null, wdNumber: null }]]));
     expect(await notifyLoadCompleted("g1", "load-1")).toBe(false);
     expect(mocks.sendMail).not.toHaveBeenCalled();
-    expect(mocks.markNotificationFailed).toHaveBeenCalledWith("n1");
+    expect(mocks.markNotificationSkipped).toHaveBeenCalledWith("n1");
+    expect(mocks.markNotificationFailed).not.toHaveBeenCalled();
     warn.mockRestore();
   });
 
@@ -112,5 +119,38 @@ describe("mail notifications", () => {
     mocks.listRequestExtractions.mockResolvedValueOnce([row("31BB", "failed", {}, "pending")]);
     expect(await notifyExtractionFailures("g1")).toBe(false);
     expect(mocks.sendMail).not.toHaveBeenCalled();
+  });
+
+  describe("retrying notifications left behind", () => {
+    const stored = (kind: string, ref: string, extra: Record<string, unknown> = {}) => ({ id: `row-${kind}`, requestGroupId: "g1", kind, ref, status: "failed", attempts: 1, ...extra });
+
+    it("sends again what failed, rebuilding the details from the request", async () => {
+      mocks.listRetryableNotifications.mockResolvedValueOnce([stored("load_completed", "load-1"), stored("load_failed", "load-2"), stored("comparison_failed", "cmp-1")]);
+      mocks.getRequestWithRequester
+        .mockResolvedValueOnce({ request: { loadStatus: "completed", loadRemoteId: "load-1", loadError: null } })
+        .mockResolvedValueOnce({ request: { loadStatus: "failed", loadRemoteId: "load-2", loadError: "SQL no disponible" } })
+        .mockResolvedValueOnce({ request: { loadStatus: "completed", loadRemoteId: "load-9", loadError: null } });
+      mocks.getComparison.mockResolvedValueOnce({ errorMessage: "LST no válido" });
+
+      expect(await retryPendingNotifications()).toBe(3);
+      expect(mocks.sendMail).toHaveBeenCalledTimes(3);
+      expect(mocks.sendMail.mock.calls[1]![0].text).toContain("- Error: SQL no disponible");
+      expect(mocks.sendMail.mock.calls[2]![0].text).toContain("- Error: LST no válido");
+    });
+
+    it("skips a completed-load notice whose load was replaced since and unknown kinds", async () => {
+      mocks.listRetryableNotifications.mockResolvedValueOnce([stored("load_completed", "old-load"), stored("something_else", "x")]);
+      mocks.getRequestWithRequester.mockResolvedValue({ request: { loadStatus: "completed", loadRemoteId: "new-load", loadError: null } });
+      expect(await retryPendingNotifications()).toBe(0);
+      expect(mocks.markNotificationSkipped).toHaveBeenCalledWith("row-load_completed");
+      expect(mocks.markNotificationSkipped).toHaveBeenCalledWith("row-something_else");
+      expect(mocks.sendMail).not.toHaveBeenCalled();
+    });
+
+    it("does nothing while mail is disabled", async () => {
+      mocks.isMailEnabled.mockReturnValue(false);
+      expect(await retryPendingNotifications()).toBe(0);
+      expect(mocks.listRetryableNotifications).not.toHaveBeenCalled();
+    });
   });
 });

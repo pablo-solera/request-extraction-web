@@ -3,7 +3,8 @@ import "server-only";
 import { resolveUserIdentities } from "@/lib/employees/identity-service";
 import { listRequestExtractions } from "@/lib/extractions/repository";
 import { applicationUrl, getMailSettings, isMailEnabled, sendMail } from "@/lib/mail/mailer";
-import { claimNotification, markNotificationFailed, markNotificationSent } from "@/lib/mail/repository";
+import { claimNotification, listRetryableNotifications, markNotificationFailed, markNotificationSent, markNotificationSkipped } from "@/lib/mail/repository";
+import { getComparison, getRequestWithRequester } from "@/lib/transformer/repository";
 import { loadCompletedMail, supportMail, type MailContent, type RequestSummary, type SupportEvent } from "@/lib/mail/templates";
 
 type Delivery = { to: string; content: MailContent } | null;
@@ -32,7 +33,7 @@ async function deliver(kind: string, requestGroupId: string, ref: string, build:
     const delivery = await build();
     if (!delivery) {
       console.warn(`Mail notification ${kind} skipped: no recipient available.`);
-      await markNotificationFailed(claim.id);
+      await markNotificationSkipped(claim.id);
       return false;
     }
     await sendMail({ to: delivery.to, ...delivery.content });
@@ -87,4 +88,33 @@ export async function notifyExtractionFailures(requestGroupId: string) {
     console.error("Mail notification extraction_failed failed (lookup).");
     return false;
   }
+}
+
+/**
+ * Sends again the notifications that failed or were left behind by a crash, at most MAX_MAIL_ATTEMPTS times each.
+ * Whatever is no longer true (a load that was reset since) is skipped instead of sent.
+ */
+export async function retryPendingNotifications() {
+  if (!isMailEnabled()) return 0;
+  let sent = 0;
+  try {
+    for (const row of await listRetryableNotifications()) {
+      const request = (await getRequestWithRequester(row.requestGroupId))?.request;
+      let ok = false;
+      if (row.kind === "load_completed") {
+        if (request?.loadStatus === "completed" && request.loadRemoteId === row.ref) ok = await notifyLoadCompleted(row.requestGroupId, row.ref);
+        else await markNotificationSkipped(row.id);
+      } else if (row.kind === "load_failed") {
+        ok = await notifyLoadFailed(row.requestGroupId, row.ref, request?.loadError ?? null);
+      } else if (row.kind === "comparison_failed") {
+        ok = await notifyComparisonFailed(row.requestGroupId, row.ref, (await getComparison(row.ref))?.errorMessage ?? null);
+      } else if (row.kind === "extraction_failed") {
+        ok = await notifyExtractionFailures(row.requestGroupId);
+      } else await markNotificationSkipped(row.id);
+      if (ok) sent++;
+    }
+  } catch {
+    console.error("Mail notification retry failed (lookup).");
+  }
+  return sent;
 }

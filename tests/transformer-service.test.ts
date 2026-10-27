@@ -7,7 +7,7 @@ const repository = vi.hoisted(() => Object.fromEntries([
 ].map((name) => [name, vi.fn()])));
 const organization = vi.hoisted(() => ({ isUserInCoordinatorTeam: vi.fn() }));
 
-const notifications = vi.hoisted(() => ({ notifyLoadCompleted: vi.fn(), notifyLoadFailed: vi.fn(), notifyComparisonFailed: vi.fn() }));
+const notifications = vi.hoisted(() => ({ notifyLoadCompleted: vi.fn(), notifyLoadFailed: vi.fn(), notifyComparisonFailed: vi.fn(), retryPendingNotifications: vi.fn() }));
 vi.mock("@/lib/mail/notifications", () => notifications);
 vi.mock("@/lib/transformer/repository", () => repository);
 vi.mock("@/lib/employees/org-service", () => organization);

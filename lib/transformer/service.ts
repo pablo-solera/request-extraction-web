@@ -11,7 +11,7 @@ import {
 import type { TransformerRequestInfo } from "@/lib/transformer/info";
 import type { TransformerState } from "@/lib/transformer/types";
 import type { UserRole } from "@/lib/auth/session";
-import { notifyComparisonFailed, notifyLoadCompleted, notifyLoadFailed } from "@/lib/mail/notifications";
+import { notifyComparisonFailed, notifyLoadCompleted, notifyLoadFailed, retryPendingNotifications } from "@/lib/mail/notifications";
 
 type Actor = { id: string; oracleEmpId: number | null; role: UserRole };
 
@@ -175,6 +175,7 @@ export async function reconcileTransformer(client: TransformerClient = getTransf
   if (!isTransformerConfigured()) return { started: 0, updated: 0 };
   const started = await startLoads(client);
   const updated = await pollLoads(client) + await pollComparisons(client);
+  await retryPendingNotifications();
   return { started, updated };
 }
 

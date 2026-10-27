@@ -127,7 +127,7 @@ async function syncExtraction(extraction: Extraction) {
     if (status === "completed") {
       await startLoadForRequest(extraction.requestGroupId).catch((error) => console.error("Transformer load could not be started.", error));
     }
-    if (status === "failed") await notifyExtractionFailures(extraction.requestGroupId);
+    if (status === "completed" || status === "failed" || status === "cancelled") await notifyExtractionFailures(extraction.requestGroupId);
     return updated;
   } catch (error) {
     if (error instanceof ReaderError && error.retryable) return extraction;
@@ -219,6 +219,7 @@ export async function performExtractionAction(
       const cancelled = await cancelUnsubmittedExtraction(id);
       if (!cancelled) throw new ReaderError("La extracción se está enviando al reader; vuelve a intentarlo en unos segundos.", "ACTION_CONFLICT", true, 409);
       await recordAction("succeeded", "cancelled");
+      await notifyExtractionFailures(extraction.requestGroupId);
       return { status: "cancelled" as const, readerStatus: "cancelled" };
     }
     const reader = getExtractionReader(extraction.readerKey);
@@ -228,6 +229,7 @@ export async function performExtractionAction(
     catch (error) { throw localizedReaderActionError(error); }
     if (result.status === "cancelled") {
       await updateExtractionState(id, { status: "cancelled", errorCode: null, errorMessage: null, readerStatus: "cancelled", readerStalled: false });
+      await notifyExtractionFailures(extraction.requestGroupId);
     } else {
       await updateExtractionState(id, { status: "running", errorCode: null, errorMessage: null, readerStatus: "cancelling", readerStalled: false });
     }

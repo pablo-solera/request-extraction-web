@@ -12,7 +12,7 @@ Portal interno para solicitar y seguir extracciones técnicas de distintos fabri
 - Extracciones BMW/MINI por typekey. Al pulsar "Continuar" en el paso "Modelos" el formulario comprueba, de tres en tres, que BMW Flat Rates tenga tiempos para cada typekey (`GET /api/readers/bmw/availability`, que consulta `GET /v1/models/availability` del reader). Los no disponibles (`CGWATB0085`) se revisan en ese mismo paso: si su tipo base tiene datos se muestra en qué características difiere y el técnico decide con un tick (sustituir) o una cruz (quitar el typekey de la solicitud); sin tipo base con datos solo se puede quitar. El paso "Resumen" mantiene el bloqueo del envío como red de seguridad. Si BMW no responde, se permite continuar y el reader lo rechaza con `422 NOT_AVAILABLE` si procede.
 - Mercedes, Grupo VAG y piezas visibles como próximas integraciones.
 
-El envío de correo y el correo en copia no forman parte de esta aplicación.
+Los correos de aviso (solicitante y soporte) se describen en la sección "Correos"; el correo en copia al coordinador no está implementado.
 
 ## Requisitos
 
@@ -64,7 +64,7 @@ Los valores sensibles de `work-from-home` no se copian al repositorio. Deben sum
 
 ## Base de datos
 
-La tabla única `extractions` contiene una fila por vehículo y dominio. Las filas del mismo envío comparten `request_group_id`; los parámetros variables del reader se conservan en `reader_params` junto con su versión.
+Las solicitudes se guardan en `extraction_requests` (datos comunes de la solicitud, estado de la carga en BMW_Labour), con una fila por typekey o familia en `extractions` (comparten `request_group_id`; los parámetros variables del reader se conservan en `reader_params` junto con su versión). `comparison_reports` guarda las comparaciones con el `.LST` y `mail_notifications` los avisos enviados. Cada fila de `extractions` contiene
 
 Ejecuta las migraciones antes de iniciar la aplicación:
 
@@ -134,4 +134,4 @@ Con `MAIL_ENABLED=true` la web envía, a través del relay SMTP interno (mismo m
 - **Al solicitante**, cuando la extracción termina y sus datos ya están cargados en BMW_Labour: "ya puedes generar la comparativa", con un enlace a `/history?request=<id>` que abre esa solicitud para subir el `.LST`.
 - **A soporte** (`MAIL_SUPPORT_TO`), cuando algo falla: typekeys fallidos cuando la solicitud ya ha terminado, la carga en BMW_Labour o la comparación con el `.LST`.
 
-Cada aviso se envía una sola vez por evento (tabla `mail_notifications`, reserva atómica en Postgres), aunque el historial y la reconciliación lo detecten a la vez. Si el servidor SMTP falla, se reintenta en la siguiente detección, hasta 3 veces; los errores se registran sin direcciones de correo. Recargar los datos o repetir la solicitud genera avisos nuevos. Para probar sin escribir a nadie real, usa `MAIL_REDIRECT_TO`.
+Cada aviso se envía una sola vez por evento (tabla `mail_notifications`, reserva atómica en Postgres), aunque el historial y la reconciliación lo detecten a la vez. El aviso a soporte por typekeys fallidos se comprueba en cada final de typekey (completado, fallido o cancelado) y sale cuando ya no queda ninguno en curso. Si el servidor SMTP falla, la reconciliación lo reintenta hasta 3 veces; un aviso que quedó "enviando" por un reinicio se recupera pasados 10 minutos, y si el solicitante no tiene correo el aviso se omite (se registra, sin direcciones). Recargar los datos o repetir la solicitud genera avisos nuevos. Para probar sin escribir a nadie real, usa `MAIL_REDIRECT_TO`.
