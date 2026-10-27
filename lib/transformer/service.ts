@@ -206,7 +206,9 @@ export async function uploadComparison(requestGroupId: string, actor: Actor, fil
     await attachComparisonRemote(comparison.id, reportId);
   } catch (error) {
     const message = error instanceof ReaderError ? error.message : "No se ha podido iniciar la comparación.";
-    if (await failComparison(comparison.id, message)) await notifyComparisonFailed(requestGroupId, comparison.id, message);
+    // A network problem is reported to the technician in the response; support only hears about errors the transformer itself raised.
+    const failed = await failComparison(comparison.id, message);
+    if (failed && !(error instanceof ReaderError && error.retryable)) await notifyComparisonFailed(requestGroupId, comparison.id, message);
     throw error;
   }
   return comparison.id;

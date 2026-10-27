@@ -4,6 +4,8 @@ const nextConfig: NextConfig = {
   output: "standalone",
   poweredByHeader: false,
   serverExternalPackages: ["oracledb"],
+  // With a proxy present Next buffers request bodies up to this size (10 MB by default); LST uploads can reach 25 MB.
+  experimental: { proxyClientMaxBodySize: "26mb" },
   outputFileTracingIncludes: {
     "/*": ["node_modules/oracledb/build/Release/*.node"],
   },

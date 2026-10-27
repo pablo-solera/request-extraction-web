@@ -5,6 +5,7 @@ import { transformerEnqueuedSchema, transformerStateSchema, type TransformerLoad
 
 const REQUEST_TIMEOUT_MS = 15_000;
 const DOWNLOAD_TIMEOUT_MS = 60_000;
+const UPLOAD_TIMEOUT_MS = 120_000;
 const MAX_RESPONSE_BYTES = 256 * 1024;
 export const MAX_LST_BYTES = 25 * 1024 * 1024;
 
@@ -55,8 +56,8 @@ export function createTransformerClient(options: { fetcher?: typeof fetch } = {}
     return response;
   }
 
-  async function json(path: string, init?: RequestInit) {
-    const response = await call(path, { ...init, headers: { Accept: "application/json", ...init?.headers } });
+  async function json(path: string, init?: RequestInit, timeoutMs?: number) {
+    const response = await call(path, { ...init, headers: { Accept: "application/json", ...init?.headers } }, timeoutMs);
     if (response.status >= 300 && response.status < 400) throw new ReaderError("El transformer ha devuelto una redirección no permitida.", "INVALID_TRANSFORMER_REDIRECT", false);
     if (!response.ok) {
       const message = await upstreamMessage(response);
@@ -95,7 +96,7 @@ export function createTransformerClient(options: { fetcher?: typeof fetch } = {}
       const form = new FormData();
       form.set("file", new File([file.bytes as BlobPart], file.name, { type: "application/octet-stream" }));
       form.set("metadata", JSON.stringify({ loadId }));
-      const result = parse(transformerEnqueuedSchema, await json("/reports", { method: "POST", body: form }));
+      const result = parse(transformerEnqueuedSchema, await json("/reports", { method: "POST", body: form }, UPLOAD_TIMEOUT_MS));
       return { reportId: result.requestId };
     },
     async getReport(reportId) {

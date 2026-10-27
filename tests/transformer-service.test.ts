@@ -370,6 +370,15 @@ describe("transformer request actions", () => {
     client.createComparison.mockRejectedValueOnce(new ReaderError("down", "TRANSFORMER_UNAVAILABLE", true));
     await expect(uploadComparison("g1", owner, { name: "a.lst", bytes: new Uint8Array([1]) }, client)).rejects.toMatchObject({ code: "TRANSFORMER_UNAVAILABLE" });
     expect(repository.failComparison).toHaveBeenCalledWith("cmp-1", "down");
+    expect(notifications.notifyComparisonFailed).not.toHaveBeenCalled();
+  });
+
+  it("tells support when the transformer itself rejects the upload", async () => {
+    repository.insertComparison.mockResolvedValueOnce({ id: "cmp-2" });
+    repository.failComparison.mockResolvedValueOnce({});
+    client.createComparison.mockRejectedValueOnce(new ReaderError("El fichero no es un listado válido.", "TRANSFORMER_REQUEST_FAILED", false));
+    await expect(uploadComparison("g1", owner, { name: "a.lst", bytes: new Uint8Array([1]) }, client)).rejects.toMatchObject({ code: "TRANSFORMER_REQUEST_FAILED" });
+    expect(notifications.notifyComparisonFailed).toHaveBeenCalledWith("g1", "cmp-2", "El fichero no es un listado válido.");
   });
 
   it("lets admins and the coordinator of the requester's team manage a request", async () => {
