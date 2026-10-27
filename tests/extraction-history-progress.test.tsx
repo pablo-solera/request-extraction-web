@@ -41,7 +41,6 @@ function item(overrides: Partial<ExtractionListItem> = {}): ExtractionListItem {
     canCancel: false,
     canResume: false,
     canForceResume: false,
-    canRepeat: false,
     canViewDetails: false,
     ...overrides,
   };
@@ -91,14 +90,14 @@ describe("BMW extraction progress in history", () => {
     expect(screen.getAllByText("Cancelada")).toHaveLength(2);
   });
 
-  it("loads authorized per-typekey reader details and offers repeat for terminal rows", async () => {
+  it("loads authorized per-typekey reader details", async () => {
     const user = (await import("@testing-library/user-event")).default.setup();
     extractionDetail.mockResolvedValueOnce({ ok: true, detail: { status: "completed", stage: "completed", progress: 100, stalled: false, typekeys: [{ typekey: "41HZ", series: "X", family: "G05", completed: 2785, total: 2785, remaining: 0, failed: 0, groups: 34 }] } });
-    render(<ExtractionHistory initialItems={[item({ status: "failed", progress: null, canRepeat: true, canViewDetails: true })]} />);
+    render(<ExtractionHistory initialItems={[item({ status: "failed", progress: null, canViewDetails: true })]} />);
     openAll();
 
     await user.click(screen.getAllByRole("button", { name: "Opciones para AX-100, X5 · G05, 41HZ" })[0]!);
-    expect(within(screen.getByLabelText("Acciones para AX-100")).getByRole("link", { name: "Volver a solicitar" })).toHaveAttribute("href", expect.stringContaining("from="));
+    expect(within(screen.getByLabelText("Acciones para AX-100")).queryByRole("link", { name: "Volver a solicitar" })).not.toBeInTheDocument();
     await user.click(screen.getByRole("button", { name: "Ver detalles" }));
 
     expect(extractionDetail).toHaveBeenCalledWith(expect.any(String));
@@ -130,15 +129,27 @@ describe("grouped request history", () => {
     expect(screen.getByText("Completion")).toBeInTheDocument();
   });
 
-  it("offers repeating only when failed or cancelled items exist, linking to the request", () => {
+  it("offers to repeat the whole request once nothing is running, even when everything completed", () => {
     vi.stubGlobal("fetch", vi.fn().mockResolvedValue(Response.json([])));
-    const withFailure = rows().map((entry) => entry.id === "b" ? { ...entry, canRepeat: true } : entry);
-    const { unmount } = render(<ExtractionHistory initialItems={withFailure} />);
+    const { unmount } = render(<ExtractionHistory initialItems={rows()} />);
     openAll();
-    expect(screen.getAllByRole("link", { name: "Volver a solicitar" })[0]).toHaveAttribute("href", `/extractions?request=${group}`);
+    expect(screen.getAllByRole("link", { name: "Volver a solicitar" })).toHaveLength(1);
+    expect(screen.getByRole("link", { name: "Volver a solicitar" })).toHaveAttribute("href", `/extractions?request=${group}`);
     unmount();
 
     render(<ExtractionHistory initialItems={rows().map((entry) => ({ ...entry, status: "completed" as const, canResume: false }))} />);
+    openAll();
+    expect(screen.getByRole("link", { name: "Volver a solicitar" })).toBeInTheDocument();
+  });
+
+  it("does not offer repeating while a typekey is still running or the request awaits approval", () => {
+    vi.stubGlobal("fetch", vi.fn().mockResolvedValue(Response.json([])));
+    const { unmount } = render(<ExtractionHistory initialItems={[...rows(), item({ id: "r", requestGroupId: group, status: "running", progress: 10 })]} />);
+    openAll();
+    expect(screen.queryByRole("link", { name: "Volver a solicitar" })).not.toBeInTheDocument();
+    unmount();
+
+    render(<ExtractionHistory initialItems={rows().map((entry) => ({ ...entry, requestStatus: "pending" as const }))} />);
     openAll();
     expect(screen.queryByRole("link", { name: "Volver a solicitar" })).not.toBeInTheDocument();
   });
@@ -187,7 +198,7 @@ describe("request accordion", () => {
   it("keeps the status on the header and hides the actions until the request is opened", async () => {
     const user = (await import("@testing-library/user-event")).default.setup();
     vi.stubGlobal("fetch", vi.fn().mockResolvedValue(Response.json([])));
-    render(<ExtractionHistory initialItems={[item({ id: "f", requestGroupId: group, status: "failed", progress: null, canResume: true, canRepeat: true })]} />);
+    render(<ExtractionHistory initialItems={[item({ id: "f", requestGroupId: group, status: "failed", progress: null, canResume: true })]} />);
 
     const header = screen.getByRole("button", { name: /^AX-100/ });
     expect(header).toHaveAttribute("aria-expanded", "false");

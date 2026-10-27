@@ -24,15 +24,15 @@ describe("getRepeatableRequestItems", () => {
     organization.isUserInCoordinatorTeam.mockResolvedValue(false);
   });
 
-  it("returns only the failed or cancelled items of a request the actor owns", async () => {
-    repository.listRequestExtractions.mockResolvedValueOnce([row("a", "completed"), row("b", "failed"), row("c", "cancelled"), row("d", "running")]);
+  it("returns every typekey of a finished request the actor owns, whatever its outcome", async () => {
+    repository.listRequestExtractions.mockResolvedValueOnce([row("a", "completed"), row("b", "failed"), row("c", "cancelled")]);
     const items = await getRepeatableRequestItems("g1", { id: "owner", oracleEmpId: 1, role: "employee" });
-    expect(items?.map((item) => item.id)).toEqual(["b", "c"]);
+    expect(items?.map((item) => item.id)).toEqual(["a", "b", "c"]);
   });
 
-  it("returns null when nothing can be repeated, the request awaits approval or the actor cannot manage it", async () => {
+  it("returns null while anything is running, the request awaits approval, there is nothing or the actor cannot manage it", async () => {
     const actor = { id: "owner", oracleEmpId: 1, role: "employee" as const };
-    repository.listRequestExtractions.mockResolvedValueOnce([row("a", "completed")]);
+    repository.listRequestExtractions.mockResolvedValueOnce([row("a", "completed"), row("d", "running")]);
     expect(await getRepeatableRequestItems("g1", actor)).toBeNull();
     repository.listRequestExtractions.mockResolvedValueOnce([row("a", "failed", "pending")]);
     expect(await getRepeatableRequestItems("g1", actor)).toBeNull();

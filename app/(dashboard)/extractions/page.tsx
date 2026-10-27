@@ -3,7 +3,7 @@ import { PageHeader } from "@/components/common/page-header";
 import { ExtractionForm, type ExtractionFormSeed } from "@/components/extractions/extraction-form";
 import { requireUser } from "@/lib/auth/guards";
 import type { Extraction } from "@/db/schema";
-import { getManageableExtraction, getRepeatableRequestItems } from "@/lib/extractions/service";
+import { getRepeatableRequestItems } from "@/lib/extractions/service";
 import { z } from "zod";
 
 export const metadata: Metadata = { title: "Nueva extracción" };
@@ -37,16 +37,13 @@ function seedFromExtractions(extractions: Extraction[]): ExtractionFormSeed | un
   return undefined;
 }
 
-export default async function ExtractionsPage({ searchParams }: { searchParams: Promise<{ from?: string; request?: string }> }) {
+export default async function ExtractionsPage({ searchParams }: { searchParams: Promise<{ request?: string }> }) {
   const user = await requireUser();
-  const { from, request } = await searchParams;
+  const { request } = await searchParams;
   let initialValues: ExtractionFormSeed | undefined;
   if (z.uuid().safeParse(request).success) {
     const items = await getRepeatableRequestItems(request!, user);
     if (items) initialValues = seedFromExtractions(items);
-  } else if (z.uuid().safeParse(from).success) {
-    const row = await getManageableExtraction(from!, user);
-    if (row) initialValues = seedFromExtractions([row.extraction]);
   }
   return (
     <div className="space-y-7">
@@ -54,7 +51,7 @@ export default async function ExtractionsPage({ searchParams }: { searchParams: 
         <PageHeader.Title>Nueva extracción</PageHeader.Title>
         <PageHeader.Description>Prepara y realiza una exportación técnica desde un único formulario.</PageHeader.Description>
       </PageHeader>
-      {initialValues ? <p className="rounded-xl border border-sky-200 bg-sky-50 px-4 py-3 text-sm text-sky-900" role="status">{request ? "Se cargaron los datos comunes y solo los elementos fallidos o cancelados de la solicitud anterior." : "Se cargaron los datos de la extracción anterior."} Revísalos y actualiza lo que necesites antes de solicitarla de nuevo.</p> : null}
+      {initialValues ? <p className="rounded-xl border border-sky-200 bg-sky-50 px-4 py-3 text-sm text-sky-900" role="status">Se cargaron los datos comunes y todos los typekeys de la solicitud anterior para extraerlos de nuevo con los datos de hoy. Revísalos y actualiza lo que necesites antes de solicitarla.</p> : null}
       <ExtractionForm draftKey={`extraction-draft-v1-${user.id}`} initialValues={initialValues} requiresApproval={user.role === "employee"} />
     </div>
   );

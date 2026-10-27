@@ -2,7 +2,6 @@ import "server-only";
 
 import { startLoadForRequest } from "@/lib/transformer/service";
 import { notifyExtractionFailures } from "@/lib/mail/notifications";
-import { retryableItems } from "@/lib/extractions/request-summary";
 import type { Extraction, ExtractionStatus } from "@/db/schema";
 import {
   attachReaderRequest,
@@ -180,12 +179,13 @@ export async function getManageableExtraction(id: string, actor: ExtractionActor
   return await canManage(row.extraction.userId, row.requester, actor) ? row : null;
 }
 
+/** Every typekey of a request that has no work left, for "Volver a solicitar": the data is extracted again in full because it can change from one day to the next. */
 export async function getRepeatableRequestItems(requestGroupId: string, actor: ExtractionActor) {
   const rows = await listRequestExtractions(requestGroupId);
   const first = rows[0];
   if (!first || first.requestStatus === "pending" || !await canManage(first.extraction.userId, first.requester, actor)) return null;
-  const items = retryableItems(rows.map((row) => row.extraction));
-  return items.length > 0 ? items : null;
+  if (rows.some(({ extraction }) => extraction.status === "pending" || extraction.status === "running")) return null;
+  return rows.map((row) => row.extraction);
 }
 
 export async function performExtractionAction(
@@ -362,7 +362,6 @@ export function extractionDto(
     && extraction.status !== "cancelled"
     && extraction.readerStatus !== "cancelled" && extraction.readerStatus !== "cancelling"
     && (extraction.status === "failed" || extraction.readerStatus === "paused" || extraction.readerStatus === "rate_limited" || extraction.readerStalled);
-  const canRepeat = requestStatus !== "pending" && (extraction.status === "failed" || extraction.status === "cancelled");
   const canViewDetails = Boolean(extraction.remoteRequestId) && (extraction.status === "running" || extraction.status === "completed" || extraction.status === "failed" || extraction.status === "cancelled");
   return {
     id: extraction.id,
@@ -390,6 +389,5 @@ export function extractionDto(
     canResume,
     canForceResume: canResume && extraction.readerStalled,
     canViewDetails,
-    canRepeat,
   };
 }

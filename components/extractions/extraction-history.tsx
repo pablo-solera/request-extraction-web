@@ -100,7 +100,7 @@ function ExtractionActions({ item, detailsExpanded, onToggleDetails, onUpdated }
     setOpen(true);
   }
 
-  const hasAction = item.canCancel || item.canResume || item.canForceResume || item.downloadReady || item.canRepeat || item.canViewDetails;
+  const hasAction = item.canCancel || item.canResume || item.canForceResume || item.downloadReady || item.canViewDetails;
   return <div className="relative flex flex-col items-end gap-2" ref={containerRef}>
     <button aria-expanded={open} aria-label={`Opciones para ${item.axCode}, ${item.modelDescription}, ${item.modelCode}`} className="inline-flex min-h-11 min-w-11 items-center justify-center rounded-lg border border-zinc-300 bg-white text-zinc-800 hover:bg-zinc-50 focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-sky-700 disabled:opacity-50" disabled={busy} onClick={toggleMenu} ref={triggerRef} type="button">
       <svg aria-hidden="true" fill="currentColor" height="20" viewBox="0 0 20 20" width="20"><circle cx="4" cy="10" r="1.5"/><circle cx="10" cy="10" r="1.5"/><circle cx="16" cy="10" r="1.5"/></svg>
@@ -108,7 +108,6 @@ function ExtractionActions({ item, detailsExpanded, onToggleDetails, onUpdated }
     {busy ? <span className="text-xs text-zinc-600" role="status">Procesando…</span> : null}
     {open ? <div className="fixed z-50 max-h-[70vh] min-w-52 overflow-y-auto rounded-lg border border-zinc-200 bg-white p-1 shadow-lg" aria-label={`Acciones para ${item.axCode}`} style={menuPosition}>
       {item.downloadReady ? <a className="flex min-h-10 items-center rounded-md px-3 text-left text-sm text-zinc-800 hover:bg-zinc-100 focus-visible:outline-2 focus-visible:outline-sky-700" href={`/api/extractions/${item.id}/download`}>Descargar ZIP de {item.modelCode}</a> : null}
-      {item.canRepeat ? <Link className="flex min-h-10 items-center rounded-md px-3 text-left text-sm text-zinc-800 hover:bg-zinc-100 focus-visible:outline-2 focus-visible:outline-sky-700" href={`/extractions?from=${encodeURIComponent(item.id)}`}>Volver a solicitar</Link> : null}
       {item.canViewDetails ? <button className="flex min-h-10 w-full items-center rounded-md px-3 text-left text-sm text-zinc-800 hover:bg-zinc-100 focus-visible:outline-2 focus-visible:outline-sky-700" onClick={() => { onToggleDetails(item.id); setOpen(false); }} type="button">{detailsExpanded ? "Ocultar detalles" : "Ver detalles"}</button> : null}
       {item.canCancel ? <button className="flex min-h-10 w-full items-center rounded-md px-3 text-left text-sm text-red-700 hover:bg-red-50 focus-visible:outline-2 focus-visible:outline-red-700" onClick={() => void run("cancel")} type="button">Cancelar extracción</button> : null}
       {item.canResume ? <button className="flex min-h-10 w-full items-center rounded-md px-3 text-left text-sm text-zinc-800 hover:bg-zinc-100 focus-visible:outline-2 focus-visible:outline-sky-700" onClick={() => void run("resume")} type="button">Reanudar extracción</button> : null}
@@ -126,7 +125,7 @@ function RequestActions({ items, onUpdated }: { items: ExtractionListItem[]; onU
   const cancellable = items.filter((item) => item.canCancel);
   const resumable = retryableItems(items).filter((item) => item.status === "failed" && item.canResume);
   const axCode = items[0]?.axCode ?? "";
-  const canRepeat = retryableItems(items).some((item) => item.canRepeat);
+  const canRepeat = items[0]?.requestStatus !== "pending" && items.every((item) => item.status !== "pending" && item.status !== "running");
 
   async function runAll(action: "cancel" | "resume", targets: ExtractionListItem[]) {
     if (action === "cancel" && !window.confirm(`¿Cancelar las ${targets.length} extracciones activas de la solicitud ${axCode}?`)) return;

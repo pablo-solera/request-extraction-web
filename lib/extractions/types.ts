@@ -25,7 +25,6 @@ export type ExtractionListItem = {
   canCancel: boolean;
   canResume: boolean;
   canForceResume: boolean;
-  canRepeat: boolean;
   canViewDetails: boolean;
 };
 
