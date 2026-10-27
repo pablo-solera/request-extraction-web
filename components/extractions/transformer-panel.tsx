@@ -100,7 +100,7 @@ export function TransformerPanel({ allCompleted, initialInfo, requestGroupId }: 
   return <section aria-label="Carga en BMW_Labour y comparación" className="space-y-3 rounded-xl border border-zinc-200 bg-white p-4">
     <h3 className="text-sm font-semibold text-zinc-950">Carga en BMW_Labour y comparación</h3>
     {!allCompleted && info.loadStatus === null ? <p className="text-sm text-zinc-600">Los datos se cargarán en BMW_Labour cuando todos los typekeys estén completados.</p> : null}
-    {loading ? <p className="text-sm text-sky-800" role="status">{info.loadStatus === null ? "Preparando la carga en BMW_Labour…" : "Cargando los datos en BMW_Labour…"}</p> : null}
+    {loading ? <p className="text-sm text-sky-800" role="status">{info.loadStatus === null ? info.loadAttempts > 0 ? "Reintentando la carga en BMW_Labour…" : "Preparando la carga en BMW_Labour…" : "Cargando los datos en BMW_Labour…"}</p> : null}
     {info.loadStatus === "failed" ? <div className="space-y-2" role="alert">
       <p className="text-sm text-red-700">La carga en BMW_Labour ha fallado{info.loadError ? `: ${info.loadError}` : "."}</p>
       {info.canRetryLoad ? <button className={`${buttonClass} border-zinc-300 bg-white text-zinc-800 hover:bg-zinc-50`} disabled={busy} onClick={() => void retryLoad()} type="button">Reintentar carga</button> : null}

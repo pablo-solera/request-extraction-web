@@ -5,7 +5,7 @@ import { isUserInCoordinatorTeam } from "@/lib/employees/org-service";
 import { ReaderError } from "@/lib/readers/errors";
 import { getTransformerClient, MAX_LST_BYTES, type TransformerClient } from "@/lib/transformer/client";
 import {
-  attachComparisonRemote, claimComparisonPoll, claimLoadPoll, failComparison, getComparison, getRequestWithRequester, insertComparison, listActiveComparisons, listActiveLoads,
+  attachComparisonRemote, claimComparisonPoll, claimLoadPoll, claimLoadStart, failComparison, getComparison, getRequestWithRequester, insertComparison, listActiveComparisons, listActiveLoads,
   listComparisonsForRequests, listRequestsByIds, listRequestsReadyForLoad, markLoadFailedToStart, markLoadRequested, resetFailedLoad, updateComparisonState, updateLoadState,
 } from "@/lib/transformer/repository";
 import type { TransformerRequestInfo } from "@/lib/transformer/info";
@@ -66,6 +66,21 @@ export async function startLoadForRequest(requestGroupId: string, client: Transf
   if (!isTransformerConfigured()) return false;
   const [ready] = await listRequestsReadyForLoad(1, requestGroupId);
   return ready ? startLoad(client, ready) : false;
+}
+
+export const TRANSFORMER_START_INTERVAL_MS = 30_000;
+
+/** Sends ready requests that have no load yet, at most once per interval each, so the history unblocks them without a scheduled job. */
+export async function startPendingLoads(requestGroupIds: string[], client: TransformerClient = getTransformerClient(), intervalMs = TRANSFORMER_START_INTERVAL_MS) {
+  if (!isTransformerConfigured()) return 0;
+  const staleBefore = new Date(Date.now() - intervalMs);
+  let started = 0;
+  for (const requestGroupId of requestGroupIds) {
+    const [ready] = await listRequestsReadyForLoad(1, requestGroupId);
+    if (!ready || !await claimLoadStart(requestGroupId, staleBefore)) continue;
+    if (await startLoad(client, ready)) started++;
+  }
+  return started;
 }
 
 type ActiveLoad = Awaited<ReturnType<typeof listActiveLoads>>[number];
@@ -162,6 +177,7 @@ async function requireManageableRequest(requestGroupId: string, actor: Actor) {
 export async function retryRequestLoad(requestGroupId: string, actor: Actor) {
   await requireManageableRequest(requestGroupId, actor);
   if (!await resetFailedLoad(requestGroupId)) throw new ReaderError("Solo se puede reintentar una carga fallida.", "LOAD_NOT_RETRYABLE", false, 409);
+  await startLoadForRequest(requestGroupId).catch((error) => console.error("Transformer load could not be restarted.", error));
 }
 
 const lstName = /\.(lst|zip)$/i;
@@ -204,7 +220,9 @@ export async function getTransformerInfo(requestGroupIds: string[], actor: Actor
   let current = visible;
   let comparisons = await listComparisonsForRequests(visibleIds);
   const running = (status: string | null) => status === "queued" || status === "running";
-  if (configured && (current.some((request) => running(request.loadStatus)) || comparisons.some((comparison) => running(comparison.status)))) {
+  const pendingStart = current.filter((request) => request.loadStatus === null && request.manufacturerGroup === "BMW" && request.status === "approved").map((request) => request.requestGroupId);
+  if (configured && (pendingStart.length > 0 || current.some((request) => running(request.loadStatus)) || comparisons.some((comparison) => running(comparison.status)))) {
+    await startPendingLoads(pendingStart).catch((error) => console.error("Transformer pending load start failed.", error));
     await syncTransformerStates(visibleIds).catch((error) => console.error("Transformer state sync failed.", error));
     current = await listRequestsByIds(visibleIds);
     comparisons = await listComparisonsForRequests(visibleIds);
@@ -213,6 +231,7 @@ export async function getTransformerInfo(requestGroupIds: string[], actor: Actor
     requestGroupId: request.requestGroupId,
     applicable: configured && request.manufacturerGroup === "BMW" && request.status === "approved",
     loadStatus: request.loadStatus,
+    loadAttempts: request.loadAttempts,
     loadError: request.loadError,
     loadedAt: request.loadedAt?.toISOString() ?? null,
     canRetryLoad: request.loadStatus === "failed",

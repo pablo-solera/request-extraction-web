@@ -2,7 +2,7 @@ import { beforeEach, describe, expect, it, vi } from "vitest";
 import { ReaderError } from "@/lib/readers/errors";
 
 const repository = vi.hoisted(() => Object.fromEntries([
-  "attachComparisonRemote", "claimComparisonPoll", "claimLoadPoll", "failComparison", "getComparison", "getRequestWithRequester", "insertComparison", "listActiveComparisons", "listActiveLoads",
+  "attachComparisonRemote", "claimComparisonPoll", "claimLoadPoll", "claimLoadStart", "failComparison", "getComparison", "getRequestWithRequester", "insertComparison", "listActiveComparisons", "listActiveLoads",
   "listComparisonsForRequests", "listRequestsByIds", "listRequestsReadyForLoad", "markLoadFailedToStart", "markLoadRequested", "resetFailedLoad", "updateComparisonState", "updateLoadState",
 ].map((name) => [name, vi.fn()])));
 const organization = vi.hoisted(() => ({ isUserInCoordinatorTeam: vi.fn() }));
@@ -14,13 +14,13 @@ vi.mock("@/lib/employees/org-service", () => organization);
 vi.mock("@/lib/transformer/client", () => ({ getTransformerClient: vi.fn(), MAX_LST_BYTES: 25 * 1024 * 1024 }));
 
 import { getTransformerClient } from "@/lib/transformer/client";
-import { downloadComparison, getTransformerInfo, reconcileTransformer, retryRequestLoad, startLoadForRequest, syncTransformerStates, uploadComparison } from "@/lib/transformer/service";
+import { downloadComparison, getTransformerInfo, reconcileTransformer, retryRequestLoad, startLoadForRequest, startPendingLoads, syncTransformerStates, uploadComparison } from "@/lib/transformer/service";
 
 const client = { createLoad: vi.fn(), getLoad: vi.fn(), createComparison: vi.fn(), getReport: vi.fn(), downloadReport: vi.fn() };
 const owner = { id: "owner", oracleEmpId: 1, role: "employee" as const };
 const request = (overrides: Record<string, unknown> = {}) => ({
   requestGroupId: "g1", requesterId: "owner", axCode: "1XF", imcEdition: "05/0", brand: "BMW", manufacturerGroup: "BMW", status: "approved",
-  loadStatus: null, loadRemoteId: null, loadError: null, loadedAt: null, ...overrides,
+  loadStatus: null, loadAttempts: 0, loadRemoteId: null, loadError: null, loadedAt: null, ...overrides,
 });
 const item = (typekey: string, series = "7'", developmentCode = "G70") => ({ requestGroupId: "g1", modelCode: typekey, readerParams: { typekey, series, developmentCode } });
 
@@ -136,6 +136,67 @@ describe("starting a load when the last typekey completes", () => {
     client.createLoad.mockRejectedValueOnce(new ReaderError("down", "TRANSFORMER_UNAVAILABLE", true));
     expect(await startLoadForRequest("g1", client)).toBe(false);
     expect(repository.markLoadFailedToStart).not.toHaveBeenCalled();
+  });
+});
+
+describe("starting pending loads and retrying failed ones", () => {
+  beforeEach(() => {
+    vi.clearAllMocks();
+    process.env.BMW_TRANSFORMER_BASE_URL = "http://localhost:3005";
+    vi.mocked(getTransformerClient).mockReturnValue(client);
+  });
+
+  it("sends ready requests that have no load and honours the claim", async () => {
+    repository.listRequestsReadyForLoad.mockResolvedValue([{ request: request(), items: [item("11EH")] }]);
+    repository.claimLoadStart.mockResolvedValueOnce({}).mockResolvedValueOnce(null);
+    client.createLoad.mockResolvedValue({ loadId: "load-1", reused: false });
+    repository.markLoadRequested.mockResolvedValue({});
+
+    expect(await startPendingLoads(["g1"], client, 30_000)).toBe(1);
+    expect(await startPendingLoads(["g1"], client, 30_000)).toBe(0);
+    expect(repository.claimLoadStart).toHaveBeenCalledWith("g1", expect.any(Date));
+    expect(client.createLoad).toHaveBeenCalledTimes(1);
+  });
+
+  it("neither claims nor sends requests that are not ready, and keeps unavailable transformers retryable", async () => {
+    repository.listRequestsReadyForLoad.mockResolvedValueOnce([]);
+    expect(await startPendingLoads(["g1"], client)).toBe(0);
+    expect(repository.claimLoadStart).not.toHaveBeenCalled();
+
+    repository.listRequestsReadyForLoad.mockResolvedValueOnce([{ request: request(), items: [item("11EH")] }]);
+    repository.claimLoadStart.mockResolvedValueOnce({});
+    client.createLoad.mockRejectedValueOnce(new ReaderError("down", "TRANSFORMER_UNAVAILABLE", true));
+    expect(await startPendingLoads(["g1"], client)).toBe(0);
+    expect(repository.markLoadFailedToStart).not.toHaveBeenCalled();
+  });
+
+  it("starts the load right after the technician retries a failed one", async () => {
+    repository.getRequestWithRequester.mockResolvedValue({ request: request(), requester: { id: "owner" } });
+    repository.resetFailedLoad.mockResolvedValueOnce({});
+    repository.listRequestsReadyForLoad.mockResolvedValueOnce([{ request: request({ loadAttempts: 1 }), items: [item("11EH")] }]);
+    client.createLoad.mockResolvedValueOnce({ loadId: "load-2", reused: false });
+    repository.markLoadRequested.mockResolvedValueOnce({});
+
+    await retryRequestLoad("g1", owner);
+
+    expect(client.createLoad).toHaveBeenCalledTimes(1);
+    expect(repository.markLoadRequested).toHaveBeenCalledWith("g1", "load-2");
+  });
+
+  it("starts pending loads when the history asks for the request info and reports the attempts", async () => {
+    const pending = request({ loadAttempts: 1 });
+    repository.listRequestsByIds.mockResolvedValue([pending]);
+    repository.getRequestWithRequester.mockResolvedValue({ request: pending, requester: { id: "owner" } });
+    repository.listComparisonsForRequests.mockResolvedValue([]);
+    repository.listRequestsReadyForLoad.mockResolvedValue([{ request: pending, items: [item("11EH")] }]);
+    repository.claimLoadStart.mockResolvedValue({});
+    client.createLoad.mockResolvedValue({ loadId: "load-3", reused: false });
+    repository.markLoadRequested.mockResolvedValue({});
+
+    const info = await getTransformerInfo(["g1"], owner);
+
+    expect(client.createLoad).toHaveBeenCalledTimes(1);
+    expect(info.g1).toMatchObject({ loadAttempts: 1, applicable: true });
   });
 });
 

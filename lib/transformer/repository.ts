@@ -67,6 +67,16 @@ export async function claimLoadPoll(requestGroupId: string, staleBefore: Date) {
   return request ?? null;
 }
 
+/** Reserves the right to try sending a pending load, so concurrent viewers do not all start it. */
+export async function claimLoadStart(requestGroupId: string, staleBefore: Date) {
+  const [request] = await getDb().update(extractionRequests).set({ loadPolledAt: new Date() }).where(and(
+    eq(extractionRequests.requestGroupId, requestGroupId),
+    isNull(extractionRequests.loadStatus),
+    or(isNull(extractionRequests.loadPolledAt), lte(extractionRequests.loadPolledAt, staleBefore)),
+  )).returning();
+  return request ?? null;
+}
+
 export async function claimComparisonPoll(id: string, staleBefore: Date) {
   const [row] = await getDb().update(comparisonReports).set({ polledAt: new Date() }).where(and(
     eq(comparisonReports.id, id),

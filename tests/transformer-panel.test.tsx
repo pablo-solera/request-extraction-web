@@ -8,7 +8,7 @@ afterEach(() => { cleanup(); vi.unstubAllGlobals(); vi.useRealTimers(); });
 
 const group = "7be5f2af-879b-4c61-84d5-6e728f438a02";
 const info = (overrides: Partial<TransformerRequestInfo> = {}): TransformerRequestInfo => ({
-  requestGroupId: group, applicable: true, loadStatus: null, loadError: null, loadedAt: null, canRetryLoad: false, canUpload: false, comparisons: [], ...overrides,
+  requestGroupId: group, applicable: true, loadStatus: null, loadAttempts: 0, loadError: null, loadedAt: null, canRetryLoad: false, canUpload: false, comparisons: [], ...overrides,
 });
 const answer = (value: TransformerRequestInfo) => Response.json({ [group]: value });
 
@@ -25,6 +25,12 @@ describe("transformer panel", () => {
     render(<TransformerPanel allCompleted={false} initialInfo={info()} requestGroupId={group} />);
     expect(screen.getByText(/cuando todos los typekeys estén completados/)).toBeInTheDocument();
     expect(fetch).not.toHaveBeenCalled();
+  });
+
+  it("tells the technician when a pending load is being retried", () => {
+    vi.stubGlobal("fetch", vi.fn().mockResolvedValue(answer(info({ loadAttempts: 1 }))));
+    render(<TransformerPanel allCompleted initialInfo={info({ loadAttempts: 1 })} requestGroupId={group} />);
+    expect(screen.getByText("Reintentando la carga en BMW_Labour…")).toBeInTheDocument();
   });
 
   it("follows a running load until the data is loaded and then offers the LST upload", async () => {
