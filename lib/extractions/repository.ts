@@ -84,6 +84,10 @@ export async function insertExtractionsWithCapacity(userId: string, input: Extra
   });
 }
 
+/** A submission claimed longer ago than this was left behind by a crash between claiming and recording the reader job. */
+export const STALE_SUBMISSION_MS = 5 * 60 * 1000;
+const unclaimedSubmission = () => or(isNull(extractions.submittedAt), lte(extractions.submittedAt, new Date(Date.now() - STALE_SUBMISSION_MS)));
+
 export async function claimExtractionSubmission(id: string) {
   const [extraction] = await getDb().update(extractions).set({
     attemptCount: sql`${extractions.attemptCount} + 1`,
@@ -93,7 +97,7 @@ export async function claimExtractionSubmission(id: string) {
     eq(extractions.id, id),
     eq(extractions.status, "pending"),
     isNull(extractions.remoteRequestId),
-    isNull(extractions.submittedAt),
+    unclaimedSubmission(),
   )).returning();
   return extraction ? loadExtraction(extraction.id) : null;
 }
@@ -106,6 +110,17 @@ export async function markSubmissionFailed(id: string, claimedAt: Date, update: 
     completedAt: now,
     updatedAt: now,
   }).where(and(
+    eq(extractions.id, id),
+    eq(extractions.status, "pending"),
+    isNull(extractions.remoteRequestId),
+    eq(extractions.submittedAt, claimedAt),
+  )).returning();
+  return extraction ? loadExtraction(extraction.id) : null;
+}
+
+/** Gives a claimed submission back after a temporary reader failure, so the reconciliation sends it again. */
+export async function releaseSubmission(id: string, claimedAt: Date) {
+  const [extraction] = await getDb().update(extractions).set({ submittedAt: null, updatedAt: new Date() }).where(and(
     eq(extractions.id, id),
     eq(extractions.status, "pending"),
     isNull(extractions.remoteRequestId),
@@ -150,7 +165,7 @@ export async function cancelUnsubmittedExtraction(id: string) {
     eq(extractions.id, id),
     eq(extractions.status, "pending"),
     isNull(extractions.remoteRequestId),
-    isNull(extractions.submittedAt),
+    unclaimedSubmission(),
   )).returning();
   return extraction ? loadExtraction(extraction.id) : null;
 }

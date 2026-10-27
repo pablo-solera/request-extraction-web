@@ -5,6 +5,7 @@ import { notifyExtractionFailures } from "@/lib/mail/notifications";
 import type { Extraction, ExtractionStatus } from "@/db/schema";
 import {
   attachReaderRequest,
+  releaseSubmission,
   getOwnedExtraction,
   claimExtractionSubmission,
   insertExtractionsWithCapacity,
@@ -36,6 +37,8 @@ export function mapReaderStatus(state: RenaultState): ExtractionStatus {
   return mapRenaultReaderStatus(state);
 }
 
+const MAX_SUBMISSION_ATTEMPTS = 5;
+
 async function submitExtraction(extraction: Extraction, context?: Awaited<ReturnType<ReturnType<typeof getExtractionReader>["prepareSubmission"]>>) {
   if (extraction.remoteRequestId || extraction.status !== "pending") return extraction;
   const claimed = await claimExtractionSubmission(extraction.id);
@@ -47,6 +50,8 @@ async function submitExtraction(extraction: Extraction, context?: Awaited<Return
     return (await attachReaderRequest(claimed.id, remote.requestId, claimed.submittedAt!, initialReaderState)) ?? claimed;
   } catch (error) {
     const readerError = error instanceof ReaderError ? error : null;
+    // A temporary reader problem is not the technician's failure: hand the submission back and let the reconciliation try again.
+    if (readerError?.retryable && claimed.attemptCount < MAX_SUBMISSION_ATTEMPTS && await releaseSubmission(claimed.id, claimed.submittedAt!)) return claimed;
     if (error instanceof ReaderError && error.code === "READER_CONFIGURATION_ERROR") console.error("Reader integration configuration is invalid.", error);
     const failed = await markSubmissionFailed(claimed.id, claimed.submittedAt!, {
       errorCode: readerError?.code ?? "INTERNAL_ERROR",

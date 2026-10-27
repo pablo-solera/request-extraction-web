@@ -1,3 +1,4 @@
+import { ReaderError } from "@/lib/readers/errors";
 import { beforeEach, describe, expect, it, vi } from "vitest";
 
 const repository = vi.hoisted(() => ({
@@ -12,6 +13,7 @@ const repository = vi.hoisted(() => ({
   listActiveExtractions: vi.fn(),
   listApprovedRequestExtractions: vi.fn(),
   markSubmissionFailed: vi.fn(),
+  releaseSubmission: vi.fn(),
   markExtractionResumed: vi.fn(),
   recordExtractionAction: vi.fn(),
   updateExtractionState: vi.fn(),
@@ -94,6 +96,34 @@ describe("reader registry extraction flow", () => {
     await submitNewApprovedRequest("g1");
     expect(repository.claimExtractionSubmission).toHaveBeenCalledWith("e1");
     expect(reader.create).not.toHaveBeenCalled();
+  });
+
+  it("hands a submission back after a temporary reader failure instead of failing the typekey", async () => {
+    const claim = { ...extraction, attemptCount: 1, submittedAt: new Date("2026-01-02T00:00:00.000Z") };
+    repository.claimExtractionSubmission.mockResolvedValueOnce(claim);
+    repository.releaseSubmission.mockResolvedValueOnce(claim);
+    reader.create.mockRejectedValueOnce(new ReaderError("El servicio de BMW no está disponible.", "READER_UNAVAILABLE", true));
+
+    await submitNewApprovedRequest("g1");
+
+    expect(repository.releaseSubmission).toHaveBeenCalledWith("e1", claim.submittedAt);
+    expect(repository.markSubmissionFailed).not.toHaveBeenCalled();
+  });
+
+  it("fails the typekey once the temporary failures reach the attempt limit or the error is permanent", async () => {
+    const claim = { ...extraction, attemptCount: 5, submittedAt: new Date("2026-01-02T00:00:00.000Z") };
+    repository.claimExtractionSubmission.mockResolvedValueOnce(claim);
+    reader.create.mockRejectedValueOnce(new ReaderError("El servicio de BMW no está disponible.", "READER_UNAVAILABLE", true));
+    await submitNewApprovedRequest("g1");
+    expect(repository.releaseSubmission).not.toHaveBeenCalled();
+    expect(repository.markSubmissionFailed).toHaveBeenCalledWith("e1", claim.submittedAt, { errorCode: "READER_UNAVAILABLE", errorMessage: "El servicio de BMW no está disponible." });
+
+    repository.markSubmissionFailed.mockClear();
+    repository.claimExtractionSubmission.mockResolvedValueOnce({ ...claim, attemptCount: 1 });
+    reader.create.mockRejectedValueOnce(new ReaderError("BMW no ha aceptado la solicitud.", "READER_REQUEST_FAILED", false));
+    await submitNewApprovedRequest("g1");
+    expect(repository.releaseSubmission).not.toHaveBeenCalled();
+    expect(repository.markSubmissionFailed).toHaveBeenCalledTimes(1);
   });
 
   it("routes BMW requests through the registered adapter and persists its remote ID", async () => {
