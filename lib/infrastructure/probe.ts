@@ -1,7 +1,7 @@
 import "server-only";
 
 import { z } from "zod";
-import { infrastructureServices } from "@/lib/infrastructure/services";
+import { infrastructureManufacturers, type InfrastructureService } from "@/lib/infrastructure/services";
 
 const PROBE_TIMEOUT_MS = 3_000;
 const MAX_RESPONSE_BYTES = 16 * 1024;
@@ -91,7 +91,7 @@ async function get(url: URL) {
   });
 }
 
-async function probeOne(service: (typeof infrastructureServices)[number]): Promise<InfrastructureProbe> {
+async function probeOne(service: InfrastructureService): Promise<InfrastructureProbe> {
   const checkedAt = new Date().toISOString();
   const rawBaseUrl = process.env[service.envVar]?.trim();
   if (!rawBaseUrl) {
@@ -145,6 +145,16 @@ async function probeOne(service: (typeof infrastructureServices)[number]): Promi
   }
 }
 
-export async function getInfrastructureStatus() {
-  return Promise.all(infrastructureServices.map(probeOne));
+export type ManufacturerInfrastructure = {
+  key: string;
+  name: string;
+  reader: InfrastructureProbe;
+  transformer: InfrastructureProbe;
+};
+
+export async function getInfrastructureStatus(): Promise<ManufacturerInfrastructure[]> {
+  return Promise.all(infrastructureManufacturers.map(async ({ key, name, reader, transformer }) => {
+    const [readerProbe, transformerProbe] = await Promise.all([probeOne(reader), probeOne(transformer)]);
+    return { key, name, reader: readerProbe, transformer: transformerProbe };
+  }));
 }
