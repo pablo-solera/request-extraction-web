@@ -2,7 +2,7 @@ import { beforeEach, describe, expect, it, vi } from "vitest";
 import { ReaderError } from "@/lib/readers/errors";
 
 const repository = vi.hoisted(() => Object.fromEntries([
-  "attachComparisonRemote", "claimComparisonPoll", "claimLoadPoll", "claimLoadStart", "failComparison", "getComparison", "getRequestWithRequester", "insertComparison", "listActiveComparisons", "listActiveLoads",
+  "attachComparisonRemote", "findLoadedTable", "claimComparisonPoll", "claimLoadPoll", "claimLoadStart", "failComparison", "getComparison", "getRequestWithRequester", "insertComparison", "listActiveComparisons", "listActiveLoads",
   "listComparisonsForRequests", "listRequestsByIds", "listRequestsReadyForLoad", "markLoadFailedToStart", "markLoadRequested", "resetFailedLoad", "updateComparisonState", "updateLoadState",
 ].map((name) => [name, vi.fn()])));
 const organization = vi.hoisted(() => ({ isUserInCoordinatorTeam: vi.fn() }));
@@ -14,7 +14,7 @@ vi.mock("@/lib/employees/org-service", () => organization);
 vi.mock("@/lib/transformer/client", () => ({ getTransformerClient: vi.fn(), MAX_LST_BYTES: 25 * 1024 * 1024 }));
 
 import { getTransformerClient } from "@/lib/transformer/client";
-import { downloadComparison, getTransformerInfo, reconcileTransformer, retryRequestLoad, startLoadForRequest, startPendingLoads, syncTransformerStates, uploadComparison } from "@/lib/transformer/service";
+import { findTableConflict, downloadComparison, getTransformerInfo, reconcileTransformer, retryRequestLoad, startLoadForRequest, startPendingLoads, syncTransformerStates, uploadComparison } from "@/lib/transformer/service";
 
 const client = { createLoad: vi.fn(), getLoad: vi.fn(), createComparison: vi.fn(), getReport: vi.fn(), downloadReport: vi.fn() };
 const owner = { id: "owner", oracleEmpId: 1, role: "employee" as const };
@@ -292,6 +292,27 @@ describe("live transformer state", () => {
     expect(client.getLoad).toHaveBeenCalledWith("load-1");
     expect(repository.updateLoadState).toHaveBeenCalledWith("g1", "load-1", { status: "completed", error: expect.any(String) });
     expect(info.g1).toMatchObject({ loadStatus: "completed", canUpload: true });
+  });
+});
+
+describe("table conflicts", () => {
+  beforeEach(() => {
+    vi.clearAllMocks();
+    process.env.BMW_TRANSFORMER_BASE_URL = "http://localhost:3005";
+  });
+
+  it("reports the newest loaded table for the AX code, edition and brand", async () => {
+    repository.findLoadedTable.mockResolvedValueOnce({ requestGroupId: "g9", loadStatus: "completed", loadedAt: new Date("2026-10-26T14:21:00Z") });
+    expect(await findTableConflict({ axCode: "1AF", imcEdition: "01/0", brand: "MINI" })).toEqual({ loadedAt: "2026-10-26T14:21:00.000Z", loadStatus: "completed" });
+    expect(repository.findLoadedTable).toHaveBeenCalledWith({ axCode: "1AF", imcEdition: "01/0", brand: "MINI" });
+    repository.findLoadedTable.mockResolvedValueOnce(null);
+    expect(await findTableConflict({ axCode: "1AF", imcEdition: "01/0", brand: "MINI" })).toBeNull();
+  });
+
+  it("never reports a conflict when the transformer is not configured", async () => {
+    delete process.env.BMW_TRANSFORMER_BASE_URL;
+    expect(await findTableConflict({ axCode: "1AF", imcEdition: "01/0", brand: "MINI" })).toBeNull();
+    expect(repository.findLoadedTable).not.toHaveBeenCalled();
   });
 });
 

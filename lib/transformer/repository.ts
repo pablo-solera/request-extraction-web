@@ -22,6 +22,19 @@ export async function listRequestsReadyForLoad(limit = 20, requestGroupId?: stri
   return requests.map((request) => ({ request, items: items.filter((item) => item.requestGroupId === request.requestGroupId) }));
 }
 
+/** The newest request whose load put (or is putting) a table for this AX code, edition and brand into BMW_Labour. */
+export async function findLoadedTable(input: { axCode: string; imcEdition: string; brand: string }) {
+  const [row] = await getDb().select({ requestGroupId: extractionRequests.requestGroupId, loadStatus: extractionRequests.loadStatus, loadedAt: extractionRequests.loadedAt })
+    .from(extractionRequests).where(and(
+      eq(extractionRequests.manufacturerGroup, "BMW"),
+      eq(extractionRequests.brand, input.brand),
+      eq(extractionRequests.imcEdition, input.imcEdition),
+      sql`upper(${extractionRequests.axCode}) = upper(${input.axCode})`,
+      inArray(extractionRequests.loadStatus, ["queued", "running", "completed"]),
+    )).orderBy(desc(sql`coalesce(${extractionRequests.loadedAt}, ${extractionRequests.loadRequestedAt})`)).limit(1);
+  return row ?? null;
+}
+
 export async function markLoadRequested(requestGroupId: string, remoteId: string) {
   const [request] = await getDb().update(extractionRequests).set({
     loadStatus: "queued", loadRemoteId: remoteId, loadError: null, loadRequestedAt: new Date(), loadedAt: null,

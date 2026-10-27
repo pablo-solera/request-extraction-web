@@ -6,7 +6,7 @@ import { ReaderError } from "@/lib/readers/errors";
 import { getTransformerClient, MAX_LST_BYTES, type TransformerClient } from "@/lib/transformer/client";
 import {
   attachComparisonRemote, claimComparisonPoll, claimLoadPoll, claimLoadStart, failComparison, getComparison, getRequestWithRequester, insertComparison, listActiveComparisons, listActiveLoads,
-  listComparisonsForRequests, listRequestsByIds, listRequestsReadyForLoad, markLoadFailedToStart, markLoadRequested, resetFailedLoad, updateComparisonState, updateLoadState,
+  findLoadedTable, listComparisonsForRequests, listRequestsByIds, listRequestsReadyForLoad, markLoadFailedToStart, markLoadRequested, resetFailedLoad, updateComparisonState, updateLoadState,
 } from "@/lib/transformer/repository";
 import type { TransformerRequestInfo } from "@/lib/transformer/info";
 import type { TransformerState } from "@/lib/transformer/types";
@@ -66,6 +66,13 @@ export async function startLoadForRequest(requestGroupId: string, client: Transf
   if (!isTransformerConfigured()) return false;
   const [ready] = await listRequestsReadyForLoad(1, requestGroupId);
   return ready ? startLoad(client, ready) : false;
+}
+
+/** Loading replaces the whole table of an AX code and edition, so the form asks for confirmation when one is already there. */
+export async function findTableConflict(input: { axCode: string; imcEdition: string; brand: string }) {
+  if (!isTransformerConfigured()) return null;
+  const row = await findLoadedTable(input);
+  return row ? { loadedAt: row.loadedAt?.toISOString() ?? null, loadStatus: row.loadStatus } : null;
 }
 
 export const TRANSFORMER_START_INTERVAL_MS = 30_000;

@@ -6,7 +6,7 @@ import { createExtractionAction, type ExtractionFormState } from "@/app/(dashboa
 import { SubmitButton } from "@/components/common/submit-button";
 import { BmwAvailabilityNotice } from "@/components/extractions/bmw-availability-notice";
 import { BmwSwapReview } from "@/components/extractions/bmw-swap-review";
-import { formatSpanishDate } from "@/lib/date-format";
+import { formatSpanishDate, formatSpanishDateTime } from "@/lib/date-format";
 import { extractionFormSchema, type ExtractionVehicle } from "@/lib/extractions/validation";
 import { useBmwAvailability, type AvailabilityTarget } from "@/lib/hooks/use-bmw-availability";
 
@@ -230,6 +230,22 @@ export function ExtractionStepperForm({
   const availability = useBmwAvailability([...availabilityTargets.values()], step === 3 && group === "BMW");
   const [checking, setChecking] = useState<{ done: number; total: number } | null>(null);
   const [reviewing, setReviewing] = useState(false);
+  const [replaceConfirmed, setReplaceConfirmed] = useState(false);
+  const [tableConflict, setTableConflict] = useState<{ key: string; loadedAt: string | null } | "none" | null>(null);
+  const bmwBrand = group === "BMW" && (brand === "BMW" || brand === "MINI") ? brand : null;
+  const conflictKey = bmwBrand ? `${bmwBrand}|${values.axCode}|${values.imcEdition}` : null;
+  useEffect(() => {
+    if (step !== 3 || !bmwBrand || !conflictKey) return;
+    const controller = new AbortController();
+    const query = new URLSearchParams({ axCode: values.axCode, imcEdition: values.imcEdition, brand: bmwBrand });
+    void fetch(`/api/extractions/table-conflict?${query.toString()}`, { cache: "no-store", signal: controller.signal })
+      .then(async (response) => response.ok ? await response.json() as { conflict: boolean; loadedAt: string | null } : null)
+      .then((result) => { if (result) setTableConflict(result.conflict ? { key: conflictKey, loadedAt: result.loadedAt } : "none"); })
+      .catch(() => undefined);
+    return () => controller.abort();
+  }, [bmwBrand, conflictKey, step, values.axCode, values.imcEdition]);
+  const conflict = tableConflict !== null && tableConflict !== "none" ? tableConflict : null;
+  const replacesTable = step === 3 && conflict !== null && conflict.key === conflictKey;
   const reviewItems = step === 2 && reviewing ? vehicles.flatMap((vehicle) => {
     const target = availabilityTargets.get(vehicle.id);
     const entry = target ? availability.entryFor(target) : null;
@@ -518,6 +534,10 @@ export function ExtractionStepperForm({
             </li>;
           })}</ul>
         </div>
+        {replacesTable ? <label className="flex items-start gap-3 rounded-lg border border-amber-300 bg-amber-50 px-4 py-3 text-sm text-amber-950">
+          <input checked={replaceConfirmed} className="mt-1 size-4" onChange={(event) => setReplaceConfirmed(event.target.checked)} type="checkbox" />
+          <span>Ya hay datos cargados en BMW_Labour para el código AX <strong className="font-mono">{values.axCode}</strong> y la edición <strong className="font-mono">{values.imcEdition}</strong>{conflict?.loadedAt ? ` (${formatSpanishDateTime(conflict.loadedAt)})` : ""}. Al terminar esta extracción se reemplazará la tabla completa por los typekeys de esta solicitud. Entiendo que se perderán los datos anteriores.</span>
+        </label> : null}
         {unavailableTypekeys.length ? <p className="rounded-lg border border-red-200 bg-red-50 px-4 py-3 text-sm text-red-800" role="alert">BMW no tiene tiempos para {unavailableTypekeys.join(", ")}. Quita esos typekeys o sustitúyelos por un tipo base sugerido para poder iniciar la extracción.</p> : null}
         {requiresApproval ? <p className="rounded-lg border border-amber-200 bg-amber-50 px-4 py-3 text-sm text-amber-900">La solicitud quedará pendiente de aprobación de tu coordinador.</p> : null}
         <label className="block"><span className="field-label">Comentarios (opcional)</span><textarea autoComplete="off" className="field-control min-h-24 resize-y" maxLength={4_000} onChange={(event) => setValues((current) => ({ ...current, comments: event.target.value }))} placeholder="Añade información útil para la extracción…" value={values.comments} /></label>
@@ -529,10 +549,11 @@ export function ExtractionStepperForm({
       <input name="completion" type="hidden" value={values.completion} />
       <input name="laboursDevelopmentStart" type="hidden" value={values.laboursDevelopmentStart} />
       <input name="comments" type="hidden" value={values.comments} />
+      <input name="confirmReplace" type="hidden" value={replacesTable && replaceConfirmed ? "true" : "false"} />
       <input name="vehicles" type="hidden" value={JSON.stringify(vehicles)} />
       <div className="flex flex-col-reverse gap-3 sm:flex-row sm:items-center sm:justify-between">
         <div className="flex items-center gap-2"><button className="min-h-11 rounded-lg px-3 py-2 text-sm font-semibold text-zinc-700 hover:bg-zinc-100 disabled:invisible" disabled={step === 0} onClick={() => { setStep((current) => Math.max(0, current - 1)); clearValidation(); }} type="button">Atrás</button><span className="text-xs text-zinc-500">{draftReady ? draftSaved ? "Borrador guardado" : "Guardando borrador…" : "Cargando borrador…"}</span></div>
-        {step < 3 ? <button className="inline-flex min-h-11 items-center justify-center rounded-lg bg-zinc-950 px-5 py-2 text-sm font-semibold text-white hover:bg-zinc-800 focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-sky-700 disabled:cursor-wait disabled:bg-zinc-700" disabled={checking !== null} onClick={nextStep} type="button">{checking ? `Comprobando disponibilidad (${checking.done}/${checking.total})…` : "Continuar"}</button> : <SubmitButton className="sm:min-w-52" disabled={unavailableTypekeys.length > 0} pendingLabel="Iniciando…">Iniciar extracción</SubmitButton>}
+        {step < 3 ? <button className="inline-flex min-h-11 items-center justify-center rounded-lg bg-zinc-950 px-5 py-2 text-sm font-semibold text-white hover:bg-zinc-800 focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-sky-700 disabled:cursor-wait disabled:bg-zinc-700" disabled={checking !== null} onClick={nextStep} type="button">{checking ? `Comprobando disponibilidad (${checking.done}/${checking.total})…` : "Continuar"}</button> : <SubmitButton className="sm:min-w-52" disabled={unavailableTypekeys.length > 0 || (replacesTable && !replaceConfirmed)} pendingLabel="Iniciando…">Iniciar extracción</SubmitButton>}
       </div>
     </div>
   </form>;

@@ -1,6 +1,6 @@
 import "server-only";
 
-import { startLoadForRequest } from "@/lib/transformer/service";
+import { findTableConflict, startLoadForRequest } from "@/lib/transformer/service";
 import { notifyExtractionFailures } from "@/lib/mail/notifications";
 import type { Extraction, ExtractionStatus } from "@/db/schema";
 import {
@@ -57,8 +57,12 @@ async function submitExtraction(extraction: Extraction, context?: Awaited<Return
   }
 }
 
-export async function createExtraction(user: { id: string; oracleEmpId: number | null }, input: ExtractionFormInput, role: UserRole) {
+export async function createExtraction(user: { id: string; oracleEmpId: number | null }, input: ExtractionFormInput, role: UserRole, options: { confirmReplace?: boolean } = {}) {
   await Promise.all([validateBmwSelections(input), validateRenaultFamilies(input)]);
+  const first = input.vehicles[0];
+  if (first?.manufacturerGroup === "BMW" && !options.confirmReplace && await findTableConflict({ axCode: input.axCode, imcEdition: input.imcEdition, brand: first.brand })) {
+    throw new ReaderError("Ya hay datos cargados para este código AX y edición. Confirma que quieres reemplazarlos para continuar.", "TABLE_REPLACE_NOT_CONFIRMED", false, 409);
+  }
   const requiresApproval = role === "employee";
   const coordinator = requiresApproval ? await findCoordinatorUser(user) : null;
   if (requiresApproval && !coordinator) throw new ReaderError("No se ha podido resolver un coordinador para la solicitud.", "COORDINATOR_UNAVAILABLE", true);

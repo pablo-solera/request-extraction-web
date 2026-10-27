@@ -110,6 +110,46 @@ describe("extraction request stepper", () => {
     await user.click(screen.getByRole("button", { name: "Continuar" }));
   }
 
+  function conflictFetch(conflict: boolean) {
+    const base = availabilityFetch({ "6J92": { typekey: "6J92", status: "available", suggestedTypekey: null } }, ["6J92"]);
+    return vi.fn(async (input: RequestInfo | URL) => String(input).includes("/table-conflict")
+      ? Response.json({ conflict, loadedAt: conflict ? "2026-10-26T14:21:00.000Z" : null })
+      : base(input));
+  }
+
+  it("asks for confirmation before submitting when the table is already loaded in BMW_Labour", async () => {
+    const fetchMock = conflictFetch(true);
+    vi.stubGlobal("fetch", fetchMock);
+    const user = userEvent.setup();
+    const { container } = render(<ExtractionForm />);
+    await reachSummary(user, fetchMock, "6J92");
+
+    const checkbox = await screen.findByRole("checkbox", { name: /Entiendo que se perderán los datos anteriores/ });
+    expect(screen.getByText(/Ya hay datos cargados en BMW_Labour/)).toBeInTheDocument();
+    expect(screen.getByRole("button", { name: "Iniciar extracción" })).toBeDisabled();
+    expect(container.querySelector('input[name="confirmReplace"]')).toHaveValue("false");
+
+    await user.click(checkbox);
+    expect(screen.getByRole("button", { name: "Iniciar extracción" })).toBeEnabled();
+    expect(container.querySelector('input[name="confirmReplace"]')).toHaveValue("true");
+    const call = fetchMock.mock.calls.map(([input]) => String(input)).find((input) => input.includes("/table-conflict"))!;
+    expect(call).toContain("axCode=1XF");
+    expect(call).toContain("imcEdition=05%2F0");
+    expect(call).toContain("brand=BMW");
+  });
+
+  it("shows no confirmation when no table is loaded for that AX code and edition", async () => {
+    const fetchMock = conflictFetch(false);
+    vi.stubGlobal("fetch", fetchMock);
+    const user = userEvent.setup();
+    render(<ExtractionForm />);
+    await reachSummary(user, fetchMock, "6J92");
+
+    await waitFor(() => expect(fetchMock.mock.calls.some(([input]) => String(input).includes("/table-conflict"))).toBe(true));
+    expect(screen.queryByRole("checkbox")).not.toBeInTheDocument();
+    expect(screen.getByRole("button", { name: "Iniciar extracción" })).toBeEnabled();
+  });
+
   it("stops at the models step and lists what changes when the base type differs, offering swap or removal", async () => {
     const fetchMock = availabilityFetch({
       "6J02": { typekey: "6J02", status: "unavailable", code: "CGWATB0085", suggestedTypekey: null, baseType: { typekey: "6J92", status: "available", reliable: false, differences: [{ attribute: "transmission", requested: "AUT", baseType: "MECH" }] } },

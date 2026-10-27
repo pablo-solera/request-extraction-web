@@ -41,7 +41,7 @@ vi.mock("@/lib/readers/bmw/client", () => bmwReader);
 vi.mock("@/lib/readers/renault/client", async () => ({ getRenaultLabourFamilies: bmwReader.getRenaultLabourFamilies }));
 const organization = vi.hoisted(() => ({ findCoordinatorUser: vi.fn(), findCoordinatorTeamUserIds: vi.fn(), isUserInCoordinatorTeam: vi.fn() }));
 vi.mock("@/lib/employees/org-service", () => organization);
-const transformer = vi.hoisted(() => ({ startLoadForRequest: vi.fn() }));
+const transformer = vi.hoisted(() => ({ startLoadForRequest: vi.fn(), findTableConflict: vi.fn() }));
 const notifications = vi.hoisted(() => ({ notifyExtractionFailures: vi.fn() }));
 vi.mock("@/lib/mail/notifications", () => notifications);
 vi.mock("@/lib/transformer/service", () => transformer);
@@ -316,6 +316,28 @@ describe("reader registry extraction flow", () => {
     expect(bmwReader.getBmwDevelopmentCodes).toHaveBeenCalledWith("BMW", "7'");
     expect(bmwReader.getBmwTypekeys).toHaveBeenCalledWith("BMW", "7'", "G70");
     expect(repository.insertExtractionsWithCapacity).toHaveBeenCalledWith("user-1", input, 50, { status: "approved", coordinatorId: null });
+  });
+
+  it("asks for confirmation before replacing a table that is already loaded for the same AX code, edition and brand", async () => {
+    const input = {
+      axCode: "AX12", imcEdition: "05/0", completion: "2026-10-20", comments: "", laboursDevelopmentStart: "2026-03-01",
+      vehicles: [{ manufacturerGroup: "BMW" as const, brand: "MINI" as const, series: "F56", developmentCode: "F56", typekey: "11EH", modelDescription: "" }],
+    };
+    bmwReader.getBmwDevelopmentCodes.mockResolvedValue([{ value: "F56", label: "F56" }]);
+    bmwReader.getBmwTypekeys.mockResolvedValue([{ value: "11EH", label: "11EH" }]);
+    transformer.findTableConflict.mockResolvedValue({ loadedAt: "2026-10-26T14:21:00.000Z", loadStatus: "completed" });
+
+    await expect(createExtraction({ id: "user-1", oracleEmpId: null }, input, "admin")).rejects.toMatchObject({ code: "TABLE_REPLACE_NOT_CONFIRMED", status: 409 });
+    expect(transformer.findTableConflict).toHaveBeenCalledWith({ axCode: "AX12", imcEdition: "05/0", brand: "MINI" });
+    expect(repository.insertExtractionsWithCapacity).not.toHaveBeenCalled();
+
+    repository.insertExtractionsWithCapacity.mockResolvedValueOnce([{ requestGroupId: "g-confirmed" }]);
+    await expect(createExtraction({ id: "user-1", oracleEmpId: null }, input, "admin", { confirmReplace: true })).resolves.toMatchObject({ requestGroupId: "g-confirmed" });
+
+    transformer.findTableConflict.mockResolvedValue(null);
+    repository.insertExtractionsWithCapacity.mockResolvedValueOnce([{ requestGroupId: "g-free" }]);
+    await expect(createExtraction({ id: "user-1", oracleEmpId: null }, input, "admin")).resolves.toMatchObject({ requestGroupId: "g-free" });
+    transformer.findTableConflict.mockReset();
   });
 
   it("revalidates every Renault family with the reader before persisting a multi-family request", async () => {

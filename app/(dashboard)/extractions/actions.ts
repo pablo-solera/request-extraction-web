@@ -51,7 +51,7 @@ export async function createExtractionAction(
   let extraction;
 
   try {
-    extraction = await createExtraction(user, parsed.data, user.role);
+    extraction = await createExtraction(user, parsed.data, user.role, { confirmReplace: formData.get("confirmReplace") === "true" });
   } catch (error) {
     if (error instanceof ReaderError) {
       return { error: error.code === "READER_CONFIGURATION_ERROR" ? "La integración con el reader no está disponible. Contacta con soporte." : error.message, values };
