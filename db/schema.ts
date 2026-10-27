@@ -58,6 +58,7 @@ export const extractionRequests = pgTable("extraction_requests", {
   loadRemoteId: text("load_remote_id"),
   loadError: text("load_error"),
   loadAttempts: integer("load_attempts").default(0).notNull(),
+  loadStartFailures: integer("load_start_failures").default(0).notNull(),
   loadRequestedAt: timestamp("load_requested_at", { withTimezone: true }),
   loadedAt: timestamp("loaded_at", { withTimezone: true }),
   loadPolledAt: timestamp("load_polled_at", { withTimezone: true }),
@@ -84,6 +85,7 @@ export const extractions = pgTable(
     requestGroupId: uuid("request_group_id").notNull().references(() => extractionRequests.requestGroupId, { onDelete: "cascade" }),
     modelDescription: text("model_description").notNull(),
     modelCode: text("model_code").notNull(),
+    dataDate: text("data_date"),
     domain: extractionDomain("domain").notNull(),
     readerKey: text("reader_key").notNull(),
     readerParamsVersion: integer("reader_params_version").default(1).notNull(),
@@ -112,6 +114,7 @@ export const extractions = pgTable(
     check("extractions_terminal_error_check", sql`(${table.status} IN ('completed', 'failed', 'cancelled')) OR ${table.completedAt} IS NULL`),
     check("extractions_reader_params_object_check", sql`jsonb_typeof(${table.readerParams}) = 'object'`),
     check("extractions_progress_range_check", sql`${table.progress} IS NULL OR (${table.progress} >= 0 AND ${table.progress} <= 100)`),
+    check("extractions_data_date_check", sql`${table.dataDate} IS NULL OR ${table.dataDate} ~ '^[0-9]{8}$'`),
     check("extractions_attempt_count_check", sql`${table.attemptCount} >= 0`),
     check("extractions_failed_error_check", sql`${table.status} <> 'failed' OR ${table.errorCode} IS NOT NULL`),
     check("extractions_completed_date_check", sql`${table.status} <> 'completed' OR ${table.completedAt} IS NOT NULL`),
@@ -137,7 +140,7 @@ export const comparisonReports = pgTable("comparison_reports", {
   check("comparison_reports_status_check", sql`${table.status} IN ('queued', 'running', 'completed', 'failed')`),
 ]);
 
-export type MailNotificationStatus = "sending" | "sent" | "failed";
+export type MailNotificationStatus = "sending" | "sent" | "failed" | "skipped";
 export const mailNotifications = pgTable("mail_notifications", {
   id: uuid("id").defaultRandom().primaryKey(),
   requestGroupId: uuid("request_group_id").notNull().references(() => extractionRequests.requestGroupId, { onDelete: "cascade" }),
@@ -145,11 +148,12 @@ export const mailNotifications = pgTable("mail_notifications", {
   ref: text("ref").notNull(),
   status: text("status").$type<MailNotificationStatus>().default("sending").notNull(),
   attempts: integer("attempts").default(1).notNull(),
+  claimedAt: timestamp("claimed_at", { withTimezone: true }).defaultNow().notNull(),
   createdAt: timestamp("created_at", { withTimezone: true }).defaultNow().notNull(),
   sentAt: timestamp("sent_at", { withTimezone: true }),
 }, (table) => [
   uniqueIndex("mail_notifications_event_unique").on(table.requestGroupId, table.kind, table.ref),
-  check("mail_notifications_status_check", sql`${table.status} IN ('sending', 'sent', 'failed')`),
+  check("mail_notifications_status_check", sql`${table.status} IN ('sending', 'sent', 'failed', 'skipped')`),
   check("mail_notifications_attempts_check", sql`${table.attempts} >= 1`),
 ]);
 
