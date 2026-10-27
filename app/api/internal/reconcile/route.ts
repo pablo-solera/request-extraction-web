@@ -26,18 +26,15 @@ export async function POST(request: Request) {
     );
   }
 
-  try {
-    const synchronized = await reconcileActiveExtractions();
-    const transformer = await reconcileTransformer().catch((error) => {
-      console.error("Transformer reconciliation failed.", error);
-      return { started: 0, updated: 0, failed: true };
-    });
-    return Response.json({ synchronized, transformer }, { headers: privateHeaders });
-  } catch (error) {
-    console.error("Extraction reconciliation failed.", error);
+  // The two steps are independent: a problem with one reader must not stop loads and comparisons from being followed.
+  const [extractions, transformer] = await Promise.allSettled([reconcileActiveExtractions(), reconcileTransformer()]);
+  if (extractions.status === "rejected") console.error("Extraction reconciliation failed.", extractions.reason);
+  if (transformer.status === "rejected") console.error("Transformer reconciliation failed.", transformer.reason);
+  if (extractions.status === "rejected") {
     return Response.json(
-      { error: { code: "RECONCILIATION_FAILED", message: "No se ha podido completar la reconciliación." } },
+      { error: { code: "RECONCILIATION_FAILED", message: "No se ha podido completar la reconciliación." }, transformer: transformer.status === "fulfilled" ? transformer.value : { failed: true } },
       { status: 503, headers: privateHeaders },
     );
   }
+  return Response.json({ synchronized: extractions.value, transformer: transformer.status === "fulfilled" ? transformer.value : { started: 0, updated: 0, failed: true } }, { headers: privateHeaders });
 }

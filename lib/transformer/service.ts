@@ -5,7 +5,7 @@ import { isUserInCoordinatorTeam } from "@/lib/employees/org-service";
 import { ReaderError } from "@/lib/readers/errors";
 import { getTransformerClient, MAX_LST_BYTES, type TransformerClient } from "@/lib/transformer/client";
 import {
-  attachComparisonRemote, claimComparisonPoll, claimLoadPoll, claimLoadStart, failComparison, getComparison, getRequestWithRequester, insertComparison, listActiveComparisons, listActiveLoads,
+  attachComparisonRemote, claimComparisonPoll, claimLoadPoll, claimLoadStart, failComparison, recordLoadStartFailure, getComparison, getRequestWithRequester, insertComparison, listActiveComparisons, listActiveLoads,
   findLoadedTable, listComparisonsForRequests, listRequestsByIds, listRequestsReadyForLoad, markLoadFailedToStart, markLoadRequested, resetFailedLoad, updateComparisonState, updateLoadState,
 } from "@/lib/transformer/repository";
 import type { TransformerRequestInfo } from "@/lib/transformer/info";
@@ -27,6 +27,9 @@ function mapStatus(state: TransformerState): TransformerJobStatus {
 
 const failureMessage = (state: TransformerState, fallback: string) => state.error?.slice(0, 500) || fallback;
 
+export const TRANSFORMER_START_INTERVAL_MS = 30_000;
+const MAX_LOAD_START_FAILURES = 5;
+
 type ReadyRequest = Awaited<ReturnType<typeof listRequestsReadyForLoad>>[number];
 
 async function failToStart(requestGroupId: string, message: string) {
@@ -36,6 +39,8 @@ async function failToStart(requestGroupId: string, message: string) {
 
 /** Sends one request to the transformer. Returns true when the load was queued; the claim in markLoadRequested keeps a request from being loaded twice. */
 async function startLoad(client: TransformerClient, { request, items }: ReadyRequest) {
+  // Every path (last typekey completing, history, reconciliation, retry) claims the request first, so two of them never call the transformer at once.
+  if (!await claimLoadStart(request.requestGroupId, new Date(Date.now() - TRANSFORMER_START_INTERVAL_MS))) return false;
   const typekeys = items.flatMap((item) => {
     const { typekey, series, developmentCode } = item.readerParams;
     return typekey && series && developmentCode ? [{ typekey, series, family: developmentCode }] : [];
@@ -49,7 +54,10 @@ async function startLoad(client: TransformerClient, { request, items }: ReadyReq
     const { loadId } = await client.createLoad({ axCode: request.axCode, imcEdition: request.imcEdition, brand, typekeys });
     return Boolean(await markLoadRequested(request.requestGroupId, loadId));
   } catch (error) {
-    if (error instanceof ReaderError && error.retryable) return false;
+    if (error instanceof ReaderError && error.retryable) {
+      if (await recordLoadStartFailure(request.requestGroupId) >= MAX_LOAD_START_FAILURES) await failToStart(request.requestGroupId, "El servicio de carga no responde. Inténtalo de nuevo más tarde con \"Reintentar carga\".");
+      return false;
+    }
     await failToStart(request.requestGroupId, error instanceof ReaderError ? error.message : "No se ha podido iniciar la carga.");
     return false;
   }
@@ -75,17 +83,14 @@ export async function findTableConflict(input: { axCode: string; imcEdition: str
   return row ? { loadedAt: row.loadedAt?.toISOString() ?? null, loadStatus: row.loadStatus } : null;
 }
 
-export const TRANSFORMER_START_INTERVAL_MS = 30_000;
 
 /** Sends ready requests that have no load yet, at most once per interval each, so the history unblocks them without a scheduled job. */
-export async function startPendingLoads(requestGroupIds: string[], client: TransformerClient = getTransformerClient(), intervalMs = TRANSFORMER_START_INTERVAL_MS) {
+export async function startPendingLoads(requestGroupIds: string[], client: TransformerClient = getTransformerClient()) {
   if (!isTransformerConfigured()) return 0;
-  const staleBefore = new Date(Date.now() - intervalMs);
   let started = 0;
   for (const requestGroupId of requestGroupIds) {
     const [ready] = await listRequestsReadyForLoad(1, requestGroupId);
-    if (!ready || !await claimLoadStart(requestGroupId, staleBefore)) continue;
-    if (await startLoad(client, ready)) started++;
+    if (ready && await startLoad(client, ready)) started++;
   }
   return started;
 }

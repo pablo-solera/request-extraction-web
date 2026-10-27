@@ -37,10 +37,17 @@ export async function findLoadedTable(input: { axCode: string; imcEdition: strin
 
 export async function markLoadRequested(requestGroupId: string, remoteId: string) {
   const [request] = await getDb().update(extractionRequests).set({
-    loadStatus: "queued", loadRemoteId: remoteId, loadError: null, loadRequestedAt: new Date(), loadedAt: null,
+    loadStatus: "queued", loadRemoteId: remoteId, loadError: null, loadRequestedAt: new Date(), loadedAt: null, loadStartFailures: 0,
     loadAttempts: sql`${extractionRequests.loadAttempts} + 1`,
   }).where(and(eq(extractionRequests.requestGroupId, requestGroupId), isNull(extractionRequests.loadStatus))).returning();
   return request ?? null;
+}
+
+/** Counts a failed attempt to reach the transformer for a request that has no load yet; returns the total so far. */
+export async function recordLoadStartFailure(requestGroupId: string) {
+  const [request] = await getDb().update(extractionRequests).set({ loadStartFailures: sql`${extractionRequests.loadStartFailures} + 1` })
+    .where(and(eq(extractionRequests.requestGroupId, requestGroupId), isNull(extractionRequests.loadStatus))).returning({ failures: extractionRequests.loadStartFailures });
+  return request?.failures ?? 0;
 }
 
 export async function markLoadFailedToStart(requestGroupId: string, message: string) {
@@ -102,7 +109,7 @@ export async function claimComparisonPoll(id: string, staleBefore: Date) {
 
 /** Lets the technician send a failed load again; the next reconciliation picks it up. */
 export async function resetFailedLoad(requestGroupId: string) {
-  const [request] = await getDb().update(extractionRequests).set({ loadStatus: null, loadError: null, loadRemoteId: null })
+  const [request] = await getDb().update(extractionRequests).set({ loadStatus: null, loadError: null, loadRemoteId: null, loadStartFailures: 0, loadPolledAt: null })
     .where(and(eq(extractionRequests.requestGroupId, requestGroupId), eq(extractionRequests.loadStatus, "failed"))).returning();
   return request ?? null;
 }
