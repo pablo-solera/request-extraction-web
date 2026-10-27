@@ -52,6 +52,16 @@ describe("transformer reconciliation", () => {
     expect(repository.markLoadRequested).toHaveBeenCalledWith("g1", "load-1");
   });
 
+  it("pins each typekey to the date of its own extraction", async () => {
+    repository.listRequestsReadyForLoad.mockResolvedValueOnce([{ request: request(), items: [{ ...item("11EH"), dataDate: "20261020" }, item("6J92", "6'", "F13")] }]);
+    client.createLoad.mockResolvedValueOnce({ loadId: "load-1", reused: false });
+    repository.markLoadRequested.mockResolvedValueOnce({});
+    await reconcileTransformer(client);
+    expect(client.createLoad.mock.calls[0]![0].typekeys).toEqual([
+      { typekey: "11EH", series: "7'", family: "G70", date: "20261020" }, { typekey: "6J92", series: "6'", family: "F13" },
+    ]);
+  });
+
   it("retries later when the transformer is unavailable and fails permanently on other errors or incomplete data", async () => {
     repository.listRequestsReadyForLoad.mockResolvedValueOnce([
       { request: request({ requestGroupId: "a" }), items: [item("11EH")] },

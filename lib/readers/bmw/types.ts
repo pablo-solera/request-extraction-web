@@ -18,6 +18,8 @@ export const bmwLabourStateSchema = z.object({
   progress: z.number().int().min(0).max(100).nullable().optional(),
   stage: z.string().optional(),
   details: z.object({ stalled: z.boolean().optional() }).passthrough().optional(),
+  // Once a typekey is being extracted the reader reports the day (YYYYMMDD) its data is stored under.
+  request: z.object({ selection: z.object({ date: z.string().regex(/^\d{8}$/).optional() }).passthrough().optional() }).passthrough().optional(),
   error: z.object({ message: z.string() }).nullable().optional(),
 });
 

@@ -15,7 +15,7 @@ export type ExtractionReaderCapabilities = { cancel: boolean; resume: boolean; d
 export type ExtractionReader = {
   prepareSubmission(): Promise<ReaderSubmissionContext>;
   create(extraction: Extraction, context?: ReaderSubmissionContext): Promise<{ requestId: string; status?: string }>;
-  getState(requestId: string): Promise<{ status: string; stage?: string; progress?: number | null; readerStalled?: boolean; details?: unknown; error?: { message: string } | null }>;
+  getState(requestId: string): Promise<{ status: string; stage?: string; progress?: number | null; readerStalled?: boolean; details?: unknown; dataDate?: string | null; error?: { message: string } | null }>;
   mapStatus(state: { status: string }): ExtractionStatus;
   failureMessage(state: { error?: { message: string } | null }): string;
   cancel?(requestId: string): Promise<{ requestId: string; status: string }>;
@@ -82,7 +82,7 @@ const bmwReader: ExtractionReader = {
   },
   async getState(requestId) {
     const state = await getBmwLabourState(requestId);
-    return { ...state, readerStalled: state.details?.stalled ?? false };
+    return { ...state, readerStalled: state.details?.stalled ?? false, dataDate: state.request?.selection?.date ?? null };
   },
   cancel: cancelBmwLabour,
   resume: resumeBmwLabour,

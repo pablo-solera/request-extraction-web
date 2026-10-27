@@ -21,5 +21,6 @@ export type TransformerLoadInput = {
   axCode: string;
   imcEdition: string;
   brand: "BMW" | "MINI";
-  typekeys: Array<{ typekey: string; series: string; family: string }>;
+  /** `date` is the day (YYYYMMDD) the reader stored that typekey under, so the load uses exactly the data of this request. */
+  typekeys: Array<{ typekey: string; series: string; family: string; date?: string }>;
 };

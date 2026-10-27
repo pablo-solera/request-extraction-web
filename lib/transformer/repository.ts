@@ -17,7 +17,7 @@ export async function listRequestsReadyForLoad(limit = 20, requestGroupId?: stri
     sql`NOT EXISTS (SELECT 1 FROM ${extractions} WHERE ${extractions.requestGroupId} = ${extractionRequests.requestGroupId} AND ${extractions.status} <> 'completed')`,
   )).orderBy(extractionRequests.createdAt).limit(limit);
   if (requests.length === 0) return [];
-  const items = await getDb().select({ requestGroupId: extractions.requestGroupId, modelCode: extractions.modelCode, readerParams: extractions.readerParams })
+  const items = await getDb().select({ requestGroupId: extractions.requestGroupId, modelCode: extractions.modelCode, readerParams: extractions.readerParams, dataDate: extractions.dataDate })
     .from(extractions).where(inArray(extractions.requestGroupId, requests.map((request) => request.requestGroupId))).orderBy(extractions.createdAt);
   return requests.map((request) => ({ request, items: items.filter((item) => item.requestGroupId === request.requestGroupId) }));
 }

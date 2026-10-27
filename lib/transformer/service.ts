@@ -43,7 +43,7 @@ async function startLoad(client: TransformerClient, { request, items }: ReadyReq
   if (!await claimLoadStart(request.requestGroupId, new Date(Date.now() - TRANSFORMER_START_INTERVAL_MS))) return false;
   const typekeys = items.flatMap((item) => {
     const { typekey, series, developmentCode } = item.readerParams;
-    return typekey && series && developmentCode ? [{ typekey, series, family: developmentCode }] : [];
+    return typekey && series && developmentCode ? [{ typekey, series, family: developmentCode, ...(item.dataDate ? { date: item.dataDate } : {}) }] : [];
   });
   const brand = request.brand === "MINI" ? "MINI" : request.brand === "BMW" ? "BMW" : null;
   if (!brand || typekeys.length !== items.length) {

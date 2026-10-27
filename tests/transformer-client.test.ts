@@ -22,6 +22,13 @@ describe("transformer client", () => {
     expect(JSON.parse(String((init as RequestInit).body))).toEqual({ axCode: "1XF", edition: "05/0", manufacturer: "MINI", brand: "MINI", typekeys: [{ typekey: "11EH", series: "F56", family: "F56" }] });
   });
 
+  it("sends the extraction date of each typekey when known", async () => {
+    process.env.BMW_TRANSFORMER_BASE_URL = "http://localhost:3005";
+    const fetcher = vi.fn().mockResolvedValue(Response.json({ requestId: id, status: "queued", reused: false }, { status: 202 }));
+    await createTransformerClient({ fetcher }).createLoad({ axCode: "1XF", imcEdition: "05/0", brand: "BMW", typekeys: [{ typekey: "11EH", series: "7", family: "G70", date: "20261020" }, { typekey: "21EH", series: "7", family: "G70" }] });
+    expect(JSON.parse(String((fetcher.mock.calls[0]![1] as RequestInit).body)).typekeys).toEqual([{ typekey: "11EH", series: "7", family: "G70", date: "20261020" }, { typekey: "21EH", series: "7", family: "G70" }]);
+  });
+
   it("validates states and maps transformer errors to stable Spanish messages", async () => {
     process.env.BMW_TRANSFORMER_BASE_URL = "http://localhost:3005";
     const fetcher = vi.fn()

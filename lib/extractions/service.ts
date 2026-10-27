@@ -128,6 +128,7 @@ async function syncExtraction(extraction: Extraction) {
       progress: status === "completed" ? 100 : remote.progress ?? current.progress ?? null,
       readerStatus: remote.status,
       readerStalled: remote.readerStalled ?? false,
+      ...(status === "completed" && remote.dataDate ? { dataDate: remote.dataDate } : {}),
     });
     if (status === "completed") {
       await startLoadForRequest(extraction.requestGroupId).catch((error) => console.error("Transformer load could not be started.", error));

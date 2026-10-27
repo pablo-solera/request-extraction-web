@@ -206,6 +206,7 @@ export async function updateExtractionState(id: string, update: {
   progress?: number | null;
   readerStatus?: string | null;
   readerStalled?: boolean;
+  dataDate?: string | null;
 }) {
   const now = new Date();
   const [extraction] = await getDb().update(extractions).set({

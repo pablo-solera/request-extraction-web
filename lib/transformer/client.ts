@@ -83,7 +83,7 @@ export function createTransformerClient(options: { fetcher?: typeof fetch } = {}
         edition: input.imcEdition,
         manufacturer: input.brand,
         brand: input.brand,
-        typekeys: input.typekeys.map(({ typekey, series, family }) => ({ typekey, series, family })),
+        typekeys: input.typekeys.map(({ typekey, series, family, date }) => ({ typekey, series, family, ...(date ? { date } : {}) })),
       };
       const result = parse(transformerEnqueuedSchema, await json("/loads", { method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify(body) }));
       return { loadId: result.requestId, reused: result.reused ?? false };
