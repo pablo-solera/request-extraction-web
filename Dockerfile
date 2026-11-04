@@ -11,6 +11,15 @@ COPY --from=deps /app/node_modules ./node_modules
 COPY . .
 RUN bun run build
 
+# One-shot image that applies the database migrations before the web starts (the standalone runtime has no drizzle-kit).
+FROM oven/bun:1.3 AS migrate
+WORKDIR /app
+ENV NEXT_TELEMETRY_DISABLED=1
+COPY --from=deps /app/node_modules ./node_modules
+COPY package.json drizzle.config.ts ./
+COPY db ./db
+CMD ["bun", "run", "db:migrate"]
+
 FROM node:22-bookworm-slim AS runner
 WORKDIR /app
 ENV NODE_ENV=production \
