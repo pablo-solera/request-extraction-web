@@ -3,8 +3,9 @@ import { getTestAccounts } from "@/lib/employees/test-accounts";
 import { createSyncedUsers, findExistingFallbackEmails, findUsersWithOracleEmpId } from "@/lib/auth/user-repository";
 
 export type SyncPlan = { toCreate: { oracleEmpId: number; email: string | null; name: string }[] };
-export async function buildSyncPlan(): Promise<SyncPlan> {
-  const [employees, mapped, existingEmails] = await Promise.all([findAllActiveEmployees(), findUsersWithOracleEmpId(), findExistingFallbackEmails()]);
+/** `employees` replaces the query to Oracle when the caller already knows the employees to consider. */
+export async function buildSyncPlan(options: { employees?: Awaited<ReturnType<typeof findAllActiveEmployees>> } = {}): Promise<SyncPlan> {
+  const [employees, mapped, existingEmails] = await Promise.all([options.employees ?? findAllActiveEmployees(), findUsersWithOracleEmpId(), findExistingFallbackEmails()]);
   const mappedIds = new Set(mapped.flatMap((user) => user.oracleEmpId === null ? [] : [user.oracleEmpId]));
   const candidates = new Map<number, { oracleEmpId: number; email: string; name: string }>();
   for (const employee of employees) {
@@ -24,5 +25,14 @@ export async function buildSyncPlan(): Promise<SyncPlan> {
   return { toCreate };
 }
 export async function runUserSync() { const plan = await buildSyncPlan(); const created = await createSyncedUsers(plan.toCreate); return { created: created.length }; }
-import "server-only";
+/**
+ * Creates only the users of the test accounts (TEST_ACCOUNTS_ENABLED), without asking Oracle for the employees. A test
+ * account can only sign in if its row exists in `users`, and a new database has none. Idempotent.
+ */
+export async function seedTestAccountUsers(): Promise<{ enabled: boolean; created: number }> {
+  if (getTestAccounts() === null) return { enabled: false, created: 0 };
+  const plan = await buildSyncPlan({ employees: [] });
+  const created = await createSyncedUsers(plan.toCreate);
+  return { enabled: true, created: created.length };
+}
 import "server-only";

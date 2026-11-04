@@ -22,6 +22,7 @@
     "test:integration": "bun run scripts/run-integration-tests.ts",
     "db:generate": "drizzle-kit generate",
     "db:migrate": "drizzle-kit migrate",
+    "db:deploy": "drizzle-kit migrate && bun --conditions=react-server run scripts/seed-test-users.ts",
     "sync:users": "bun --conditions=react-server run scripts/sync-users-timertask.ts",
     "sync:users:apply": "bun --conditions=react-server run scripts/sync-users-timertask.ts --apply",
     "docker:build": "docker build -t request-extraction-web:latest .",

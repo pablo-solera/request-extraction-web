@@ -81,6 +81,17 @@ npm run db:migrate
 
 El servicio solo publica PostgreSQL en `127.0.0.1:5432` y guarda los datos en el volumen `postgres_data`. Puedes personalizar `POSTGRES_DB`, `POSTGRES_USER` y `POSTGRES_PASSWORD` mediante `.env`.
 
+### Despliegue: migraciones y cuentas de prueba
+
+En un servidor, la base de datos se prepara con `bun run db:deploy`, que es lo que ejecuta la imagen `request-extraction-web-migrate` (servicio `migrate` del compose, que termina antes de arrancar la web):
+
+1. Aplica las migraciones.
+2. Si `TEST_ACCOUNTS_ENABLED=true`, crea los usuarios de las cuentas de prueba (`TEST_ACCOUNT_ADMIN`, `_COORDINATOR` y `_EMPLOYEE`). No consulta Oracle, solo necesita `DATABASE_URL` y esas variables. Es idempotente.
+
+Las variables `TEST_ACCOUNT_*` solo definen quiénes son las cuentas; para iniciar sesión además hace falta su fila en `users`, y una base de datos nueva no tiene ninguna. Con las cuentas de prueba desactivadas (lo normal en producción) este paso no crea nada.
+
+Los usuarios reales (los empleados de TimerTask) se crean con la sincronización, que sí necesita Oracle: el botón de `/admin/users`, o `bun run sync:users` (simulación) y `bun run sync:users:apply`.
+
 Para generar una migración después de modificar `db/schema.ts`:
 
 ```bash

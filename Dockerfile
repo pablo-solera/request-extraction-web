@@ -11,14 +11,17 @@ COPY --from=deps /app/node_modules ./node_modules
 COPY . .
 RUN bun run build
 
-# One-shot image that applies the database migrations before the web starts (the standalone runtime has no drizzle-kit).
+# One-shot image that sets the database up on a deployment (`bun run db:deploy`): it applies the migrations and creates the
+# users of the test accounts, if enabled. The standalone runtime has neither drizzle-kit nor the sources.
 FROM oven/bun:1.3 AS migrate
 WORKDIR /app
 ENV NEXT_TELEMETRY_DISABLED=1
 COPY --from=deps /app/node_modules ./node_modules
-COPY package.json drizzle.config.ts ./
+COPY package.json tsconfig.json drizzle.config.ts ./
 COPY db ./db
-CMD ["bun", "run", "db:migrate"]
+COPY lib ./lib
+COPY scripts ./scripts
+CMD ["bun", "run", "db:deploy"]
 
 FROM node:22-bookworm-slim AS runner
 WORKDIR /app
