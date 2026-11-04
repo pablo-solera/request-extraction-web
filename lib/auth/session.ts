@@ -24,16 +24,15 @@ function getSessionSecret() {
   return secret;
 }
 
-function shouldUseSecureCookie() {
-  if (process.env.NODE_ENV === "production") {
-    if (process.env.SESSION_COOKIE_SECURE === "false") {
-      throw new Error("SESSION_COOKIE_SECURE cannot be false in production.");
-    }
-
-    return true;
-  }
-
-  return process.env.SESSION_COOKIE_SECURE === "true";
+/**
+ * Secure by default in production. A deployment that is only reachable over plain HTTP (internal network without TLS)
+ * has to opt out with SESSION_COOKIE_SECURE=false, because browsers drop Secure cookies received over HTTP and nobody
+ * could sign in.
+ */
+export function shouldUseSecureCookie() {
+  const configured = process.env.SESSION_COOKIE_SECURE;
+  if (process.env.NODE_ENV === "production") return configured !== "false";
+  return configured === "true";
 }
 
 export function createSessionToken(user: { id: string }) {

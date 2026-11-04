@@ -1,5 +1,5 @@
 import { afterEach, describe, expect, it, vi } from "vitest";
-import { createSessionToken, verifySessionToken } from "@/lib/auth/session";
+import { createSessionToken, shouldUseSecureCookie, verifySessionToken } from "@/lib/auth/session";
 
 const originalSecret = process.env.SESSION_SECRET;
 
@@ -23,5 +23,25 @@ describe("session tokens", () => {
     vi.stubEnv("SESSION_SECRET", "another-secret-with-at-least-thirty-two-chars");
 
     expect(verifySessionToken(token)).toBeNull();
+  });
+});
+
+describe("session cookie security", () => {
+  it("is Secure by default in production and only an explicit false turns it off", () => {
+    vi.stubEnv("NODE_ENV", "production");
+    vi.stubEnv("SESSION_COOKIE_SECURE", "");
+    expect(shouldUseSecureCookie()).toBe(true);
+    vi.stubEnv("SESSION_COOKIE_SECURE", "true");
+    expect(shouldUseSecureCookie()).toBe(true);
+    vi.stubEnv("SESSION_COOKIE_SECURE", "false");
+    expect(shouldUseSecureCookie()).toBe(false);
+  });
+
+  it("is not Secure outside production unless requested", () => {
+    vi.stubEnv("NODE_ENV", "development");
+    vi.stubEnv("SESSION_COOKIE_SECURE", "");
+    expect(shouldUseSecureCookie()).toBe(false);
+    vi.stubEnv("SESSION_COOKIE_SECURE", "true");
+    expect(shouldUseSecureCookie()).toBe(true);
   });
 });
