@@ -6,6 +6,7 @@ import {
   renaultStateSchema,
 } from "@/lib/readers/renault/types";
 import { ReaderError } from "@/lib/readers/errors";
+import { isTrustedServiceUrl } from "@/lib/readers/service-url";
 import { z } from "zod";
 
 export { ReaderError } from "@/lib/readers/errors";
@@ -24,9 +25,8 @@ function requiredEnvironment(name: string) {
 
 function readerBaseUrl() {
   const url = new URL(requiredEnvironment("RENAULT_READER_BASE_URL"));
-  const isLoopback = url.hostname === "127.0.0.1" || url.hostname === "localhost";
 
-  if (url.protocol !== "https:" && !(isLoopback && url.protocol === "http:")) {
+  if (!isTrustedServiceUrl(url)) {
     throw new ReaderError(
       "La conexion con Renault debe usar HTTPS fuera del equipo local.",
       "READER_CONFIGURATION_ERROR",

@@ -161,6 +161,13 @@ describe("BMW reader client", () => {
     expect(fetcher).toHaveBeenCalledOnce();
   });
 
+  it("accepts plain HTTP towards a Docker service name", async () => {
+    process.env.BMW_READER_BASE_URL = "http://bmw-reader-api:3004";
+    const fetcher = vi.fn().mockResolvedValue(Response.json({ requestId: "7be5f2af-879b-4c61-84d5-6e728f438a02", status: "running", progress: 5 }));
+    await createBmwReaderClient({ fetcher }).getLabourState("7be5f2af-879b-4c61-84d5-6e728f438a02");
+    expect(String(fetcher.mock.calls[0]![0])).toBe("http://bmw-reader-api:3004/v1/labours/7be5f2af-879b-4c61-84d5-6e728f438a02");
+  });
+
   it("cancels and resumes through the common v1 labour action routes", async () => {
     process.env.BMW_READER_BASE_URL = "http://127.0.0.1:3004";
     const fetcher = vi.fn()

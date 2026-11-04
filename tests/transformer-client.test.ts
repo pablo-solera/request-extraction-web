@@ -83,4 +83,11 @@ describe("transformer client", () => {
     process.env.BMW_TRANSFORMER_BASE_URL = "http://transformer.example.com";
     await expect(client.getLoad(id)).rejects.toMatchObject({ code: "TRANSFORMER_CONFIGURATION_ERROR" });
   });
+
+  it("accepts plain HTTP towards a Docker service name", async () => {
+    const fetcher = vi.fn().mockResolvedValue(Response.json({ requestId: id, status: "completed", progress: 100, pivotKey: "k" }));
+    process.env.BMW_TRANSFORMER_BASE_URL = "http://bmw-transformer-api:3005";
+    await createTransformerClient({ fetcher }).getLoad(id);
+    expect(String(fetcher.mock.calls[0]![0])).toBe(`http://bmw-transformer-api:3005/loads/${id}`);
+  });
 });

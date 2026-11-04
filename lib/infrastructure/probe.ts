@@ -1,6 +1,7 @@
 import "server-only";
 
 import { z } from "zod";
+import { isTrustedServiceUrl } from "@/lib/readers/service-url";
 import { infrastructureManufacturers, type InfrastructureService } from "@/lib/infrastructure/services";
 
 const PROBE_TIMEOUT_MS = 3_000;
@@ -32,8 +33,7 @@ function parseBaseUrl(raw: string): URL {
     throw new Error("invalid-url");
   }
 
-  const isLoopback = url.hostname === "localhost" || url.hostname === "127.0.0.1" || url.hostname === "[::1]";
-  if ((url.protocol !== "https:" && !(isLoopback && url.protocol === "http:")) || url.username || url.password) {
+  if (!isTrustedServiceUrl(url) || url.username || url.password) {
     throw new Error("invalid-url");
   }
 

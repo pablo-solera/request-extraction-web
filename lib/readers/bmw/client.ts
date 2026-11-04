@@ -2,6 +2,7 @@ import "server-only";
 
 import { z } from "zod";
 import { ReaderError } from "@/lib/readers/errors";
+import { isTrustedServiceUrl } from "@/lib/readers/service-url";
 import { bmwBrandSchema, bmwCreateResponseSchema, bmwLabourActionResponseSchema, bmwLabourStateSchema, bmwTypekeyAvailabilitySchema, parseBmwDevelopmentCodes, parseBmwSeriesOptions, parseBmwTypekeys, type BmwBrand, type BmwDevelopmentCodeOption, type BmwLabourState, type BmwSeriesOption, type BmwTypekeyAvailability, type BmwTypekeyOption } from "@/lib/readers/bmw/types";
 
 const REQUEST_TIMEOUT_MS = 12_000;
@@ -21,8 +22,7 @@ function requiredBaseUrl() {
     throw new ReaderError("La integración con BMW no está configurada correctamente.", "READER_CONFIGURATION_ERROR", false, 500);
   }
 
-  const isLoopback = url.hostname === "localhost" || url.hostname === "127.0.0.1" || url.hostname === "[::1]";
-  if ((url.protocol !== "https:" && !(isLoopback && url.protocol === "http:")) || url.username || url.password || url.search || url.hash) {
+  if (!isTrustedServiceUrl(url) || url.username || url.password || url.search || url.hash) {
     throw new ReaderError("La conexión con BMW debe usar HTTPS fuera del equipo local.", "READER_CONFIGURATION_ERROR", false, 500);
   }
 

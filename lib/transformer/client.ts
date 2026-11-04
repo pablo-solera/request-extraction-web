@@ -1,6 +1,7 @@
 import "server-only";
 
 import { ReaderError } from "@/lib/readers/errors";
+import { isTrustedServiceUrl } from "@/lib/readers/service-url";
 import { transformerEnqueuedSchema, transformerStateSchema, type TransformerLoadInput, type TransformerState } from "@/lib/transformer/types";
 
 const REQUEST_TIMEOUT_MS = 15_000;
@@ -15,8 +16,7 @@ function requiredBaseUrl() {
   if (!raw) throw fail();
   let url: URL;
   try { url = new URL(raw); } catch { throw fail(); }
-  const isLoopback = url.hostname === "localhost" || url.hostname === "127.0.0.1" || url.hostname === "[::1]";
-  if ((url.protocol !== "https:" && !(isLoopback && url.protocol === "http:")) || url.username || url.password || url.search || url.hash) throw fail();
+  if (!isTrustedServiceUrl(url) || url.username || url.password || url.search || url.hash) throw fail();
   return url;
 }
 
