@@ -36,21 +36,21 @@ Variables principales:
 | `INTEGRATION_LDAP_ACCESSACCOUNT_PWD` | Contraseña de la cuenta de servicio. |
 | `INTEGRATION_LDAP_USER_BASESEARCHGROUP` | Base DN de búsqueda. |
 | `INTEGRATION_LDAP_ALLOWED_GROUP_DN` | Grupo AD anidado opcional para restringir el acceso. |
-| `RENAULT_READER_BASE_URL` | URL interna del reader; HTTP solo se admite por loopback. |
+| `RENAULT_READER_BASE_URL` | URL interna del reader. HTTP se admite por loopback y para nombres de un solo término, como el servicio de Docker (`http://renault-reader-api:3000`); cualquier host con puntos exige HTTPS. |
 | `RENAULT_READER_FORMAT` | Valor exacto autorizado por `/labours/options`. |
 | `RENAULT_READER_LANGUAGE` | Idioma autorizado por `/labours/options`. |
 | `RENAULT_READER_RANGE` | Rango Renault, inicialmente `active`. |
 | `RENAULT_READER_DOWNLOAD_ORIGIN` | Origen HTTPS S3 permitido para redirecciones de descarga. |
-| `BMW_READER_BASE_URL` | URL interna de BMW Reader; HTTP solo se admite por loopback. |
+| `BMW_READER_BASE_URL` | URL interna de BMW Reader (`http://bmw-reader-api:3004` en Docker). Misma regla de HTTP que `RENAULT_READER_BASE_URL`. |
 | `BMW_READER_LANGUAGE` | Idioma de series y etiquetas BMW/MINI; por defecto `en-GB`. |
-| `BMW_TRANSFORMER_BASE_URL` | URL de `bmw-transformer` (HTTP solo por loopback). Sin ella no se cargan datos ni se comparan `.LST`. |
+| `BMW_TRANSFORMER_BASE_URL` | URL de `bmw-transformer` (`http://bmw-transformer-api:3005` en Docker; misma regla de HTTP). Sin ella no se cargan datos ni se comparan `.LST`. |
 | `MAIL_ENABLED` | `true` para enviar correos; por defecto no se envía ninguno. |
 | `SMTP_HOST`, `SMTP_PORT` | Relay SMTP interno (puerto 25 por defecto, sin usuario ni contraseña; se usa STARTTLS si el servidor lo ofrece). |
 | `SMTP_SECURE` | `true` solo para TLS implícito (puerto 465). |
 | `SMTP_FROM` | Remitente; por defecto `extracciones@audatex.es`. |
 | `MAIL_SUPPORT_TO` | Buzón de soporte que recibe los avisos de fallo; por defecto `DL-ESMA-D-Acciona@audatexdatos.es`. |
 | `MAIL_REDIRECT_TO` | Solo en desarrollo: todos los correos llegan a esta dirección, con el destinatario real en el asunto. |
-| `APP_BASE_URL` | URL pública de la web para los enlaces de los correos (`request-extraction-peuwaxprvdacc03.axadmin.net`; si no lleva `http(s)://` se añade `https://`). |
+| `APP_BASE_URL` | URL pública de la web para los enlaces de los correos (`request-extraction-peuwaxprvdacc03.axadmin.net`; escribe el protocolo (`http://…` si no hay TLS): si falta, se añade `https://`). |
 | `RECONCILE_SECRET` | Token aleatorio de al menos 32 caracteres para el trabajo programado. |
 | `DATABASE_CA_CERT_PATH` | CA pública opcional para PostgreSQL remoto. |
 
