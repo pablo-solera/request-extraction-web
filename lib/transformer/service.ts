@@ -8,6 +8,7 @@ import {
   attachComparisonRemote, claimComparisonPoll, claimLoadPoll, claimLoadStart, failComparison, recordLoadStartFailure, getComparison, getRequestWithRequester, insertComparison, listActiveComparisons, listActiveLoads,
   findLoadedTable, listComparisonsForRequests, listRequestsByIds, listRequestsReadyForLoad, markLoadFailedToStart, markLoadRequested, resetFailedLoad, updateComparisonState, updateLoadState,
 } from "@/lib/transformer/repository";
+import { transformerDefinitions } from "@/lib/transformer/registry";
 import type { TransformerRequestInfo } from "@/lib/transformer/info";
 import type { TransformerState } from "@/lib/transformer/types";
 import type { UserRole } from "@/lib/auth/session";
@@ -16,16 +17,21 @@ import { notifyComparisonFailed, notifyLoadCompleted, notifyLoadFailed, retryPen
 type Actor = { id: string; oracleEmpId: number | null; role: UserRole };
 
 export function isTransformerConfigured() {
-  return Boolean(process.env.BMW_TRANSFORMER_BASE_URL?.trim());
+  return Boolean(process.env[transformerDefinitions.bmw.envVar]?.trim());
 }
 
 function mapStatus(state: TransformerState): TransformerJobStatus {
-  if (state.status === "completed") return "completed";
-  if (state.status === "failed") return "failed";
-  return state.status === "queued" ? "queued" : "running";
+  switch (state.status) {
+    case "completed": return "completed";
+    case "failed":
+    case "cancelled": return "failed";
+    case "queued": return "queued";
+    // Any other status, including one this web does not know yet, means the job is still going.
+    default: return "running";
+  }
 }
 
-const failureMessage = (state: TransformerState, fallback: string) => state.error?.slice(0, 500) || fallback;
+const failureMessage = (state: TransformerState, fallback: string) => (state.status === "cancelled" ? "La operación ha sido cancelada." : state.error?.message.slice(0, 500)) || fallback;
 
 export const TRANSFORMER_START_INTERVAL_MS = 30_000;
 const MAX_LOAD_START_FAILURES = 5;
@@ -202,7 +208,7 @@ export async function uploadComparison(requestGroupId: string, actor: Actor, fil
   if (file.bytes.byteLength === 0 || file.bytes.byteLength > MAX_LST_BYTES) throw new ReaderError("El fichero está vacío o supera el tamaño permitido.", "INVALID_LST_FILE", false, 400);
   const comparison = await insertComparison({ requestGroupId, uploadedById: actor.id, sourceFilename: file.name.slice(0, 200) });
   try {
-    const { reportId } = await client.createComparison(request.loadRemoteId, file);
+    const { reportId } = await client.createComparison({ loadId: request.loadRemoteId, axCode: request.axCode, imcEdition: request.imcEdition }, file);
     await attachComparisonRemote(comparison.id, reportId);
   } catch (error) {
     const message = error instanceof ReaderError ? error.message : "No se ha podido iniciar la comparación.";

@@ -16,7 +16,7 @@ vi.mock("@/lib/transformer/client", () => ({ getTransformerClient: vi.fn(), MAX_
 import { getTransformerClient } from "@/lib/transformer/client";
 import { findTableConflict, downloadComparison, getTransformerInfo, reconcileTransformer, retryRequestLoad, startLoadForRequest, startPendingLoads, syncTransformerStates, uploadComparison } from "@/lib/transformer/service";
 
-const client = { createLoad: vi.fn(), getLoad: vi.fn(), createComparison: vi.fn(), getReport: vi.fn(), downloadReport: vi.fn() };
+const client = { getCapabilities: vi.fn(), createLoad: vi.fn(), getLoad: vi.fn(), createComparison: vi.fn(), createReport: vi.fn(), getReport: vi.fn(), downloadReport: vi.fn() };
 const owner = { id: "owner", oracleEmpId: 1, role: "employee" as const };
 const request = (overrides: Record<string, unknown> = {}) => ({
   requestGroupId: "g1", requesterId: "owner", axCode: "1XF", imcEdition: "05/0", brand: "BMW", manufacturerGroup: "BMW", status: "approved",
@@ -92,7 +92,7 @@ describe("transformer reconciliation", () => {
     ]);
     client.getLoad
       .mockResolvedValueOnce({ requestId: "la", status: "importing" })
-      .mockResolvedValueOnce({ requestId: "lb", status: "failed", error: "SQL no disponible" })
+      .mockResolvedValueOnce({ requestId: "lb", status: "failed", error: { code: "INTERNAL_ERROR", message: "SQL no disponible" } })
       .mockRejectedValueOnce(new ReaderError("down", "TRANSFORMER_UNAVAILABLE", true))
       .mockRejectedValueOnce(new ReaderError("El trabajo del transformer ya no está disponible.", "TRANSFORMER_JOB_NOT_FOUND", false, 404));
     repository.updateLoadState.mockResolvedValue({});
@@ -253,6 +253,20 @@ describe("live transformer state", () => {
     expect(repository.updateLoadState).toHaveBeenCalledWith("g1", "load-1", { status: "completed", error: expect.any(String) });
   });
 
+  it("keeps a load running for statuses it does not know and fails it when the transformer cancelled it", async () => {
+    for (const [status, expected] of [["something_new", "running"], ["rate_limited", "running"], ["paused", "running"], ["cancelled", "failed"]] as const) {
+      vi.clearAllMocks();
+      repository.listRequestsByIds.mockResolvedValueOnce([running({ loadStatus: "queued" })]);
+      repository.claimLoadPoll.mockResolvedValueOnce(running({ loadStatus: "queued" }));
+      repository.listComparisonsForRequests.mockResolvedValue([]);
+      repository.updateLoadState.mockResolvedValue({});
+      client.getLoad.mockResolvedValueOnce({ requestId: "load-1", status, stage: "pivoting" });
+
+      await syncTransformerStates(["g1"], client);
+      expect(repository.updateLoadState).toHaveBeenCalledWith("g1", "load-1", { status: expected, error: expect.any(String) });
+    }
+  });
+
   it("asks the transformer at most once per interval", async () => {
     repository.listRequestsByIds.mockResolvedValueOnce([running()]);
     repository.claimLoadPoll.mockResolvedValueOnce(null);
@@ -283,10 +297,10 @@ describe("live transformer state", () => {
   it("emails the requester when a load completes and support when a load or comparison fails", async () => {
     repository.listRequestsByIds.mockResolvedValueOnce([running({ requestGroupId: "a" }), running({ requestGroupId: "b", loadRemoteId: "load-b" })]);
     repository.claimLoadPoll.mockResolvedValueOnce(running({ requestGroupId: "a" })).mockResolvedValueOnce(running({ requestGroupId: "b", loadRemoteId: "load-b" }));
-    client.getLoad.mockResolvedValueOnce({ requestId: "load-1", status: "completed" }).mockResolvedValueOnce({ requestId: "load-b", status: "failed", error: "SQL no disponible" });
+    client.getLoad.mockResolvedValueOnce({ requestId: "load-1", status: "completed" }).mockResolvedValueOnce({ requestId: "load-b", status: "failed", error: { code: "INTERNAL_ERROR", message: "SQL no disponible" } });
     repository.listComparisonsForRequests.mockResolvedValueOnce([{ id: "c1", requestGroupId: "a", status: "queued", remoteReportId: "r1" }]);
     repository.claimComparisonPoll.mockResolvedValueOnce({ id: "c1", requestGroupId: "a", status: "queued", remoteReportId: "r1" });
-    client.getReport.mockResolvedValueOnce({ requestId: "r1", status: "failed", error: "LST no válido" });
+    client.getReport.mockResolvedValueOnce({ requestId: "r1", status: "failed", error: { code: "INVALID_INPUT", message: "LST no válido" } });
 
     await syncTransformerStates(["a", "b"], client);
 
@@ -362,7 +376,7 @@ describe("transformer request actions", () => {
     client.createComparison.mockResolvedValueOnce({ reportId: "report-1" });
 
     expect(await uploadComparison("g1", owner, { name: "Listing.LST", bytes: new Uint8Array([1]) }, client)).toBe("cmp-1");
-    expect(client.createComparison).toHaveBeenCalledWith("load-1", { name: "Listing.LST", bytes: expect.any(Uint8Array) });
+    expect(client.createComparison).toHaveBeenCalledWith({ loadId: "load-1", axCode: "1XF", imcEdition: "05/0" }, { name: "Listing.LST", bytes: expect.any(Uint8Array) });
     expect(repository.attachComparisonRemote).toHaveBeenCalledWith("cmp-1", "report-1");
   });
 
