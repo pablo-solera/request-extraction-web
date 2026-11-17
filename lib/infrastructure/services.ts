@@ -28,4 +28,5 @@ export const infrastructureManufacturers: InfrastructureManufacturer[] = [
   manufacturer("bmw", "BMW"),
   manufacturer("renault", "Renault"),
   manufacturer("vag", "VAG"),
+  manufacturer("mercedes", "Mercedes-Benz"),
 ];

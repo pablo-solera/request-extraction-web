@@ -25,7 +25,7 @@ describe("infrastructure probe", () => {
     vi.stubGlobal("fetch", vi.fn());
     const result = await getInfrastructureStatus();
 
-    expect(result.map((manufacturer) => manufacturer.key)).toEqual(["bmw", "renault", "vag"]);
+    expect(result.map((manufacturer) => manufacturer.key)).toEqual(["bmw", "renault", "vag", "mercedes"]);
     expect(bmw(result).reader).toMatchObject({ key: "bmw-reader", kind: "reader" });
     expect(bmw(result).transformer).toMatchObject({ key: "bmw-transformer", kind: "transformer" });
     expect(result.every((manufacturer) => manufacturer.reader.status === "unconfigured" && manufacturer.transformer.status === "unconfigured")).toBe(true);
