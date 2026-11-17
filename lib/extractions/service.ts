@@ -6,7 +6,6 @@ import type { Extraction, ExtractionStatus } from "@/db/schema";
 import {
   attachReaderRequest,
   releaseSubmission,
-  getOwnedExtraction,
   claimExtractionSubmission,
   insertExtractionsWithCapacity,
   listActiveExtractions,
@@ -142,11 +141,6 @@ async function syncExtraction(extraction: Extraction) {
     await notifyExtractionFailures(extraction.requestGroupId);
     return failed;
   }
-}
-
-export async function syncOwnedExtraction(id: string, userId: string) {
-  const extraction = await getOwnedExtraction(id, userId);
-  return extraction ? syncExtraction(extraction) : null;
 }
 
 export type ExtractionActor = { id: string; oracleEmpId: number | null; role: UserRole };
@@ -313,10 +307,6 @@ export async function syncLiveReaderProgress<T extends { extraction: Extraction;
     })));
   }
   return synchronized;
-}
-
-export function extractionDtoForStatus(extraction: Extraction, requestStatus: ExtractionListItem["requestStatus"]): ExtractionListItem {
-  return extractionDto(extraction, requestStatus);
 }
 
 export async function reconcileActiveExtractions() {

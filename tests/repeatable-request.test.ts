@@ -1,7 +1,7 @@
 import { beforeEach, describe, expect, it, vi } from "vitest";
 
 const repository = vi.hoisted(() => Object.fromEntries([
-  "attachReaderRequest", "getOwnedExtraction", "claimExtractionSubmission", "insertExtractionsWithCapacity", "listActiveExtractions", "getRequestStatus",
+  "attachReaderRequest", "claimExtractionSubmission", "insertExtractionsWithCapacity", "listActiveExtractions", "getRequestStatus",
   "listApprovedRequestExtractions", "markSubmissionFailed", "claimReaderProgressPoll", "updateExtractionState", "getExtractionWithRequester", "listRequestExtractions",
   "listVisibleExtractions", "listVisibleExtractionsByIds", "cancelUnsubmittedExtraction", "markExtractionResumed", "recordExtractionAction",
 ].map((name) => [name, vi.fn()])));

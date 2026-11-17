@@ -1,26 +1,43 @@
 import { z } from "zod";
 
-export const transformerStatusSchema = z.enum(["queued", "resolving", "importing", "pivoting", "persisting", "parsing-dda", "reporting", "completed", "failed"]);
+/** Statuses of the shared transformer contract. A status outside this list is tolerated and treated as "running". */
+export const transformerStatuses = ["queued", "running", "rate_limited", "paused", "cancelling", "cancelled", "completed", "failed"] as const;
+
+const errorSchema = z.union([
+  z.object({ code: z.string().optional(), message: z.string() }),
+  z.string().transform((message) => ({ code: undefined, message })),
+]);
 
 export const transformerStateSchema = z.object({
-  requestId: z.uuid(),
-  status: transformerStatusSchema,
+  requestId: z.string().min(1),
+  resource: z.string().optional(),
+  status: z.string().min(1),
   stage: z.string().optional(),
-  progress: z.number().min(0).max(100).optional(),
-  error: z.string().optional(),
-  pivotKey: z.string().optional(),
-  reportKey: z.string().optional(),
-  summary: z.record(z.string(), z.unknown()).optional(),
+  progress: z.number().nullable().optional(),
+  artifacts: z.array(z.object({ name: z.string(), kind: z.string().optional(), primary: z.boolean().optional() }).passthrough()).optional(),
+  error: errorSchema.nullable().optional(),
+  details: z.record(z.string(), z.unknown()).optional(),
 });
 
-export const transformerEnqueuedSchema = z.object({ requestId: z.uuid(), reused: z.boolean().optional() });
+export const transformerEnqueuedSchema = z.object({ requestId: z.string().min(1), reused: z.boolean().optional() });
+
+export const transformerInfoSchema = z.object({
+  capabilities: z.record(z.string(), z.object({ create: z.boolean().optional() }).passthrough()),
+});
 
 export type TransformerState = z.infer<typeof transformerStateSchema>;
+
+export type TransformerResource = "loads" | "reports";
+
+export type TransformerTypekey = { typekey: string; series: string; family: string; /** Day (YYYYMMDD) the reader stored that typekey under, so the load uses exactly the data of this request. */ date?: string };
 
 export type TransformerLoadInput = {
   axCode: string;
   imcEdition: string;
   brand: "BMW" | "MINI";
-  /** `date` is the day (YYYYMMDD) the reader stored that typekey under, so the load uses exactly the data of this request. */
-  typekeys: Array<{ typekey: string; series: string; family: string; date?: string }>;
+  typekeys: TransformerTypekey[];
 };
+
+export type TransformerComparisonInput = { loadId: string; axCode: string; imcEdition: string };
+
+export type TransformerReportInput = { axCode: string; imcEdition: string; language?: string; selection: Record<string, unknown> };
