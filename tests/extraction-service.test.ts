@@ -7,7 +7,6 @@ const repository = vi.hoisted(() => ({
   cancelUnsubmittedExtraction: vi.fn(),
   claimExtractionSubmission: vi.fn(),
   getExtractionWithRequester: vi.fn(),
-  getOwnedExtraction: vi.fn(),
   getRequestStatus: vi.fn(),
   insertExtractionsWithCapacity: vi.fn(),
   listActiveExtractions: vi.fn(),

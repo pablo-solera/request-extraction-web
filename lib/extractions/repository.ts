@@ -225,13 +225,6 @@ export async function updateExtractionState(id: string, update: {
   return loadExtraction(extraction?.id ?? id);
 }
 
-export async function getOwnedExtraction(id: string, userId: string) {
-  const [extraction] = await getDb().select(extractionColumns).from(extractions)
-    .innerJoin(extractionRequests, eq(extractions.requestGroupId, extractionRequests.requestGroupId))
-    .where(and(eq(extractions.id, id), eq(extractions.userId, userId))).limit(1);
-  return extraction ?? null;
-}
-
 export async function getExtractionWithRequester(id: string) {
   const [row] = await getDb().select({
     extraction: extractionColumns,
@@ -256,12 +249,6 @@ export async function listOwnedExtractions(userId: string, ids: string[]) {
     .from(extractions)
     .innerJoin(extractionRequests, eq(extractions.requestGroupId, extractionRequests.requestGroupId))
     .where(and(eq(extractions.userId, userId), inArray(extractions.id, uniqueIds)));
-}
-
-export async function listUserExtractions(userId: string) {
-  return getDb().select({ extraction: extractionColumns, requestStatus: extractionRequests.status }).from(extractions)
-    .innerJoin(extractionRequests, eq(extractions.requestGroupId, extractionRequests.requestGroupId)).where(eq(extractions.userId, userId))
-    .orderBy(desc(extractions.createdAt)).limit(100);
 }
 
 export async function listAllExtractions() {

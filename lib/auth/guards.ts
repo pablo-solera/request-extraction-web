@@ -53,8 +53,3 @@ export async function requireAdmin() {
   return user;
 }
 
-export async function requireCoordinator() {
-  const user = await requireUser();
-  if (user.role !== "coordinator") redirect("/extractions");
-  return user;
-}
