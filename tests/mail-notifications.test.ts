@@ -20,7 +20,7 @@ vi.mock("@/lib/mail/mailer", () => ({
   applicationUrl: (path: string) => `https://app.example${path}`,
 }));
 
-import { notifyComparisonFailed, notifyExtractionFailures, notifyLoadCompleted, notifyLoadFailed, retryPendingNotifications } from "@/lib/mail/notifications";
+import { notifyComparisonFailed, notifyExtractionFailures, notifyLoadCompleted, notifyLoadFailed, notifyReportFailed, retryPendingNotifications } from "@/lib/mail/notifications";
 
 const requester = { id: "u1", oracleEmpId: 1, fallbackName: null, fallbackEmail: null };
 const row = (modelCode: string, status: string, extra: Record<string, unknown> = {}, requestStatus = "approved") => ({
@@ -93,6 +93,18 @@ describe("mail notifications", () => {
     await notifyComparisonFailed("g1", "cmp-1", "LST no válido");
     expect(mocks.claimNotification).toHaveBeenLastCalledWith("g1", "comparison_failed", "cmp-1");
     expect(mocks.sendMail).toHaveBeenLastCalledWith(expect.objectContaining({ to: "soporte@audatex.es" }));
+  });
+
+  it("reports a failed Mercedes-Benz report to the support mailbox and retries it from the stored error", async () => {
+    await notifyReportFailed("g1", "rep-1", "SQL Server no disponible");
+    expect(mocks.claimNotification).toHaveBeenLastCalledWith("g1", "report_failed", "rep-1");
+    expect(mocks.sendMail).toHaveBeenLastCalledWith(expect.objectContaining({ to: "soporte@audatex.es", subject: "[Extracciones] El informe Excel de Mercedes-Benz ha fallado: 1AF · 01/0" }));
+    expect(mocks.sendMail.mock.calls[0]![0].text).toContain("- Error: SQL Server no disponible");
+
+    mocks.listRetryableNotifications.mockResolvedValueOnce([{ id: "row-r", requestGroupId: "g1", kind: "report_failed", ref: "rep-1", status: "failed", attempts: 1 }]);
+    mocks.getRequestWithRequester.mockResolvedValueOnce({ request: { reportError: "Falta un fichero" } });
+    expect(await retryPendingNotifications()).toBe(1);
+    expect(mocks.sendMail.mock.calls[1]![0].text).toContain("- Error: Falta un fichero");
   });
 
   it("tells support about failed typekeys only once every typekey of the request has finished", async () => {

@@ -1,6 +1,6 @@
 import "server-only";
 
-import { findTableConflict, startLoadForRequest } from "@/lib/transformer/service";
+import { findTableConflict, startLoadForRequest, startReportForRequest } from "@/lib/transformer/service";
 import { notifyExtractionFailures } from "@/lib/mail/notifications";
 import type { Extraction, ExtractionStatus } from "@/db/schema";
 import {
@@ -146,6 +146,7 @@ async function syncExtraction(extraction: Extraction) {
     });
     if (status === "completed") {
       await startLoadForRequest(extraction.requestGroupId).catch((error) => console.error("Transformer load could not be started.", error));
+      await startReportForRequest(extraction.requestGroupId).catch((error) => console.error("Transformer report could not be started.", error));
     }
     if (status === "completed" || status === "failed" || status === "cancelled") await notifyExtractionFailures(extraction.requestGroupId);
     return updated;

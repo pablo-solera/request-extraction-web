@@ -24,7 +24,7 @@ export type RequestSummary = {
 
 const plural = (count: number, singular: string, pluralForm: string) => (count === 1 ? singular : pluralForm);
 
-export function summarizeRequest(requestStatus: ExtractionRequestStatus, items: RequestSummaryItem[], noun: "typekey" | "familia" = "typekey"): RequestSummary {
+export function summarizeRequest(requestStatus: ExtractionRequestStatus, items: RequestSummaryItem[], noun: "typekey" | "familia" | "modelo" = "typekey"): RequestSummary {
   const counts: Record<ExtractionStatus, number> = { pending: 0, running: 0, completed: 0, failed: 0, cancelled: 0 };
   for (const item of items) counts[item.status]++;
   const total = items.length;
@@ -40,11 +40,12 @@ export function summarizeRequest(requestStatus: ExtractionRequestStatus, items: 
 
   const progress = total === 0 ? 0 : Math.round(items.reduce((sum, item) => sum + (item.status === "completed" ? 100 : Math.min(100, Math.max(0, item.progress ?? 0))), 0) / total);
 
-  const nouns = noun === "typekey" ? ["typekey", "typekeys"] as const : ["familia", "familias"] as const;
-  const completedWord = noun === "typekey" ? plural(total, "completado", "completados") : plural(total, "completada", "completadas");
+  const feminine = noun === "familia";
+  const nouns = [noun, `${noun}s`] as const;
+  const completedWord = feminine ? plural(total, "completada", "completadas") : plural(total, "completado", "completados");
   const parts = [`${counts.completed} de ${total} ${plural(total, nouns[0], nouns[1])} ${completedWord}`];
-  if (counts.failed) parts.push(`${counts.failed} ${plural(counts.failed, noun === "typekey" ? "fallido" : "fallida", noun === "typekey" ? "fallidos" : "fallidas")}`);
-  if (counts.cancelled) parts.push(`${counts.cancelled} ${plural(counts.cancelled, noun === "typekey" ? "cancelado" : "cancelada", noun === "typekey" ? "cancelados" : "canceladas")}`);
+  if (counts.failed) parts.push(`${counts.failed} ${plural(counts.failed, feminine ? "fallida" : "fallido", feminine ? "fallidas" : "fallidos")}`);
+  if (counts.cancelled) parts.push(`${counts.cancelled} ${plural(counts.cancelled, feminine ? "cancelada" : "cancelado", feminine ? "canceladas" : "cancelados")}`);
 
   return { status, label: requestAggregateLabels[status], progress, total, counts, description: parts.join(" · ") };
 }

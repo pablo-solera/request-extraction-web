@@ -40,12 +40,13 @@ export function loadCompletedMail(input: RequestSummary & { requesterName: strin
   };
 }
 
-export type SupportEvent = "extraction_failed" | "load_failed" | "comparison_failed";
+export type SupportEvent = "extraction_failed" | "load_failed" | "comparison_failed" | "report_failed";
 
 const supportTitles: Record<SupportEvent, string> = {
   extraction_failed: "La extracción ha terminado con typekeys fallidos",
   load_failed: "La carga en BMW_Labour ha fallado",
   comparison_failed: "La comparación con el .LST ha fallado",
+  report_failed: "El informe Excel de Mercedes-Benz ha fallado",
 };
 
 /** Sent to the support mailbox when something went wrong; `details` lines must not contain secrets. */

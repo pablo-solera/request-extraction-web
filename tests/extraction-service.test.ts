@@ -44,7 +44,7 @@ vi.mock("@/lib/readers/mercedes/client", () => mercedesReader);
 vi.mock("@/lib/readers/renault/client", async () => ({ getRenaultLabourFamilies: bmwReader.getRenaultLabourFamilies }));
 const organization = vi.hoisted(() => ({ findCoordinatorUser: vi.fn(), findCoordinatorTeamUserIds: vi.fn(), isUserInCoordinatorTeam: vi.fn() }));
 vi.mock("@/lib/employees/org-service", () => organization);
-const transformer = vi.hoisted(() => ({ startLoadForRequest: vi.fn(), findTableConflict: vi.fn() }));
+const transformer = vi.hoisted(() => ({ startLoadForRequest: vi.fn(), startReportForRequest: vi.fn(), findTableConflict: vi.fn() }));
 const notifications = vi.hoisted(() => ({ notifyExtractionFailures: vi.fn() }));
 vi.mock("@/lib/mail/notifications", () => notifications);
 vi.mock("@/lib/transformer/service", () => transformer);
@@ -189,6 +189,28 @@ describe("reader registry extraction flow", () => {
     reader.mapStatus.mockReturnValueOnce("running");
     await reconcileActiveExtractions();
     expect(transformer.startLoadForRequest).not.toHaveBeenCalled();
+  });
+
+  it("stores the reader's extraction date and requests the Mercedes-Benz report when its last model completes", async () => {
+    transformer.startReportForRequest.mockResolvedValue(true);
+    repository.claimReaderProgressPoll.mockResolvedValue({ ...extraction, readerKey: "mercedes-labours" });
+    repository.updateExtractionState.mockResolvedValue({ ...extraction, status: "completed" });
+    const mercedes = { ...extraction, readerKey: "mercedes-labours", status: "running", remoteRequestId: "remote-1" };
+    repository.listActiveExtractions.mockResolvedValueOnce([mercedes]);
+    reader.getState.mockResolvedValueOnce({ status: "completed", progress: 100, error: null, dataDate: "20261117" });
+    reader.mapStatus.mockReturnValueOnce("completed");
+
+    await reconcileActiveExtractions();
+    expect(repository.claimReaderProgressPoll).toHaveBeenCalledWith("e1", expect.any(Date));
+    expect(repository.updateExtractionState).toHaveBeenCalledWith("e1", expect.objectContaining({ status: "completed", dataDate: "20261117" }));
+    expect(transformer.startReportForRequest).toHaveBeenCalledWith("g1");
+
+    transformer.startReportForRequest.mockClear();
+    repository.listActiveExtractions.mockResolvedValueOnce([mercedes]);
+    reader.getState.mockResolvedValueOnce({ status: "running", progress: 40, error: null });
+    reader.mapStatus.mockReturnValueOnce("running");
+    await reconcileActiveExtractions();
+    expect(transformer.startReportForRequest).not.toHaveBeenCalled();
   });
 
   it("asks for the failure email when a typekey fails and not when it is still running", async () => {

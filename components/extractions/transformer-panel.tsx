@@ -16,9 +16,28 @@ const buttonClass = "inline-flex min-h-11 items-center rounded-lg border px-3 te
 
 function isActive(info: TransformerRequestInfo | undefined, allCompleted: boolean) {
   if (!info?.applicable) return false;
+  if (info.kind === "mercedes") return info.report?.status === "queued" || info.report?.status === "running" || (info.report?.status === null && allCompleted);
   return info.loadStatus === "queued" || info.loadStatus === "running"
     || (info.loadStatus === null && allCompleted)
     || info.comparisons.some((comparison) => comparison.status === "queued" || comparison.status === "running");
+}
+
+function ReportSection({ allCompleted, busy, info, onRetry, requestGroupId }: { allCompleted: boolean; busy: boolean; info: TransformerRequestInfo; onRetry(): void; requestGroupId: string }) {
+  const report = info.report;
+  const status = report?.status ?? null;
+  const download = report?.downloadReady ? <a className="text-sm font-medium text-sky-800 underline underline-offset-2" href={`/api/requests/${requestGroupId}/report/download`}>Descargar Excel</a> : null;
+  return <section aria-label="Informe Excel" className="space-y-3 rounded-xl border border-zinc-200 bg-white p-4">
+    <h3 className="text-sm font-semibold text-zinc-950">Informe Excel</h3>
+    {!allCompleted && status === null ? <p className="text-sm text-zinc-600">El informe se generará cuando todos los modelos estén completados.</p> : null}
+    {status === null && allCompleted ? <p className="text-sm text-sky-800" role="status">{report && report.attempts > 0 ? "Reintentando generar el informe…" : "Preparando el informe…"}</p> : null}
+    {status === "queued" || status === "running" ? <p className="text-sm text-sky-800" role="status">Generando el informe Excel…</p> : null}
+    {status === "completed" ? <p className="flex flex-wrap items-center gap-x-3 text-sm text-emerald-800">Informe listo{report?.completedAt ? ` el ${formatSpanishDateTime(report.completedAt)}` : ""}. {download}</p> : null}
+    {status === "failed" ? <div className="space-y-2" role="alert">
+      <p className="text-sm text-red-700">El informe ha fallado{report?.error ? `: ${report.error}` : "."}</p>
+      {download ? <p className="text-sm text-zinc-700">El Excel se llegó a generar y se puede descargar. {download}</p> : null}
+      {report?.canRetry ? <button className={`${buttonClass} border-zinc-300 bg-white text-zinc-800 hover:bg-zinc-50`} disabled={busy} onClick={onRetry} type="button">Reintentar informe</button> : null}
+    </div> : null}
+  </section>;
 }
 
 function ComparisonRow({ comparison }: { comparison: TransformerComparisonInfo }) {
@@ -73,6 +92,16 @@ export function TransformerPanel({ allCompleted, initialInfo, requestGroupId }: 
     setBusy(false);
   }
 
+  async function retryReport() {
+    setBusy(true);
+    try {
+      const response = await fetch(`/api/requests/${requestGroupId}/report/retry`, { method: "POST" });
+      if (!response.ok) setError(((await response.json().catch(() => null)) as { error?: { message?: string } } | null)?.error?.message ?? "No se ha podido reintentar el informe.");
+      else { setError(""); await refresh(); }
+    } catch { setError("No se ha podido reintentar el informe."); }
+    setBusy(false);
+  }
+
   async function upload(event: React.FormEvent<HTMLFormElement>) {
     event.preventDefault();
     const file = fileInput.current?.files?.[0];
@@ -95,6 +124,10 @@ export function TransformerPanel({ allCompleted, initialInfo, requestGroupId }: 
   }
 
   if (!info?.applicable) return null;
+  if (info.kind === "mercedes") return <>
+    <ReportSection allCompleted={allCompleted} busy={busy} info={info} onRetry={() => void retryReport()} requestGroupId={requestGroupId} />
+    {error ? <p className="text-sm text-red-700" role="alert">{error}</p> : null}
+  </>;
   const loading = info.loadStatus === "queued" || info.loadStatus === "running" || (info.loadStatus === null && allCompleted);
 
   return <section aria-label="Carga en BMW_Labour y comparación" className="space-y-3 rounded-xl border border-zinc-200 bg-white p-4">
