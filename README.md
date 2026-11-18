@@ -10,7 +10,8 @@ Portal interno para solicitar y seguir extracciones técnicas de distintos fabri
 - Creación y seguimiento asíncrono de exportaciones Renault TM01.
 - Historial privado por usuario y descarga protegida del ZIP.
 - Extracciones BMW/MINI por typekey. Al pulsar "Continuar" en el paso "Modelos" el formulario comprueba, de tres en tres, que BMW Flat Rates tenga tiempos para cada typekey (`GET /api/readers/bmw/availability`, que consulta `GET /v1/models/availability` del reader). Los no disponibles (`CGWATB0085`) se revisan en ese mismo paso: si su tipo base tiene datos se muestra en qué características difiere y el técnico decide con un tick (sustituir) o una cruz (quitar el typekey de la solicitud); sin tipo base con datos solo se puede quitar. El paso "Resumen" mantiene el bloqueo del envío como red de seguridad. Si BMW no responde, se permite continuar y el reader lo rechaza con `422 NOT_AVAILABLE` si procede.
-- Mercedes, Grupo VAG y piezas visibles como próximas integraciones.
+- Extracciones Mercedes-Benz por modelo (`modelDesignation`). El paso "Modelos" ofrece primero la serie y, si el catálogo tiene más de un grupo de producto, un filtro por grupo; después se marcan uno o varios modelos (`GET /api/readers/mercedes/series` y `/models`, que consultan `GET /v1/models/options` de `mercedes-reader`). Cada modelo genera una extracción independiente y no se muestra aviso de coste: cada modelo supone unas 3000 llamadas de pago a la API de Mercedes-Benz. La fecha de extracción (`YYYYMMDD`, UTC) se fija al crear la solicitud y se envía al reader en `selection.date`, de modo que todos los modelos queden en la misma carpeta.
+- Grupo VAG y piezas visibles como próximas integraciones.
 
 Los correos de aviso (solicitante y soporte) se describen en la sección "Correos"; el correo en copia al coordinador no está implementado.
 
@@ -44,7 +45,7 @@ Variables principales:
 | `BMW_READER_BASE_URL` | URL interna de BMW Reader (`http://bmw-reader-api:3004` en Docker). Misma regla de HTTP que `RENAULT_READER_BASE_URL`. |
 | `BMW_READER_LANGUAGE` | Idioma de series y etiquetas BMW/MINI; por defecto `en-GB`. |
 | `MERCEDES_READER_BASE_URL` | URL interna de `mercedes-reader` (`http://mercedes-reader-api:3005` en Docker; misma regla de HTTP). Sin ella no se pueden solicitar extracciones Mercedes-Benz. |
-| `MERCEDES_TRANSFORMER_BASE_URL` | URL de `mercedes-transformer` (solo informes). De momento solo aparece en la página de infraestructura y está registrado en `lib/transformer/registry.ts`. |
+| `MERCEDES_TRANSFORMER_BASE_URL` | URL de `mercedes-transformer` (solo informes). Sin ella no se piden los informes de Mercedes-Benz. También aparece en la página de infraestructura. |
 | `BMW_TRANSFORMER_BASE_URL` | URL de `bmw-transformer` (`http://bmw-transformer-api:3005` en Docker; misma regla de HTTP). Sin ella no se cargan datos ni se comparan `.LST`. |
 | `MAIL_ENABLED` | `true` para enviar correos; por defecto no se envía ninguno. |
 | `SMTP_HOST`, `SMTP_PORT` | Relay SMTP interno (puerto 25 por defecto, sin usuario ni contraseña; se usa STARTTLS si el servidor lo ofrece). |
@@ -66,7 +67,7 @@ Los valores sensibles de `work-from-home` no se copian al repositorio. Deben sum
 
 ## Base de datos
 
-Las solicitudes se guardan en `extraction_requests` (datos comunes de la solicitud, estado de la carga en BMW_Labour), con una fila por typekey o familia en `extractions` (comparten `request_group_id`; los parámetros variables del reader se conservan en `reader_params` junto con su versión). `comparison_reports` guarda las comparaciones con el `.LST` y `mail_notifications` los avisos enviados. Cada fila de `extractions` contiene
+Las solicitudes se guardan en `extraction_requests` (datos comunes de la solicitud, estado de la carga en BMW_Labour y, para Mercedes-Benz, estado del informe: columnas `report_*`, migración `0018_mercedes_reports.sql`), con una fila por typekey o familia en `extractions` (comparten `request_group_id`; los parámetros variables del reader se conservan en `reader_params` junto con su versión). `comparison_reports` guarda las comparaciones con el `.LST` y `mail_notifications` los avisos enviados. Cada fila de `extractions` contiene
 
 Ejecuta las migraciones antes de iniciar la aplicación:
 
@@ -140,11 +141,22 @@ Cuando **todos** los typekeys de una solicitud BMW/MINI aprobada terminan bien, 
 
 En el historial, dentro de cada solicitud, el panel "Carga en BMW_Labour y comparación" muestra el estado de la carga (con "Reintentar carga" si falla). Cuando está cargada, el solicitante, su coordinador y los administradores pueden subir el listado maestro (`.LST` o `.ZIP`, máx. 25 MB) y la web descarga el Excel `DDA contra BMW` a través de `GET /api/comparisons/{id}/download`, sin exponer el almacenamiento interno.
 
+## Informe de Mercedes-Benz
+
+Cuando **todos** los modelos de una solicitud Mercedes-Benz aprobada terminan bien, la web pide el informe a `mercedes-transformer` con el mismo disparador que BMW (al detectar el último "Completada", y la reconciliación como red de seguridad). No hay paso de carga ni subida de ficheros: `POST /v1/reports` con `{ manufacturer: "Mercedes-Benz", axCode, edition, selection: { series, date, models: [{ modelDesignation }] } }`.
+
+- La **edición** va al reader con guion bajo (`04_0`, como BMW) y al transformer con barra (`04/0`), para que su `UPDATE dbo.Request ... WHERE Edition = @edition` coincida.
+- La **serie** es exactamente la enviada al reader y la **fecha** la que el reader informa en `request.selection.date` (se guarda como `data_date` de cada extracción; si faltara se usa la guardada al crear la solicitud). Si los modelos no comparten serie y fecha, el informe falla al iniciarse con un mensaje claro.
+- Se guarda `report_remote_id` y se consulta el estado con la misma cadencia que las cargas de BMW. El historial muestra "Informe Excel" con el estado, y cuando está listo, "Descargar Excel" (`GET /api/requests/{id}/report/download`, que sigue el 307 en el servidor y entrega `{axCode}.xlsx`).
+- Un informe `failed` muestra el `error.message` del transformer y avisa a soporte (`report_failed`). Si el transformer conserva el Excel (por ejemplo, falló solo el paso de SQL Server), el artefacto `report` permite descargarlo igualmente. "Reintentar informe" (`POST /api/requests/{id}/report/retry`) lo vuelve a pedir.
+- No se muestra el resumen `details.warnings` ni el estado de `requestDateEnd` del transformer.
+- Variables: `MERCEDES_READER_BASE_URL` y `MERCEDES_TRANSFORMER_BASE_URL`; sin la segunda no se piden informes.
+
 ## Correos
 
 Con `MAIL_ENABLED=true` la web envía, a través del relay SMTP interno (mismo modelo que `work-from-home`):
 
 - **Al solicitante**, cuando la extracción termina y sus datos ya están cargados en BMW_Labour: "ya puedes generar la comparativa", con un enlace a `/history?request=<id>` que abre esa solicitud para subir el `.LST`.
-- **A soporte** (`MAIL_SUPPORT_TO`), cuando algo falla: typekeys fallidos cuando la solicitud ya ha terminado, la carga en BMW_Labour o la comparación con el `.LST`.
+- **A soporte** (`MAIL_SUPPORT_TO`), cuando algo falla: typekeys fallidos cuando la solicitud ya ha terminado, la carga en BMW_Labour, la comparación con el `.LST` o el informe Excel de Mercedes-Benz.
 
 Cada aviso se envía una sola vez por evento (tabla `mail_notifications`, reserva atómica en Postgres), aunque el historial y la reconciliación lo detecten a la vez. El aviso a soporte por typekeys fallidos se comprueba en cada final de typekey (completado, fallido o cancelado) y sale cuando ya no queda ninguno en curso. Si el servidor SMTP falla, la reconciliación lo reintenta hasta 3 veces; un aviso que quedó "enviando" por un reinicio se recupera pasados 10 minutos, y si el solicitante no tiene correo el aviso se omite (se registra, sin direcciones). Recargar los datos o repetir la solicitud genera avisos nuevos. Para probar sin escribir a nadie real, usa `MAIL_REDIRECT_TO`.

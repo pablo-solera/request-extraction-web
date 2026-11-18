@@ -6,6 +6,13 @@ The format follows [Keep a Changelog](https://keepachangelog.com/en/1.1.0/) and 
 
 ## [Unreleased]
 
+### Added
+
+- **readers**: add the Mercedes-Benz reader client (`MERCEDES_READER_BASE_URL`) with cancel, resume and model discovery.
+- **extractions**: request Mercedes-Benz extractions by series and model designation, one extraction per model.
+- **transformer**: generate the Mercedes-Benz Excel report when the last model completes, follow it in the history, download it as `{axCode}.xlsx` and retry it when it fails.
+- **db**: add the `report_*` columns to `extraction_requests` (migration `0018_mercedes_reports`).
+
 ## [1.0.0] - 2026-11-17
 
 ### Added
