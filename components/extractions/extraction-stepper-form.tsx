@@ -6,6 +6,7 @@ import { createExtractionAction, type ExtractionFormState } from "@/app/(dashboa
 import { SubmitButton } from "@/components/common/submit-button";
 import { BmwAvailabilityNotice } from "@/components/extractions/bmw-availability-notice";
 import { BmwSwapReview } from "@/components/extractions/bmw-swap-review";
+import { MercedesModelSelector } from "@/components/extractions/mercedes-model-selector";
 import { formatSpanishDate, formatSpanishDateTime } from "@/lib/date-format";
 import { extractionFormSchema, type ExtractionVehicle } from "@/lib/extractions/validation";
 import { useBmwAvailability, type AvailabilityTarget } from "@/lib/hooks/use-bmw-availability";
@@ -22,6 +23,7 @@ const STEP_TITLES = ["Datos comunes", "Fabricante", "Modelos", "Resumen"] as con
 const BRAND_OPTIONS: Record<ManufacturerGroup, ManufacturerBrand[]> = {
   BMW: ["BMW", "MINI"],
   Renault: ["Renault", "Dacia"],
+  Mercedes: ["Mercedes-Benz"],
 };
 function isBrandInGroup(group: ManufacturerGroup | "", brand: ManufacturerBrand | ""): boolean {
   return group ? brand === "" || BRAND_OPTIONS[group].some((option) => option === brand) : brand === "";
@@ -48,8 +50,8 @@ const commonStepSchema = z.object({
 });
 
 const draftSchema = z.object({
-  group: z.union([z.literal(""), z.enum(["BMW", "Renault"])]),
-  brand: z.union([z.literal(""), z.enum(["BMW", "MINI", "Renault", "Dacia"])]),
+  group: z.union([z.literal(""), z.enum(["BMW", "Renault", "Mercedes"])]),
+  brand: z.union([z.literal(""), z.enum(["BMW", "MINI", "Renault", "Dacia", "Mercedes-Benz"])]),
   step: z.number().int().min(0).max(3).optional(),
   values: z.object({
     axCode: z.string().max(4),
@@ -61,6 +63,7 @@ const draftSchema = z.object({
   vehicles: z.array(z.discriminatedUnion("manufacturerGroup", [
     z.object({ id: z.string().min(1).max(100), manufacturerGroup: z.literal("Renault"), brand: z.enum(["Renault", "Dacia"]), modelDescription: z.string().max(200), modelCode: z.string().max(200) }).strict(),
     z.object({ id: z.string().min(1).max(100), manufacturerGroup: z.literal("BMW"), brand: z.enum(["BMW", "MINI"]), series: z.string().max(100), developmentCode: z.string().max(20), typekey: z.string().max(4), modelDescription: z.string().max(200) }).strict(),
+    z.object({ id: z.string().min(1).max(100), manufacturerGroup: z.literal("Mercedes"), brand: z.literal("Mercedes-Benz"), series: z.string().max(100), modelCode: z.string().max(50), modelDescription: z.string().max(200) }).strict(),
   ])).max(50),
 }).strict();
 
@@ -307,7 +310,7 @@ export function ExtractionStepperForm({
       : Boolean(vehicle.modelCode));
     if (hasModels && !window.confirm("Cambiar de grupo borrará los modelos seleccionados. ¿Quieres continuar?")) return;
     setGroup(nextGroup);
-    setBrand("");
+    setBrand(nextGroup === "Mercedes" ? "Mercedes-Benz" : "");
     setVehicles([]);
     clearValidation();
   }
@@ -375,6 +378,21 @@ export function ExtractionStepperForm({
   function addBlankBmwVehicle() {
     if (group !== "BMW" || (brand !== "BMW" && brand !== "MINI") || vehicles.length >= 50) return;
     setVehicles((current) => [...current, emptyVehicle("BMW", brand, `${formId}-model-${current.length}`)]);
+    clearValidation();
+  }
+
+  function toggleMercedesModel(option: Option, selected: boolean, series: string) {
+    if (group !== "Mercedes") return;
+    setVehicles((current) => {
+      const without = current.filter((vehicle) => vehicle.manufacturerGroup !== "Mercedes" || vehicle.modelCode !== option.value);
+      if (!selected || without.length >= 50) return without;
+      return [...without, { id: `${formId}-mercedes-${option.value}`, manufacturerGroup: "Mercedes", brand: "Mercedes-Benz", series, modelCode: option.value, modelDescription: option.label }];
+    });
+    clearValidation();
+  }
+
+  function changeMercedesSeries(series: string) {
+    setVehicles((current) => current.filter((vehicle) => vehicle.manufacturerGroup === "Mercedes" && vehicle.series === series));
     clearValidation();
   }
 
@@ -484,7 +502,7 @@ export function ExtractionStepperForm({
         <StepHeading title="Grupo y fabricante" description="Una solicitud corresponde a una sola marca. Después podrás añadir varios modelos o familias de esa marca." />
         <fieldset className="space-y-3"><legend className="field-label">Grupo de fabricantes</legend>
           <div className="grid gap-3 sm:grid-cols-3">
-            {(["BMW", "Renault"] as const).map((option) => <button aria-pressed={group === option} className={`min-h-16 rounded-xl border px-4 py-3 text-left text-sm font-semibold transition-colors focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-sky-700 ${group === option ? "border-sky-700 bg-sky-50 text-sky-950" : "border-zinc-300 bg-white text-zinc-800 hover:bg-zinc-50"}`} key={option} onClick={() => selectGroup(option)} type="button">{option === "BMW" ? "BMW Group" : "Renault Group"}</button>)}
+            {(["BMW", "Renault", "Mercedes"] as const).map((option) => <button aria-pressed={group === option} className={`min-h-16 rounded-xl border px-4 py-3 text-left text-sm font-semibold transition-colors focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-sky-700 ${group === option ? "border-sky-700 bg-sky-50 text-sky-950" : "border-zinc-300 bg-white text-zinc-800 hover:bg-zinc-50"}`} key={option} onClick={() => selectGroup(option)} type="button">{option === "BMW" ? "BMW Group" : option === "Renault" ? "Renault Group" : "Mercedes-Benz Group"}</button>)}
             <button aria-describedby="vag-disabled-description" aria-disabled="true" className="min-h-16 cursor-not-allowed rounded-xl border border-zinc-200 bg-zinc-100 px-4 py-3 text-left text-sm font-semibold text-zinc-500" disabled type="button">VAG <span className="mt-1 block text-xs font-normal">Deshabilitado</span></button>
           </div>
           <p className="text-xs text-zinc-500" id="vag-disabled-description">El reader VAG está disponible, pero las solicitudes siguen deshabilitadas en este formulario. Incluye Volkswagen, Audi, Škoda y SEAT.</p>
@@ -494,8 +512,9 @@ export function ExtractionStepperForm({
       </section> : null}
 
       {step === 2 ? <section aria-labelledby="step-models" className="space-y-5">
-        <StepHeading title={summaryTitle} description={group === "BMW" ? "Elige la serie, el código de desarrollo y los typekeys. Cada typekey genera una extracción." : "Selecciona una o varias familias. Se creará una extracción independiente por cada familia."} />
+        <StepHeading title={summaryTitle} description={group === "BMW" ? "Elige la serie, el código de desarrollo y los typekeys. Cada typekey genera una extracción." : group === "Mercedes" ? "Elige la serie y uno o varios modelos. Se creará una extracción independiente por cada modelo." : "Selecciona una o varias familias. Se creará una extracción independiente por cada familia."} />
         {group === "Renault" && (brand === "Renault" || brand === "Dacia") ? <RenaultFamilySelector brand={brand} onToggle={toggleRenaultFamily} selected={vehicles} /> : null}
+        {group === "Mercedes" ? <MercedesModelSelector initialSeries={vehicles[0]?.manufacturerGroup === "Mercedes" ? vehicles[0].series : ""} onSeriesChange={changeMercedesSeries} onToggle={toggleMercedesModel} selected={vehicles.flatMap((vehicle) => vehicle.manufacturerGroup === "Mercedes" ? [{ series: vehicle.series, modelCode: vehicle.modelCode }] : [])} /> : null}
         {group === "BMW" ? <>
           {vehicles.length === 0 ? <p className="text-sm text-zinc-600">Añade el primer typekey para continuar.</p> : <div className="space-y-4">{vehicles.map((vehicle, index) => vehicle.manufacturerGroup === "BMW" ? <fieldset className="grid min-w-0 gap-3 rounded-xl border border-zinc-200 bg-zinc-50 p-4 md:grid-cols-[0.65fr_0.8fr_1fr_1fr_1.7fr_auto]" key={vehicle.id}>
             <legend className="sr-only">Typekey {index + 1}</legend>
@@ -529,7 +548,7 @@ export function ExtractionStepperForm({
           <ul className="divide-y divide-zinc-100">{vehicles.map((vehicle, index) => {
             const target = availabilityTargets.get(vehicle.id);
             return <li className="px-5 py-3 text-sm" key={vehicle.id}>
-              <div className="flex items-center gap-3"><span aria-hidden="true" className="flex size-6 shrink-0 items-center justify-center rounded-full bg-zinc-100 text-xs font-medium tabular-nums text-zinc-600">{index + 1}</span><span className="min-w-0 flex-1 font-medium text-zinc-900">{vehicle.modelDescription || "Modelo seleccionado"}</span><span className="shrink-0 rounded-md border border-zinc-200 bg-zinc-50 px-2 py-1 font-mono text-xs text-zinc-700">{vehicle.manufacturerGroup === "BMW" ? `${vehicle.series} · ${vehicle.developmentCode} · ${vehicle.typekey}` : vehicle.modelCode}</span></div>
+              <div className="flex items-center gap-3"><span aria-hidden="true" className="flex size-6 shrink-0 items-center justify-center rounded-full bg-zinc-100 text-xs font-medium tabular-nums text-zinc-600">{index + 1}</span><span className="min-w-0 flex-1 font-medium text-zinc-900">{vehicle.modelDescription || "Modelo seleccionado"}</span><span className="shrink-0 rounded-md border border-zinc-200 bg-zinc-50 px-2 py-1 font-mono text-xs text-zinc-700">{vehicle.manufacturerGroup === "BMW" ? `${vehicle.series} · ${vehicle.developmentCode} · ${vehicle.typekey}` : vehicle.manufacturerGroup === "Mercedes" ? `${vehicle.series} · ${vehicle.modelCode}` : vehicle.modelCode}</span></div>
               {target ? <div className="mt-2 pl-9"><BmwAvailabilityNotice entry={availability.entryFor(target)} onRetry={() => availability.retry(target)} onUseBaseType={(baseTypekey) => replaceWithBaseType(vehicle.id, baseTypekey)} typekey={target.typekey} /></div> : null}
             </li>;
           })}</ul>

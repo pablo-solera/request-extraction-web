@@ -7,17 +7,18 @@ import { getTransformerClient, MAX_LST_BYTES, type TransformerClient } from "@/l
 import {
   attachComparisonRemote, claimComparisonPoll, claimLoadPoll, claimLoadStart, failComparison, recordLoadStartFailure, getComparison, getRequestWithRequester, insertComparison, listActiveComparisons, listActiveLoads,
   findLoadedTable, listComparisonsForRequests, listRequestsByIds, listRequestsReadyForLoad, markLoadFailedToStart, markLoadRequested, resetFailedLoad, updateComparisonState, updateLoadState,
+  claimReportPoll, claimReportStart, listActiveReports, listRequestsReadyForReport, markReportFailedToStart, markReportRequested, recordReportStartFailure, resetFailedReport, updateReportState,
 } from "@/lib/transformer/repository";
-import { transformerDefinitions } from "@/lib/transformer/registry";
+import { transformerDefinitions, type TransformerKey } from "@/lib/transformer/registry";
 import type { TransformerRequestInfo } from "@/lib/transformer/info";
 import type { TransformerState } from "@/lib/transformer/types";
 import type { UserRole } from "@/lib/auth/session";
-import { notifyComparisonFailed, notifyLoadCompleted, notifyLoadFailed, retryPendingNotifications } from "@/lib/mail/notifications";
+import { notifyComparisonFailed, notifyLoadCompleted, notifyLoadFailed, notifyReportFailed, retryPendingNotifications } from "@/lib/mail/notifications";
 
 type Actor = { id: string; oracleEmpId: number | null; role: UserRole };
 
-export function isTransformerConfigured() {
-  return Boolean(process.env[transformerDefinitions.bmw.envVar]?.trim());
+export function isTransformerConfigured(key: TransformerKey = "bmw") {
+  return Boolean(process.env[transformerDefinitions[key].envVar]?.trim());
 }
 
 function mapStatus(state: TransformerState): TransformerJobStatus {
@@ -101,6 +102,94 @@ export async function startPendingLoads(requestGroupIds: string[], client: Trans
   return started;
 }
 
+type ReadyReport = Awaited<ReturnType<typeof listRequestsReadyForReport>>[number];
+
+async function failReportToStart(requestGroupId: string, message: string) {
+  const failed = await markReportFailedToStart(requestGroupId, message);
+  if (failed) await notifyReportFailed(requestGroupId, `start-${failed.reportAttempts}`, message);
+}
+
+/**
+ * Asks mercedes-transformer for the Excel of a finished request. There is no load step: the report is built from the series, the
+ * day the reader stored its data under and the model designations of the extractions. The edition goes as stored (`04/0`).
+ */
+async function startReport(client: TransformerClient, { request, items }: ReadyReport) {
+  if (!await claimReportStart(request.requestGroupId, new Date(Date.now() - TRANSFORMER_START_INTERVAL_MS))) return false;
+  const series = new Set(items.map((item) => item.readerParams.series));
+  const dates = new Set(items.map((item) => item.dataDate ?? item.readerParams.date));
+  const [seriesText] = [...series];
+  const [date] = [...dates];
+  if (series.size !== 1 || !seriesText || dates.size !== 1 || !date) {
+    await failReportToStart(request.requestGroupId, "La solicitud no tiene la serie y la fecha de extracción necesarias para generar el informe.");
+    return false;
+  }
+  try {
+    const { reportId } = await client.createReport({
+      axCode: request.axCode,
+      imcEdition: request.imcEdition,
+      selection: { series: seriesText, date, models: [...new Set(items.map((item) => item.modelCode))].map((modelDesignation) => ({ modelDesignation })) },
+    });
+    return Boolean(await markReportRequested(request.requestGroupId, reportId));
+  } catch (error) {
+    if (error instanceof ReaderError && error.retryable) {
+      if (await recordReportStartFailure(request.requestGroupId) >= MAX_LOAD_START_FAILURES) await failReportToStart(request.requestGroupId, "El servicio de informes no responde. Inténtalo de nuevo más tarde con «Reintentar informe».");
+      return false;
+    }
+    await failReportToStart(request.requestGroupId, error instanceof ReaderError ? error.message : "No se ha podido iniciar el informe.");
+    return false;
+  }
+}
+
+async function startReports(client: TransformerClient) {
+  let started = 0;
+  for (const ready of await listRequestsReadyForReport()) if (await startReport(client, ready)) started++;
+  return started;
+}
+
+/** Called when a model completes: requests the report right away if that was the last one. Safe to call for any request. */
+export async function startReportForRequest(requestGroupId: string, client?: TransformerClient) {
+  if (!isTransformerConfigured("mercedes")) return false;
+  const [ready] = await listRequestsReadyForReport(1, requestGroupId);
+  return ready ? startReport(client ?? getTransformerClient("mercedes"), ready) : false;
+}
+
+export async function startPendingReports(requestGroupIds: string[], client: TransformerClient = getTransformerClient("mercedes")) {
+  if (!isTransformerConfigured("mercedes")) return 0;
+  let started = 0;
+  for (const requestGroupId of requestGroupIds) {
+    const [ready] = await listRequestsReadyForReport(1, requestGroupId);
+    if (ready && await startReport(client, ready)) started++;
+  }
+  return started;
+}
+
+type ActiveReport = Awaited<ReturnType<typeof listActiveReports>>[number];
+
+async function pollReport(client: TransformerClient, request: ActiveReport) {
+  try {
+    const state = await client.getReport(request.reportRemoteId!);
+    const status = mapStatus(state);
+    if (status === request.reportStatus) return false;
+    // A report whose last step failed can still hold its Excel, so the artifact decides, not the status.
+    const downloadable = status === "completed" || Boolean(state.artifacts?.some((artifact) => artifact.name === "report"));
+    const error = failureMessage(state, "El informe ha fallado.");
+    const updated = await updateReportState(request.requestGroupId, request.reportRemoteId!, { status, error, downloadable });
+    if (updated && status === "failed") await notifyReportFailed(request.requestGroupId, request.reportRemoteId!, error);
+    return Boolean(updated);
+  } catch (error) {
+    if (error instanceof ReaderError && error.retryable) return false;
+    const message = error instanceof ReaderError ? error.message : "No se ha podido consultar el informe.";
+    if (await updateReportState(request.requestGroupId, request.reportRemoteId!, { status: "failed", error: message, downloadable: false })) await notifyReportFailed(request.requestGroupId, request.reportRemoteId!, message);
+    return false;
+  }
+}
+
+async function pollReports(client: TransformerClient) {
+  let updated = 0;
+  for (const request of await listActiveReports()) if (await pollReport(client, request)) updated++;
+  return updated;
+}
+
 type ActiveLoad = Awaited<ReturnType<typeof listActiveLoads>>[number];
 type ActiveComparison = Awaited<ReturnType<typeof listActiveComparisons>>[number];
 
@@ -158,11 +247,22 @@ export const TRANSFORMER_POLL_INTERVAL_MS = 5_000;
  * looking at the history sees the result without waiting for the scheduled reconciliation. Each job is queried at most
  * once per interval, however many people are watching.
  */
-export async function syncTransformerStates(requestGroupIds: string[], client: TransformerClient = getTransformerClient(), intervalMs = TRANSFORMER_POLL_INTERVAL_MS) {
-  if (!isTransformerConfigured() || requestGroupIds.length === 0) return 0;
+export async function syncTransformerStates(requestGroupIds: string[], client: TransformerClient = getTransformerClient(), intervalMs = TRANSFORMER_POLL_INTERVAL_MS, mercedesClient?: TransformerClient) {
+  const bmw = isTransformerConfigured();
+  const mercedes = isTransformerConfigured("mercedes");
+  if (requestGroupIds.length === 0 || (!bmw && !mercedes)) return 0;
   const staleBefore = new Date(Date.now() - intervalMs);
   let updated = 0;
   const requests = await listRequestsByIds(requestGroupIds);
+  if (mercedes) {
+    const reports = mercedesClient ?? getTransformerClient("mercedes");
+    for (const request of requests) {
+      if (request.reportStatus !== "queued" && request.reportStatus !== "running") continue;
+      const claimed = await claimReportPoll(request.requestGroupId, staleBefore);
+      if (claimed && await pollReport(reports, claimed as ActiveReport)) updated++;
+    }
+  }
+  if (!bmw) return updated;
   for (const request of requests) {
     if (request.loadStatus !== "queued" && request.loadStatus !== "running") continue;
     const claimed = await claimLoadPoll(request.requestGroupId, staleBefore);
@@ -177,10 +277,21 @@ export async function syncTransformerStates(requestGroupIds: string[], client: T
 }
 
 /** Sends finished BMW requests to the transformer and follows their loads and comparisons. Does nothing when the transformer is not configured. */
-export async function reconcileTransformer(client: TransformerClient = getTransformerClient()) {
-  if (!isTransformerConfigured()) return { started: 0, updated: 0 };
-  const started = await startLoads(client);
-  const updated = await pollLoads(client) + await pollComparisons(client);
+export async function reconcileTransformer(client: TransformerClient = getTransformerClient(), mercedesClient?: TransformerClient) {
+  const bmw = isTransformerConfigured();
+  const mercedes = isTransformerConfigured("mercedes");
+  if (!bmw && !mercedes) return { started: 0, updated: 0 };
+  let started = 0;
+  let updated = 0;
+  if (bmw) {
+    started += await startLoads(client);
+    updated += await pollLoads(client) + await pollComparisons(client);
+  }
+  if (mercedes) {
+    const reports = mercedesClient ?? getTransformerClient("mercedes");
+    started += await startReports(reports);
+    updated += await pollReports(reports);
+  }
   await retryPendingNotifications();
   return { started, updated };
 }
@@ -197,6 +308,20 @@ export async function retryRequestLoad(requestGroupId: string, actor: Actor) {
   await requireManageableRequest(requestGroupId, actor);
   if (!await resetFailedLoad(requestGroupId)) throw new ReaderError("Solo se puede reintentar una carga fallida.", "LOAD_NOT_RETRYABLE", false, 409);
   await startLoadForRequest(requestGroupId).catch((error) => console.error("Transformer load could not be restarted.", error));
+}
+
+export async function retryRequestReport(requestGroupId: string, actor: Actor) {
+  await requireManageableRequest(requestGroupId, actor);
+  if (!await resetFailedReport(requestGroupId)) throw new ReaderError("Solo se puede reintentar un informe fallido.", "REPORT_NOT_RETRYABLE", false, 409);
+  await startReportForRequest(requestGroupId).catch((error) => console.error("Transformer report could not be restarted.", error));
+}
+
+/** The Excel of a Mercedes-Benz request, named after the AX code. A failed report is downloadable when the transformer kept the file. */
+export async function downloadRequestReport(requestGroupId: string, actor: Actor, client?: TransformerClient) {
+  const request = await requireManageableRequest(requestGroupId, actor);
+  if (!request.reportDownloadable || !request.reportRemoteId) throw new ReaderError("El Excel todavía no está listo.", "REPORT_NOT_READY", false, 409);
+  const file = await (client ?? getTransformerClient("mercedes")).downloadReport(request.reportRemoteId);
+  return { file, filename: `${request.axCode}.xlsx` };
 }
 
 const lstName = /\.(lst|zip)$/i;
@@ -237,26 +362,40 @@ export async function getTransformerInfo(requestGroupIds: string[], actor: Actor
     try { await requireManageableRequest(request.requestGroupId, actor); visible.push(request); } catch { /* not visible to this actor */ }
   }
   const visibleIds = visible.map((request) => request.requestGroupId);
-  const configured = isTransformerConfigured();
+  const bmwConfigured = isTransformerConfigured();
+  const mercedesConfigured = isTransformerConfigured("mercedes");
   let current = visible;
   let comparisons = await listComparisonsForRequests(visibleIds);
   const running = (status: string | null) => status === "queued" || status === "running";
   const pendingStart = current.filter((request) => request.loadStatus === null && request.manufacturerGroup === "BMW" && request.status === "approved").map((request) => request.requestGroupId);
-  if (configured && (pendingStart.length > 0 || current.some((request) => running(request.loadStatus)) || comparisons.some((comparison) => running(comparison.status)))) {
-    await startPendingLoads(pendingStart).catch((error) => console.error("Transformer pending load start failed.", error));
+  const pendingReports = current.filter((request) => request.reportStatus === null && request.manufacturerGroup === "Mercedes" && request.status === "approved").map((request) => request.requestGroupId);
+  const bmwBusy = bmwConfigured && (pendingStart.length > 0 || current.some((request) => running(request.loadStatus)) || comparisons.some((comparison) => running(comparison.status)));
+  const mercedesBusy = mercedesConfigured && (pendingReports.length > 0 || current.some((request) => running(request.reportStatus)));
+  if (bmwBusy || mercedesBusy) {
+    if (bmwBusy) await startPendingLoads(pendingStart).catch((error) => console.error("Transformer pending load start failed.", error));
+    if (mercedesBusy) await startPendingReports(pendingReports).catch((error) => console.error("Transformer pending report start failed.", error));
     await syncTransformerStates(visibleIds).catch((error) => console.error("Transformer state sync failed.", error));
     current = await listRequestsByIds(visibleIds);
     comparisons = await listComparisonsForRequests(visibleIds);
   }
   return Object.fromEntries(current.map((request) => [request.requestGroupId, {
     requestGroupId: request.requestGroupId,
-    applicable: configured && request.manufacturerGroup === "BMW" && request.status === "approved",
+    kind: request.manufacturerGroup === "Mercedes" ? "mercedes" as const : "bmw" as const,
+    applicable: request.status === "approved" && (request.manufacturerGroup === "BMW" ? bmwConfigured : request.manufacturerGroup === "Mercedes" && mercedesConfigured),
     loadStatus: request.loadStatus,
     loadAttempts: request.loadAttempts,
     loadError: request.loadError,
     loadedAt: request.loadedAt?.toISOString() ?? null,
     canRetryLoad: request.loadStatus === "failed",
     canUpload: request.loadStatus === "completed",
+    report: request.manufacturerGroup === "Mercedes" ? {
+      status: request.reportStatus,
+      attempts: request.reportAttempts,
+      error: request.reportError,
+      completedAt: request.reportCompletedAt?.toISOString() ?? null,
+      downloadReady: request.reportDownloadable,
+      canRetry: request.reportStatus === "failed",
+    } : null,
     comparisons: comparisons.filter((comparison) => comparison.requestGroupId === request.requestGroupId).map((comparison) => ({
       id: comparison.id,
       filename: comparison.sourceFilename,

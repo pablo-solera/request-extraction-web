@@ -3,7 +3,7 @@ import { beforeEach, describe, expect, it, vi } from "vitest";
 import { ReaderError } from "@/lib/readers/errors";
 
 const mocks = vi.hoisted(() => ({
-  requireApiIdentity: vi.fn(), uploadComparison: vi.fn(), retryRequestLoad: vi.fn(), downloadComparison: vi.fn(), getTransformerInfo: vi.fn(),
+  requireApiIdentity: vi.fn(), uploadComparison: vi.fn(), retryRequestLoad: vi.fn(), downloadComparison: vi.fn(), getTransformerInfo: vi.fn(), retryRequestReport: vi.fn(), downloadRequestReport: vi.fn(),
 }));
 
 vi.mock("@/lib/auth/guards", () => ({ requireApiIdentity: mocks.requireApiIdentity }));
@@ -14,6 +14,8 @@ import { GET as downloadRoute } from "@/app/api/comparisons/[id]/download/route"
 import { POST as retryRoute } from "@/app/api/requests/[id]/load/retry/route";
 import { POST as uploadRoute } from "@/app/api/requests/[id]/comparisons/route";
 import { GET as infoRoute } from "@/app/api/requests/transformer/route";
+import { POST as reportRetryRoute } from "@/app/api/requests/[id]/report/retry/route";
+import { GET as reportDownloadRoute } from "@/app/api/requests/[id]/report/download/route";
 
 const id = "7be5f2af-879b-4c61-84d5-6e728f438a02";
 const user = { id: "u1", oracleEmpId: 1, role: "employee" };
@@ -84,5 +86,37 @@ describe("transformer routes", () => {
     expect(response.status).toBe(200);
     expect(await response.json()).toEqual({ [id]: { requestGroupId: id, applicable: true } });
     expect(mocks.getTransformerInfo).toHaveBeenCalledWith([id], user);
+  });
+
+  it("requires a session and a valid identifier for the Mercedes-Benz report routes", async () => {
+    mocks.requireApiIdentity.mockResolvedValue(null);
+    expect((await reportRetryRoute(new Request("http://localhost"), context())).status).toBe(401);
+    expect((await reportDownloadRoute(new Request("http://localhost"), context())).status).toBe(401);
+    mocks.requireApiIdentity.mockResolvedValue(user);
+    expect((await reportRetryRoute(new Request("http://localhost"), context("nope"))).status).toBe(400);
+    expect((await reportDownloadRoute(new Request("http://localhost"), context("nope"))).status).toBe(400);
+  });
+
+  it("retries a failed report and maps conflicts and unexpected errors", async () => {
+    mocks.retryRequestReport.mockResolvedValueOnce(undefined);
+    expect((await reportRetryRoute(new Request("http://localhost"), context())).status).toBe(202);
+    expect(mocks.retryRequestReport).toHaveBeenCalledWith(id, user);
+    mocks.retryRequestReport.mockRejectedValueOnce(new ReaderError("Solo se puede reintentar un informe fallido.", "REPORT_NOT_RETRYABLE", false, 409));
+    expect((await reportRetryRoute(new Request("http://localhost"), context())).status).toBe(409);
+    mocks.retryRequestReport.mockRejectedValueOnce(new Error("boom"));
+    expect((await reportRetryRoute(new Request("http://localhost"), context())).status).toBe(502);
+  });
+
+  it("streams the report as {axCode}.xlsx with private headers", async () => {
+    mocks.downloadRequestReport.mockResolvedValueOnce({ file: new Response("xlsx-bytes", { headers: { "content-length": "10" } }), filename: "3F6.xlsx" });
+    const response = await reportDownloadRoute(new Request("http://localhost"), context());
+    expect(response.status).toBe(200);
+    expect(response.headers.get("content-disposition")).toBe('attachment; filename="3F6.xlsx"');
+    expect(response.headers.get("cache-control")).toContain("no-store");
+    expect(await response.text()).toBe("xlsx-bytes");
+    mocks.downloadRequestReport.mockRejectedValueOnce(new ReaderError("El Excel todavía no está listo.", "REPORT_NOT_READY", false, 409));
+    expect((await reportDownloadRoute(new Request("http://localhost"), context())).status).toBe(409);
+    mocks.downloadRequestReport.mockRejectedValueOnce(new Error("boom"));
+    expect((await reportDownloadRoute(new Request("http://localhost"), context())).status).toBe(502);
   });
 });

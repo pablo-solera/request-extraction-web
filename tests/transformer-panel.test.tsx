@@ -8,7 +8,7 @@ afterEach(() => { cleanup(); vi.unstubAllGlobals(); vi.useRealTimers(); });
 
 const group = "7be5f2af-879b-4c61-84d5-6e728f438a02";
 const info = (overrides: Partial<TransformerRequestInfo> = {}): TransformerRequestInfo => ({
-  requestGroupId: group, applicable: true, loadStatus: null, loadAttempts: 0, loadError: null, loadedAt: null, canRetryLoad: false, canUpload: false, comparisons: [], ...overrides,
+  requestGroupId: group, kind: "bmw", report: null, applicable: true, loadStatus: null, loadAttempts: 0, loadError: null, loadedAt: null, canRetryLoad: false, canUpload: false, comparisons: [], ...overrides,
 });
 const answer = (value: TransformerRequestInfo) => Response.json({ [group]: value });
 
@@ -92,5 +92,46 @@ describe("transformer panel", () => {
     await user.upload(screen.getByLabelText(/Listado maestro/), new File(["x"], "notes.lst"));
     await user.click(screen.getByRole("button", { name: "Comparar con .LST" }));
     await waitFor(() => expect(screen.getByRole("alert")).toHaveTextContent("El fichero debe ser un .LST o un .ZIP"));
+  });
+
+  describe("Mercedes-Benz report", () => {
+    const report = (overrides: Partial<NonNullable<TransformerRequestInfo["report"]>> = {}) => info({ kind: "mercedes", report: { status: null, attempts: 0, error: null, completedAt: null, downloadReady: false, canRetry: false, ...overrides } });
+
+    it("waits for every model without polling, then follows the report until the Excel is ready", async () => {
+      vi.stubGlobal("fetch", vi.fn());
+      const { unmount } = render(<TransformerPanel allCompleted={false} initialInfo={report()} requestGroupId={group} />);
+      expect(screen.getByText(/cuando todos los modelos estén completados/)).toBeInTheDocument();
+      expect(fetch).not.toHaveBeenCalled();
+      unmount();
+
+      const fetchMock = vi.fn().mockResolvedValue(answer(report({ status: "completed", downloadReady: true, completedAt: "2026-11-18T10:00:00.000Z" })));
+      vi.stubGlobal("fetch", fetchMock);
+      render(<TransformerPanel allCompleted initialInfo={report({ status: "running" })} requestGroupId={group} />);
+      expect(screen.getByText("Generando el informe Excel…")).toBeInTheDocument();
+      expect(await screen.findByText(/Informe listo/)).toBeInTheDocument();
+      expect(screen.getByRole("link", { name: "Descargar Excel" })).toHaveAttribute("href", `/api/requests/${group}/report/download`);
+      expect(screen.queryByText(/Carga en BMW_Labour/)).not.toBeInTheDocument();
+    });
+
+    it("shows the failure message, still offers the Excel the transformer kept and retries", async () => {
+      const user = userEvent.setup();
+      const fetchMock = vi.fn()
+        .mockResolvedValueOnce(Response.json({ ok: true }, { status: 202 }))
+        .mockResolvedValue(answer(report({ status: null, attempts: 2 })));
+      vi.stubGlobal("fetch", fetchMock);
+      render(<TransformerPanel allCompleted initialInfo={report({ status: "failed", error: "SQL Server no disponible", downloadReady: true, canRetry: true, attempts: 1 })} requestGroupId={group} />);
+
+      expect(screen.getByRole("alert")).toHaveTextContent("El informe ha fallado: SQL Server no disponible");
+      expect(screen.getByRole("link", { name: "Descargar Excel" })).toHaveAttribute("href", `/api/requests/${group}/report/download`);
+      await user.click(screen.getByRole("button", { name: "Reintentar informe" }));
+      expect(String(fetchMock.mock.calls[0]![0])).toBe(`/api/requests/${group}/report/retry`);
+      expect(await screen.findByText("Reintentando generar el informe…")).toBeInTheDocument();
+    });
+
+    it("does not offer a download for a failed report without a file", () => {
+      vi.stubGlobal("fetch", vi.fn());
+      render(<TransformerPanel allCompleted initialInfo={report({ status: "failed", error: "Falta un fichero", canRetry: true })} requestGroupId={group} />);
+      expect(screen.queryByRole("link", { name: "Descargar Excel" })).not.toBeInTheDocument();
+    });
   });
 });

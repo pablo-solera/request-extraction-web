@@ -30,7 +30,15 @@ const bmwVehicleSchema = z.object({
   modelDescription: z.string().trim().max(200, "La descripción es demasiado larga."),
 });
 
-const vehiclesSchema = z.array(z.discriminatedUnion("manufacturerGroup", [renaultVehicleSchema, bmwVehicleSchema]))
+const mercedesVehicleSchema = z.object({
+  manufacturerGroup: z.literal("Mercedes"),
+  brand: z.literal("Mercedes-Benz", { error: "Selecciona Mercedes-Benz." }),
+  series: z.string().trim().min(1, "La serie es obligatoria.").max(100, "La serie es demasiado larga."),
+  modelCode: z.string().trim().min(1, "El modelo es obligatorio.").max(50, "El modelo es demasiado largo."),
+  modelDescription: z.string().trim().max(200, "La descripción es demasiado larga."),
+});
+
+const vehiclesSchema = z.array(z.discriminatedUnion("manufacturerGroup", [renaultVehicleSchema, bmwVehicleSchema, mercedesVehicleSchema]))
   .min(1, "Añade al menos un vehículo.")
   .max(50, "No puedes añadir más de 50 vehículos.")
   .superRefine((vehicles, context) => {
@@ -40,11 +48,16 @@ const vehiclesSchema = z.array(z.discriminatedUnion("manufacturerGroup", [renaul
     const brands = new Set(vehicles.map((vehicle) => vehicle.brand));
     if (brands.size > 1) context.addIssue({ code: "custom", message: "Una solicitud solo puede incluir un fabricante.", path: [] });
 
+    const mercedesSeries = new Set(vehicles.flatMap((vehicle) => vehicle.manufacturerGroup === "Mercedes" ? [vehicle.series] : []));
+    if (mercedesSeries.size > 1) context.addIssue({ code: "custom", message: "Una solicitud Mercedes-Benz solo puede incluir una serie.", path: [] });
+
     const seenModels = new Set<string>();
     vehicles.forEach((vehicle, index) => {
       const identity = vehicle.manufacturerGroup === "BMW" ? vehicle.typekey : vehicle.modelCode;
       if (seenModels.has(identity)) {
-        context.addIssue({ code: "custom", message: vehicle.manufacturerGroup === "BMW" ? "No repitas el mismo typekey de desarrollo." : "No repitas la misma familia en esta solicitud.", path: [index, vehicle.manufacturerGroup === "BMW" ? "typekey" : "modelCode"] });
+        const message = vehicle.manufacturerGroup === "BMW" ? "No repitas el mismo typekey de desarrollo."
+          : vehicle.manufacturerGroup === "Mercedes" ? "No repitas el mismo modelo en esta solicitud." : "No repitas la misma familia en esta solicitud.";
+        context.addIssue({ code: "custom", message, path: [index, vehicle.manufacturerGroup === "BMW" ? "typekey" : "modelCode"] });
       }
       seenModels.add(identity);
     });

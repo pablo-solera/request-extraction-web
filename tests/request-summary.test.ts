@@ -37,3 +37,11 @@ describe("summarizeRequest", () => {
     expect(retryableItems([item("completed"), item("failed"), item("cancelled"), item("running")]).map((entry) => entry.status)).toEqual(["failed", "cancelled"]);
   });
 });
+
+describe("summarizeRequest nouns", () => {
+  it("counts Mercedes-Benz requests in models", () => {
+    expect(summarizeRequest("approved", [item("completed"), item("failed"), item("cancelled")], "modelo").description).toBe("1 de 3 modelos completados · 1 fallido · 1 cancelado");
+    expect(summarizeRequest("approved", [item("completed")], "modelo").description).toBe("1 de 1 modelo completado");
+    expect(summarizeRequest("approved", [item("completed"), item("failed")], "familia").description).toBe("1 de 2 familias completadas · 1 fallida");
+  });
+});

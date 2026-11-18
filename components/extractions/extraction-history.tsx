@@ -32,7 +32,7 @@ const requestStatusLabels = { pending: "Pendiente de aprobación", approved: "Ap
 function readerStatusNotice(item: ExtractionListItem) {
   if (item.readerStatus === "queued") return "En cola";
   if (item.readerStatus === "paused") return "En pausa";
-  if (item.readerStatus === "rate_limited" || item.readerStatus === "rate-limited") return item.manufacturerGroup === "BMW" ? "En pausa por límite de BMW" : "En pausa por límite del reader";
+  if (item.readerStatus === "rate_limited" || item.readerStatus === "rate-limited") return item.manufacturerGroup === "BMW" ? "En pausa por límite de BMW" : item.manufacturerGroup === "Mercedes" ? "En pausa por límite de Mercedes-Benz" : "En pausa por límite del reader";
   if (item.readerStatus === "cancelling") return "Cancelando…";
   if (item.readerStalled) return "El reader no detecta actividad";
   return null;
@@ -274,7 +274,7 @@ export function ExtractionHistory({ createdId, openId, draftKey = "extraction-dr
       <div className="space-y-4">
         {groups.map((group) => {
           const first = group.items[0]!;
-          const noun = first.manufacturerGroup === "Renault" ? "familia" : "typekey";
+          const noun = first.manufacturerGroup === "Renault" ? "familia" : first.manufacturerGroup === "Mercedes" ? "modelo" : "typekey";
           const summary = summarizeRequest(first.requestStatus, group.items, noun);
           const expanded = toggledGroups[group.id] ?? (group.id === createdId || group.id === openId);
           const panelId = `request-panel-${group.id}`;
@@ -292,7 +292,7 @@ export function ExtractionHistory({ createdId, openId, draftKey = "extraction-dr
                     <span className="block"><span className="block text-xs font-normal text-zinc-500">Edición IMC</span><span className="mt-0.5 block text-sm font-medium text-zinc-900" translate="no">{first.imcEdition}</span></span>
                     <span className="block"><span className="block text-xs font-normal text-zinc-500">Inicio del desarrollo</span><span className="mt-0.5 block text-sm font-medium text-zinc-900">{first.developmentStart ? formatSpanishDate(first.developmentStart) : "—"}</span></span>
                     <span className="block"><span className="block text-xs font-normal text-zinc-500">Completion</span><span className="mt-0.5 block text-sm font-medium text-zinc-900">{formatSpanishDate(first.completion)}</span></span>
-                    <span className="block"><span className="block text-xs font-normal text-zinc-500">{noun === "familia" ? "Familias" : "Typekeys"}</span><span className="mt-0.5 block text-sm font-medium text-zinc-900">{group.items.length}</span></span>
+                    <span className="block"><span className="block text-xs font-normal text-zinc-500">{noun === "familia" ? "Familias" : noun === "modelo" ? "Modelos" : "Typekeys"}</span><span className="mt-0.5 block text-sm font-medium text-zinc-900">{group.items.length}</span></span>
                   </span>
                   <span className="mt-3 block text-xs font-normal text-zinc-500">Solicitada el <time dateTime={first.createdAt}>{formatSpanishDateTime(first.createdAt)}</time>{first.requesterName ? ` · ${first.requesterName}` : ""}</span>
                 </span>
@@ -309,7 +309,7 @@ export function ExtractionHistory({ createdId, openId, draftKey = "extraction-dr
                   <div className="max-w-80"><div className="mb-1 flex justify-between text-xs text-zinc-600"><span>Progreso</span><span>{summary.progress}%</span></div><div aria-label={`Progreso de la solicitud ${first.axCode}`} aria-valuemax={100} aria-valuemin={0} aria-valuenow={summary.progress} className="h-2 overflow-hidden rounded-full bg-zinc-200" role="progressbar"><div className={`h-full rounded-full bg-sky-600 transition-[width] duration-500 ${running ? "motion-safe:animate-pulse" : ""}`} style={{ width: `${summary.progress}%` }} /></div></div>
                 </> : null}
                 <RequestActions items={group.items} onUpdated={updateItem} />
-                {first.manufacturerGroup === "BMW" ? <TransformerPanel allCompleted={group.items.every((item) => item.status === "completed")} initialInfo={initialTransformer[group.id]} requestGroupId={group.id} /> : null}
+                {first.manufacturerGroup === "BMW" || first.manufacturerGroup === "Mercedes" ? <TransformerPanel allCompleted={group.items.every((item) => item.status === "completed")} initialInfo={initialTransformer[group.id]} requestGroupId={group.id} /> : null}
               </div>
               <div className="divide-y divide-zinc-200 border-t border-zinc-200 bg-zinc-50/50">
               {group.items.map((item) => {

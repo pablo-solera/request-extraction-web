@@ -1,6 +1,6 @@
 import "server-only";
 
-import { findTableConflict, startLoadForRequest } from "@/lib/transformer/service";
+import { findTableConflict, startLoadForRequest, startReportForRequest } from "@/lib/transformer/service";
 import { notifyExtractionFailures } from "@/lib/mail/notifications";
 import type { Extraction, ExtractionStatus } from "@/db/schema";
 import {
@@ -27,6 +27,7 @@ import type { ExtractionListItem, ExtractionReaderDetail } from "@/lib/extractio
 import { ReaderError } from "@/lib/readers/errors";
 import { getExtractionReader, getExtractionReaderCapabilities, mapRenaultReaderStatus, type ExtractionReaderCapabilities } from "@/lib/readers/registry";
 import { getBmwDevelopmentCodes, getBmwTypekeys } from "@/lib/readers/bmw/client";
+import { getMercedesModels } from "@/lib/readers/mercedes/client";
 import { getRenaultLabourFamilies } from "@/lib/readers/renault/client";
 import { findCoordinatorTeamUserIds, findCoordinatorUser, isUserInCoordinatorTeam } from "@/lib/employees/org-service";
 import type { UserRole } from "@/lib/auth/session";
@@ -38,6 +39,9 @@ export function mapReaderStatus(state: RenaultState): ExtractionStatus {
 
 const MAX_SUBMISSION_ATTEMPTS = 5;
 
+/** Readers on the core v1 contract report their own progress, so the web follows them live. */
+const usesCoreProgress = (readerKey: string) => readerKey === "bmw-labours" || readerKey === "mercedes-labours";
+
 async function submitExtraction(extraction: Extraction, context?: Awaited<ReturnType<ReturnType<typeof getExtractionReader>["prepareSubmission"]>>) {
   if (extraction.remoteRequestId || extraction.status !== "pending") return extraction;
   const claimed = await claimExtractionSubmission(extraction.id);
@@ -45,7 +49,7 @@ async function submitExtraction(extraction: Extraction, context?: Awaited<Return
   try {
     const reader = getExtractionReader(claimed.readerKey);
     const remote = await reader.create(claimed, context);
-    const initialReaderState = claimed.readerKey === "bmw-labours" ? { progress: 0, readerStatus: remote.status ?? "queued" } : undefined;
+    const initialReaderState = usesCoreProgress(claimed.readerKey) ? { progress: 0, readerStatus: remote.status ?? "queued" } : undefined;
     return (await attachReaderRequest(claimed.id, remote.requestId, claimed.submittedAt!, initialReaderState)) ?? claimed;
   } catch (error) {
     const readerError = error instanceof ReaderError ? error : null;
@@ -62,7 +66,7 @@ async function submitExtraction(extraction: Extraction, context?: Awaited<Return
 }
 
 export async function createExtraction(user: { id: string; oracleEmpId: number | null }, input: ExtractionFormInput, role: UserRole, options: { confirmReplace?: boolean } = {}) {
-  await Promise.all([validateBmwSelections(input), validateRenaultFamilies(input)]);
+  await Promise.all([validateBmwSelections(input), validateRenaultFamilies(input), validateMercedesSelections(input)]);
   const first = input.vehicles[0];
   if (first?.manufacturerGroup === "BMW" && !options.confirmReplace && await findTableConflict({ axCode: input.axCode, imcEdition: input.imcEdition, brand: first.brand })) {
     throw new ReaderError("Ya hay datos cargados para este código AX y edición. Confirma que quieres reemplazarlos para continuar.", "TABLE_REPLACE_NOT_CONFIRMED", false, 409);
@@ -84,6 +88,17 @@ async function validateRenaultFamilies(input: ExtractionFormInput) {
     if (!available.has(vehicle.modelCode)) {
       throw new ReaderError("La familia ya no está disponible para el fabricante seleccionado.", "INVALID_RENAULT_SELECTION", false, 400);
     }
+  }
+}
+
+async function validateMercedesSelections(input: ExtractionFormInput) {
+  const vehicles = input.vehicles.filter((vehicle) => vehicle.manufacturerGroup === "Mercedes");
+  const series = vehicles[0]?.series;
+  if (!series) return;
+  const { models } = await getMercedesModels(series);
+  const available = new Set(models.map((model) => model.value));
+  if (vehicles.some((vehicle) => !available.has(vehicle.modelCode))) {
+    throw new ReaderError("El modelo ya no está disponible para la serie seleccionada.", "INVALID_MERCEDES_SELECTION", false, 400);
   }
 }
 
@@ -112,7 +127,7 @@ async function syncExtraction(extraction: Extraction) {
   if (!extraction.remoteRequestId || extraction.status === "completed" || extraction.status === "failed") return extraction;
   try {
     let current = extraction;
-    if (extraction.readerKey === "bmw-labours") {
+    if (usesCoreProgress(extraction.readerKey)) {
       const claimed = await claimReaderProgressPoll(extraction.id, new Date(Date.now() - 10_000));
       if (!claimed) return extraction;
       current = claimed;
@@ -131,6 +146,7 @@ async function syncExtraction(extraction: Extraction) {
     });
     if (status === "completed") {
       await startLoadForRequest(extraction.requestGroupId).catch((error) => console.error("Transformer load could not be started.", error));
+      await startReportForRequest(extraction.requestGroupId).catch((error) => console.error("Transformer report could not be started.", error));
     }
     if (status === "completed" || status === "failed" || status === "cancelled") await notifyExtractionFailures(extraction.requestGroupId);
     return updated;
@@ -299,7 +315,7 @@ export async function syncLiveReaderProgress<T extends { extraction: Extraction;
     const batch = rows.slice(index, index + 5);
     synchronized.push(...await Promise.all(batch.map(async (row) => {
       const { extraction, requestStatus } = row;
-      const shouldSync = extraction.readerKey === "bmw-labours"
+      const shouldSync = usesCoreProgress(extraction.readerKey)
         && requestStatus === "approved"
         && (extraction.status === "pending" || extraction.status === "running")
         && Boolean(extraction.remoteRequestId);
@@ -353,7 +369,9 @@ export function extractionDto(
 ): ExtractionListItem {
   const resolvedCapabilities = capabilities ?? (extraction.readerKey === "bmw-labours"
     ? { cancel: true, resume: true, download: true }
-    : extraction.readerKey === "renault-labours"
+    : extraction.readerKey === "mercedes-labours"
+      ? { cancel: true, resume: true, download: false }
+      : extraction.readerKey === "renault-labours"
       ? { cancel: false, resume: false, download: true }
       : { cancel: false, resume: false, download: false });
   const canCancel = requestStatus !== "rejected" && (

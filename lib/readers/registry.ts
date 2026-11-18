@@ -3,6 +3,8 @@ import "server-only";
 import type { Extraction, ExtractionStatus } from "@/db/schema";
 import { cancelBmwLabour, createBmwLabour, downloadBmwLabourArchive, getBmwLabourState, resumeBmwLabour } from "@/lib/readers/bmw/client";
 import { bmwBrandSchema, type BmwLabourState } from "@/lib/readers/bmw/types";
+import { cancelMercedesLabour, createMercedesLabour, getMercedesLabourState, resumeMercedesLabour } from "@/lib/readers/mercedes/client";
+import type { MercedesLabourState } from "@/lib/readers/mercedes/types";
 import { ReaderError } from "@/lib/readers/errors";
 import { cancelRenaultLabour, createRenaultLabour, getRenaultLabourOptions, getRenaultLabourState, getRenaultReaderCapabilities, getRenaultSettings, resumeRenaultLabour } from "@/lib/readers/renault/client";
 import type { RenaultState } from "@/lib/readers/renault/types";
@@ -64,6 +66,22 @@ const renaultReader: ExtractionReader = {
   },
 };
 
+function mapCoreReaderStatus(name: string): ExtractionReader["mapStatus"] {
+  return (state) => {
+    switch (state.status) {
+      case "queued": return "pending";
+      case "running":
+      case "rate_limited":
+      case "paused":
+      case "cancelling": return "running";
+      case "completed": return "completed";
+      case "failed": return "failed";
+      case "cancelled": return "cancelled";
+      default: throw new ReaderError(`${name} ha devuelto un estado desconocido.`, "UNKNOWN_READER_STATUS", false);
+    }
+  };
+}
+
 const bmwReader: ExtractionReader = {
   async prepareSubmission() { return undefined; },
   async create(extraction) {
@@ -88,23 +106,30 @@ const bmwReader: ExtractionReader = {
   resume: resumeBmwLabour,
   downloadArchive: downloadBmwLabourArchive,
   async getCapabilities() { return { cancel: true, resume: true, download: true }; },
-  mapStatus(state) {
-    switch (state.status) {
-      case "queued": return "pending";
-      case "running":
-      case "rate_limited":
-      case "paused":
-      case "cancelling": return "running";
-      case "completed": return "completed";
-      case "failed": return "failed";
-      case "cancelled": return "cancelled";
-      default: throw new ReaderError("BMW ha devuelto un estado desconocido.", "UNKNOWN_READER_STATUS", false);
-    }
-  },
+  mapStatus: mapCoreReaderStatus("BMW"),
   failureMessage(state) { return state.error?.message || "BMW no ha podido completar la extracción."; },
 };
 
+const mercedesReader: ExtractionReader = {
+  async prepareSubmission() { return undefined; },
+  async create(extraction) {
+    const { series, date } = extraction.readerParams;
+    if (!series || !date) throw new ReaderError("La extracción de Mercedes-Benz no tiene serie o fecha guardadas.", "INVALID_MERCEDES_SELECTION", false, 400);
+    return createMercedesLabour({ series, date, modelDesignations: [extraction.modelCode], axCode: extraction.axCode, imcEdition: extraction.imcEdition });
+  },
+  async getState(requestId) {
+    const state = await getMercedesLabourState(requestId);
+    return { ...state, readerStalled: state.details?.stalled ?? false, dataDate: state.request?.selection?.date ?? null };
+  },
+  cancel: cancelMercedesLabour,
+  resume: resumeMercedesLabour,
+  async getCapabilities() { return { cancel: true, resume: true, download: false }; },
+  mapStatus: mapCoreReaderStatus("Mercedes-Benz"),
+  failureMessage(state) { return state.error?.message || "Mercedes-Benz no ha podido completar la extracción."; },
+};
+
 const readers: Record<string, ExtractionReader> = {
+  "mercedes-labours": mercedesReader,
   "renault-labours": renaultReader,
   "bmw-labours": bmwReader,
 };
@@ -126,4 +151,8 @@ export function mapBmwReaderStatus(state: BmwLabourState) {
 
 export function mapRenaultReaderStatus(state: RenaultState) {
   return renaultReader.mapStatus(state);
+}
+
+export function mapMercedesReaderStatus(state: MercedesLabourState) {
+  return mercedesReader.mapStatus(state);
 }

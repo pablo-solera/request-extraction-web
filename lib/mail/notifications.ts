@@ -72,6 +72,10 @@ export function notifyComparisonFailed(requestGroupId: string, comparisonId: str
   return deliver("comparison_failed", requestGroupId, comparisonId, supportDelivery("comparison_failed", requestGroupId, () => [error ? `Error: ${error}` : "Error desconocido"]));
 }
 
+export function notifyReportFailed(requestGroupId: string, reportRef: string, error: string | null) {
+  return deliver("report_failed", requestGroupId, reportRef, supportDelivery("report_failed", requestGroupId, () => [error ? `Error: ${error}` : "Error desconocido"]));
+}
+
 /** Once every typekey of an approved request has finished, tells support about the ones that failed. */
 export async function notifyExtractionFailures(requestGroupId: string) {
   if (!isMailEnabled()) return false;
@@ -108,6 +112,8 @@ export async function retryPendingNotifications() {
         ok = await notifyLoadFailed(row.requestGroupId, row.ref, request?.loadError ?? null);
       } else if (row.kind === "comparison_failed") {
         ok = await notifyComparisonFailed(row.requestGroupId, row.ref, (await getComparison(row.ref))?.errorMessage ?? null);
+      } else if (row.kind === "report_failed") {
+        ok = await notifyReportFailed(row.requestGroupId, row.ref, request?.reportError ?? null);
       } else if (row.kind === "extraction_failed") {
         ok = await notifyExtractionFailures(row.requestGroupId);
       } else await markNotificationSkipped(row.id);

@@ -172,3 +172,91 @@ export async function getComparison(id: string) {
   const [row] = await getDb().select().from(comparisonReports).where(eq(comparisonReports.id, id)).limit(1);
   return row ?? null;
 }
+
+/** Approved Mercedes-Benz requests whose models have all completed and whose report has not been requested yet. */
+export async function listRequestsReadyForReport(limit = 20, requestGroupId?: string) {
+  const requests = await getDb().select().from(extractionRequests).where(and(
+    eq(extractionRequests.status, "approved"),
+    eq(extractionRequests.manufacturerGroup, "Mercedes"),
+    isNull(extractionRequests.reportStatus),
+    requestGroupId ? eq(extractionRequests.requestGroupId, requestGroupId) : undefined,
+    sql`EXISTS (SELECT 1 FROM ${extractions} WHERE ${extractions.requestGroupId} = ${extractionRequests.requestGroupId})`,
+    sql`NOT EXISTS (SELECT 1 FROM ${extractions} WHERE ${extractions.requestGroupId} = ${extractionRequests.requestGroupId} AND ${extractions.status} <> 'completed')`,
+  )).orderBy(extractionRequests.createdAt).limit(limit);
+  if (requests.length === 0) return [];
+  const items = await getDb().select({ requestGroupId: extractions.requestGroupId, modelCode: extractions.modelCode, readerParams: extractions.readerParams, dataDate: extractions.dataDate })
+    .from(extractions).where(inArray(extractions.requestGroupId, requests.map((request) => request.requestGroupId))).orderBy(extractions.createdAt);
+  return requests.map((request) => ({ request, items: items.filter((item) => item.requestGroupId === request.requestGroupId) }));
+}
+
+/** Reserves the right to try sending a pending report, so concurrent viewers do not all start it. */
+export async function claimReportStart(requestGroupId: string, staleBefore: Date) {
+  const [request] = await getDb().update(extractionRequests).set({ reportPolledAt: new Date() }).where(and(
+    eq(extractionRequests.requestGroupId, requestGroupId),
+    isNull(extractionRequests.reportStatus),
+    or(isNull(extractionRequests.reportPolledAt), lte(extractionRequests.reportPolledAt, staleBefore)),
+  )).returning();
+  return request ?? null;
+}
+
+export async function markReportRequested(requestGroupId: string, remoteId: string) {
+  const [request] = await getDb().update(extractionRequests).set({
+    reportStatus: "queued", reportRemoteId: remoteId, reportError: null, reportRequestedAt: new Date(), reportCompletedAt: null, reportDownloadable: false, reportStartFailures: 0,
+    reportAttempts: sql`${extractionRequests.reportAttempts} + 1`,
+  }).where(and(eq(extractionRequests.requestGroupId, requestGroupId), isNull(extractionRequests.reportStatus))).returning();
+  return request ?? null;
+}
+
+/** Counts a failed attempt to reach the transformer for a request that has no report yet; returns the total so far. */
+export async function recordReportStartFailure(requestGroupId: string) {
+  const [request] = await getDb().update(extractionRequests).set({ reportStartFailures: sql`${extractionRequests.reportStartFailures} + 1` })
+    .where(and(eq(extractionRequests.requestGroupId, requestGroupId), isNull(extractionRequests.reportStatus))).returning({ failures: extractionRequests.reportStartFailures });
+  return request?.failures ?? 0;
+}
+
+export async function markReportFailedToStart(requestGroupId: string, message: string) {
+  const [request] = await getDb().update(extractionRequests).set({
+    reportStatus: "failed", reportError: message, reportAttempts: sql`${extractionRequests.reportAttempts} + 1`,
+  }).where(and(eq(extractionRequests.requestGroupId, requestGroupId), isNull(extractionRequests.reportStatus))).returning();
+  return request ?? null;
+}
+
+export async function listActiveReports(limit = 50) {
+  return getDb().select().from(extractionRequests)
+    .where(and(inArray(extractionRequests.reportStatus, ["queued", "running"]), sql`${extractionRequests.reportRemoteId} IS NOT NULL`))
+    .orderBy(extractionRequests.reportRequestedAt).limit(limit);
+}
+
+/** `downloadable` is whether the transformer holds the Excel: a report whose last step failed can still have it. */
+export async function updateReportState(requestGroupId: string, remoteId: string, update: { status: TransformerJobStatus; error?: string | null; downloadable: boolean }) {
+  const terminal = update.status === "completed" || update.status === "failed";
+  const [request] = await getDb().update(extractionRequests).set({
+    reportStatus: update.status,
+    reportError: update.status === "failed" ? update.error ?? "El informe ha fallado." : null,
+    reportDownloadable: update.downloadable,
+    reportCompletedAt: terminal ? new Date() : null,
+  }).where(and(
+    eq(extractionRequests.requestGroupId, requestGroupId),
+    eq(extractionRequests.reportRemoteId, remoteId),
+    inArray(extractionRequests.reportStatus, ["queued", "running"]),
+  )).returning();
+  return request ?? null;
+}
+
+/** Reserves the right to ask the transformer about a report, so concurrent viewers do not all query it. */
+export async function claimReportPoll(requestGroupId: string, staleBefore: Date) {
+  const [request] = await getDb().update(extractionRequests).set({ reportPolledAt: new Date() }).where(and(
+    eq(extractionRequests.requestGroupId, requestGroupId),
+    inArray(extractionRequests.reportStatus, ["queued", "running"]),
+    sql`${extractionRequests.reportRemoteId} IS NOT NULL`,
+    or(isNull(extractionRequests.reportPolledAt), lte(extractionRequests.reportPolledAt, staleBefore)),
+  )).returning();
+  return request ?? null;
+}
+
+/** Lets the technician ask for a failed report again; the next reconciliation (or the retry itself) sends it. */
+export async function resetFailedReport(requestGroupId: string) {
+  const [request] = await getDb().update(extractionRequests).set({ reportStatus: null, reportError: null, reportRemoteId: null, reportDownloadable: false, reportStartFailures: 0, reportPolledAt: null })
+    .where(and(eq(extractionRequests.requestGroupId, requestGroupId), eq(extractionRequests.reportStatus, "failed"))).returning();
+  return request ?? null;
+}
