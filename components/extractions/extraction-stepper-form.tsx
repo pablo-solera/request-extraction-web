@@ -22,6 +22,7 @@ const STEP_TITLES = ["Datos comunes", "Fabricante", "Modelos", "Resumen"] as con
 const BRAND_OPTIONS: Record<ManufacturerGroup, ManufacturerBrand[]> = {
   BMW: ["BMW", "MINI"],
   Renault: ["Renault", "Dacia"],
+  Mercedes: ["Mercedes-Benz"],
 };
 function isBrandInGroup(group: ManufacturerGroup | "", brand: ManufacturerBrand | ""): boolean {
   return group ? brand === "" || BRAND_OPTIONS[group].some((option) => option === brand) : brand === "";

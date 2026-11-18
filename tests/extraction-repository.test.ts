@@ -126,4 +126,40 @@ describe("insertExtractionsWithCapacity reader persistence", () => {
     expect(insertedRows[0]?.readerParams).not.toHaveProperty("developmentStart");
     expect(insertedRows[0]?.readerParams).not.toHaveProperty("publishedAfter");
   });
+
+  it("stores one Mercedes-Benz extraction per model with the series and a single UTC date for the whole request", async () => {
+    let insertedRows: Array<Record<string, unknown>> = [];
+    let requestValues: Record<string, unknown> = {};
+    const transaction = {
+      execute: vi.fn(),
+      select: () => ({ from: () => ({ where: async () => [{ active: 0 }] }) }),
+      insert: () => ({ values: (value: unknown) => {
+        if (Array.isArray(value)) {
+          insertedRows = value as Array<Record<string, unknown>>;
+          return { returning: async () => insertedRows };
+        }
+        requestValues = value as Record<string, unknown>;
+        return Promise.resolve(value);
+      } }),
+    };
+    database.transaction.mockImplementationOnce(async (callback: (tx: typeof transaction) => Promise<unknown>) => callback(transaction));
+    vi.useFakeTimers({ toFake: ["Date"] });
+    vi.setSystemTime(new Date("2026-11-18T23:59:59Z"));
+    try {
+      await insertExtractionsWithCapacity("user-1", {
+        axCode: "3F6", imcEdition: "04/0", completion: "2026-03-14", comments: "", laboursDevelopmentStart: "2026-03-01",
+        vehicles: [
+          { manufacturerGroup: "Mercedes", brand: "Mercedes-Benz", series: "GLB 248", modelCode: "248642", modelDescription: "248642 GLB 200" },
+          { manufacturerGroup: "Mercedes", brand: "Mercedes-Benz", series: "GLB 248", modelCode: "248644", modelDescription: "" },
+        ],
+      }, 50, { status: "approved", coordinatorId: null });
+    } finally {
+      vi.useRealTimers();
+    }
+
+    expect(requestValues).toMatchObject({ manufacturerGroup: "Mercedes", brand: "Mercedes-Benz", imcEdition: "04/0" });
+    expect(insertedRows).toHaveLength(2);
+    expect(insertedRows[0]).toMatchObject({ modelCode: "248642", modelDescription: "248642 GLB 200 · GLB 248", readerKey: "mercedes-labours", readerParams: { series: "GLB 248", date: "20261118" } });
+    expect(insertedRows[1]).toMatchObject({ modelCode: "248644", modelDescription: "GLB 248", readerParams: { series: "GLB 248", date: "20261118" } });
+  });
 });

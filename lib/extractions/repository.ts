@@ -30,6 +30,7 @@ export async function insertExtractionsWithCapacity(userId: string, input: Extra
   const renaultCoreCapabilities = usesRenault ? await getRenaultReaderCapabilities() : null;
   const renaultSettings = usesRenault && !renaultCoreCapabilities?.create ? getRenaultSettings() : null;
   const bmwLanguage = process.env.BMW_READER_LANGUAGE?.trim() || "en-GB";
+  const mercedesDate = new Date().toISOString().slice(0, 10).replace(/-/g, "");
   const requestGroupId = crypto.randomUUID();
 
   return getDb().transaction(async (transaction) => {
@@ -50,32 +51,34 @@ export async function insertExtractionsWithCapacity(userId: string, input: Extra
       manufacturerGroup: input.vehicles[0]!.manufacturerGroup,
       brand: input.vehicles[0]!.brand,
     };
-    const values = input.vehicles.map((vehicle) => {
-      const isBmw = vehicle.manufacturerGroup === "BMW";
-      const readerParams: Record<string, string> = isBmw ? {
-        series: vehicle.series,
-        developmentCode: vehicle.developmentCode,
-        typekey: vehicle.typekey,
-        language: bmwLanguage,
-      } : {
-        format: renaultSettings?.format ?? "",
-        language: renaultSettings?.language ?? "",
-        range: renaultSettings?.range ?? "",
-        family: vehicle.modelCode,
-      };
+    const values = input.vehicles.map((vehicle): typeof extractions.$inferInsert => {
+      const common = { userId, requestGroupId, domain: "labours" as const, readerParamsVersion: 1, status: "pending" as const };
+      if (vehicle.manufacturerGroup === "BMW") {
+        return {
+          ...common,
+          modelDescription: [vehicle.modelDescription, `${vehicle.series} / ${vehicle.developmentCode}`].filter(Boolean).join(" · "),
+          modelCode: vehicle.typekey,
+          readerKey: "bmw-labours",
+          readerParams: { series: vehicle.series, developmentCode: vehicle.developmentCode, typekey: vehicle.typekey, language: bmwLanguage },
+        };
+      }
+      if (vehicle.manufacturerGroup === "Mercedes") {
+        return {
+          ...common,
+          modelDescription: [vehicle.modelDescription, vehicle.series].filter(Boolean).join(" · "),
+          modelCode: vehicle.modelCode,
+          readerKey: "mercedes-labours",
+          // One day for the whole request, so every model lands in the folder the transformer will read.
+          readerParams: { series: vehicle.series, date: mercedesDate },
+        };
+      }
       return {
-      userId,
-      requestGroupId,
-      modelDescription: isBmw
-        ? [vehicle.modelDescription, `${vehicle.series} / ${vehicle.developmentCode}`].filter(Boolean).join(" · ")
-        : vehicle.modelDescription,
-      modelCode: isBmw ? vehicle.typekey : vehicle.modelCode,
-      domain: "labours" as const,
-      readerKey: isBmw ? "bmw-labours" : "renault-labours",
-      readerParamsVersion: 1,
-      readerParams,
-      status: "pending" as const,
-    };
+        ...common,
+        modelDescription: vehicle.modelDescription,
+        modelCode: vehicle.modelCode,
+        readerKey: "renault-labours",
+        readerParams: { format: renaultSettings?.format ?? "", language: renaultSettings?.language ?? "", range: renaultSettings?.range ?? "", family: vehicle.modelCode },
+      };
     });
 
     await transaction.insert(extractionRequests).values({ requestGroupId, requesterId: userId, coordinatorId: request.coordinatorId, status: request.status, ...shared });

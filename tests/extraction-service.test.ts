@@ -30,6 +30,7 @@ const reader = vi.hoisted(() => ({
   mapStatus: vi.fn((state: { status: string }): "pending" | "running" | "completed" | "failed" | "cancelled" => state.status === "completed" ? "completed" : state.status === "failed" ? "failed" : state.status === "cancelled" ? "cancelled" : "running"),
   failureMessage: vi.fn(() => "BMW no ha podido completar la extracción."),
 }));
+const mercedesReader = vi.hoisted(() => ({ getMercedesModels: vi.fn() }));
 const bmwReader = vi.hoisted(() => ({
   getBmwDevelopmentCodes: vi.fn(),
   getBmwTypekeys: vi.fn(),
@@ -39,6 +40,7 @@ const bmwReader = vi.hoisted(() => ({
 vi.mock("@/lib/extractions/repository", () => repository);
 vi.mock("@/lib/readers/registry", () => registry);
 vi.mock("@/lib/readers/bmw/client", () => bmwReader);
+vi.mock("@/lib/readers/mercedes/client", () => mercedesReader);
 vi.mock("@/lib/readers/renault/client", async () => ({ getRenaultLabourFamilies: bmwReader.getRenaultLabourFamilies }));
 const organization = vi.hoisted(() => ({ findCoordinatorUser: vi.fn(), findCoordinatorTeamUserIds: vi.fn(), isUserInCoordinatorTeam: vi.fn() }));
 vi.mock("@/lib/employees/org-service", () => organization);
@@ -436,5 +438,26 @@ describe("reader registry extraction flow", () => {
 
     await expect(createExtraction({ id: "user-1", oracleEmpId: null }, input, "admin")).rejects.toMatchObject({ code: "INVALID_BMW_SELECTION" });
     expect(repository.insertExtractionsWithCapacity).not.toHaveBeenCalled();
+  });
+
+  it("revalidates every Mercedes-Benz model against the series options before persisting", async () => {
+    mercedesReader.getMercedesModels.mockResolvedValue({ productGroups: [], models: [{ value: "248642", label: "248642", productGroup: null }, { value: "248644", label: "248644", productGroup: null }] });
+    const vehicle = { manufacturerGroup: "Mercedes" as const, brand: "Mercedes-Benz" as const, series: "GLB 248", modelCode: "248642", modelDescription: "" };
+    const input = { axCode: "3F6", imcEdition: "04/0", completion: "2026-10-20", comments: "", laboursDevelopmentStart: "2026-03-01", vehicles: [vehicle, { ...vehicle, modelCode: "248644" }] };
+    repository.insertExtractionsWithCapacity.mockResolvedValueOnce([{ requestGroupId: "g-mb" }]);
+
+    await expect(createExtraction({ id: "user-1", oracleEmpId: null }, input, "admin")).resolves.toMatchObject({ requestGroupId: "g-mb" });
+    expect(mercedesReader.getMercedesModels).toHaveBeenCalledWith("GLB 248");
+    expect(transformer.findTableConflict).not.toHaveBeenCalled();
+
+    repository.insertExtractionsWithCapacity.mockClear();
+    await expect(createExtraction({ id: "user-1", oracleEmpId: null }, { ...input, vehicles: [{ ...vehicle, modelCode: "999999" }] }, "admin")).rejects.toMatchObject({ code: "INVALID_MERCEDES_SELECTION", status: 400 });
+    expect(repository.insertExtractionsWithCapacity).not.toHaveBeenCalled();
+  });
+
+  it("lets Mercedes-Benz extractions be cancelled and resumed but not downloaded", () => {
+    const dto = extractionDto({ ...extraction, readerKey: "mercedes-labours", manufacturerGroup: "Mercedes", brand: "Mercedes-Benz", status: "running", remoteRequestId: "r1", readerStatus: "paused", submittedAt: new Date() } as never, "approved");
+    expect(dto).toMatchObject({ canCancel: true, canResume: true, downloadReady: false });
+    expect(extractionDto({ ...extraction, readerKey: "mercedes-labours", status: "completed", remoteRequestId: "r1" } as never, "approved").downloadReady).toBe(false);
   });
 });

@@ -71,4 +71,17 @@ describe("extractionFormSchema", () => {
       extractionFormSchema.safeParse({ ...validInput, laboursDevelopmentStart: "2026-02-29" }).success,
     ).toBe(false);
   });
+
+  it("validates Mercedes-Benz vehicles: one series per request, no repeated model and the fixed brand", () => {
+    const vehicle = { manufacturerGroup: "Mercedes" as const, brand: "Mercedes-Benz" as const, series: "S-Class 223", modelCode: "223159", modelDescription: "223159 S 500" };
+    const input = { ...validInput, vehicles: [vehicle, { ...vehicle, modelCode: "223161" }] };
+    expect(extractionFormSchema.safeParse(input).success).toBe(true);
+    expect(extractionFormSchema.safeParse({ ...input, vehicles: [vehicle, { ...vehicle, series: "GLB 248", modelCode: "248642" }] }).success).toBe(false);
+    const repeated = extractionFormSchema.safeParse({ ...input, vehicles: [vehicle, vehicle] });
+    expect(repeated.success).toBe(false);
+    if (!repeated.success) expect(repeated.error.issues[0]?.message).toBe("No repitas el mismo modelo en esta solicitud.");
+    expect(extractionFormSchema.safeParse({ ...input, vehicles: [{ ...vehicle, brand: "Smart" }] }).success).toBe(false);
+    expect(extractionFormSchema.safeParse({ ...input, vehicles: [{ ...vehicle, series: "" }] }).success).toBe(false);
+    expect(extractionFormSchema.safeParse({ ...input, vehicles: [vehicle, { manufacturerGroup: "Renault", brand: "Renault", modelDescription: "Clio", modelCode: "X98" }] }).success).toBe(false);
+  });
 });
