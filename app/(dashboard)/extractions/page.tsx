@@ -26,6 +26,17 @@ function seedFromExtractions(extractions: Extraction[]): ExtractionFormSeed | un
     if (vehicles.length === 0) return undefined;
     return { group: "BMW", values: { ...baseValues, laboursDevelopmentStart: first.developmentStart ?? first.readerParams.developmentStart ?? "" }, vehicles };
   }
+  if (first.manufacturerGroup === "Mercedes" && brand === "Mercedes-Benz") {
+    const vehicles = extractions.flatMap((extraction) => {
+      const series = extraction.readerParams.series;
+      if (!series) return [];
+      const suffix = ` · ${series}`;
+      const modelDescription = extraction.modelDescription === series ? "" : extraction.modelDescription.endsWith(suffix) ? extraction.modelDescription.slice(0, -suffix.length) : extraction.modelDescription;
+      return [{ manufacturerGroup: "Mercedes" as const, brand: "Mercedes-Benz" as const, series, modelCode: extraction.modelCode, modelDescription }];
+    });
+    if (vehicles.length === 0) return undefined;
+    return { group: "Mercedes", values: { ...baseValues, laboursDevelopmentStart: first.developmentStart ?? "" }, vehicles };
+  }
   if (first.manufacturerGroup === "Renault" && (brand === "Renault" || brand === "Dacia")) {
     const renaultBrand: "Renault" | "Dacia" = brand;
     return {
