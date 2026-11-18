@@ -3,7 +3,7 @@ import type { ExtractionRequestStatus, ExtractionStatus } from "@/db/schema";
 export type RequestSummaryItem = { status: ExtractionStatus; progress: number | null };
 export type RequestAggregateStatus = "pending_approval" | "rejected" | "running" | "completed" | "completed_with_issues" | "failed" | "cancelled";
 
-export const requestAggregateLabels: Record<RequestAggregateStatus, string> = {
+const requestAggregateLabels: Record<RequestAggregateStatus, string> = {
   pending_approval: "Pendiente de aprobación",
   rejected: "Rechazada",
   running: "En proceso",

@@ -1,8 +1,5 @@
 import { z } from "zod";
 
-/** Statuses of the shared transformer contract. A status outside this list is tolerated and treated as "running". */
-export const transformerStatuses = ["queued", "running", "rate_limited", "paused", "cancelling", "cancelled", "completed", "failed"] as const;
-
 const errorSchema = z.union([
   z.object({ code: z.string().optional(), message: z.string() }),
   z.string().transform((message) => ({ code: undefined, message })),
@@ -29,7 +26,7 @@ export type TransformerState = z.infer<typeof transformerStateSchema>;
 
 export type TransformerResource = "loads" | "reports";
 
-export type TransformerTypekey = { typekey: string; series: string; family: string; /** Day (YYYYMMDD) the reader stored that typekey under, so the load uses exactly the data of this request. */ date?: string };
+type TransformerTypekey = { typekey: string; series: string; family: string; /** Day (YYYYMMDD) the reader stored that typekey under, so the load uses exactly the data of this request. */ date?: string };
 
 export type TransformerLoadInput = {
   axCode: string;

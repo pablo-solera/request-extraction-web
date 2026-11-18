@@ -9,7 +9,7 @@ export type TransformerComparisonInfo = {
   downloadReady: boolean;
 };
 
-export type TransformerReportInfo = {
+type TransformerReportInfo = {
   status: TransformerJobStatus | null;
   /** Times the report was sent to the transformer; above zero while the status is empty means it is being retried. */
   attempts: number;

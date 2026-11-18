@@ -27,7 +27,7 @@ export const mercedesLabourActionResponseSchema = z.object({ requestId: z.uuid()
 
 export type MercedesLabourState = z.infer<typeof mercedesLabourStateSchema>;
 export type MercedesOption = { value: string; label: string };
-export type MercedesModelOption = MercedesOption & { productGroup: string | null };
+type MercedesModelOption = MercedesOption & { productGroup: string | null };
 export type MercedesModelOptions = { productGroups: MercedesOption[]; models: MercedesModelOption[] };
 
 function filterValues(parsed: z.infer<typeof modelOptionsSchema>, name: string): MercedesOption[] {

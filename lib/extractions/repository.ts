@@ -88,7 +88,7 @@ export async function insertExtractionsWithCapacity(userId: string, input: Extra
 }
 
 /** A submission claimed longer ago than this was left behind by a crash between claiming and recording the reader job. */
-export const STALE_SUBMISSION_MS = 5 * 60 * 1000;
+const STALE_SUBMISSION_MS = 5 * 60 * 1000;
 const unclaimedSubmission = () => or(isNull(extractions.submittedAt), lte(extractions.submittedAt, new Date(Date.now() - STALE_SUBMISSION_MS)));
 
 export async function claimExtractionSubmission(id: string) {
@@ -254,7 +254,7 @@ export async function listOwnedExtractions(userId: string, ids: string[]) {
     .where(and(eq(extractions.userId, userId), inArray(extractions.id, uniqueIds)));
 }
 
-export async function listAllExtractions() {
+async function listAllExtractions() {
   return getDb().select({
     extraction: extractionColumns,
     requestStatus: extractionRequests.status,
@@ -265,7 +265,7 @@ export async function listAllExtractions() {
     .orderBy(desc(extractions.createdAt));
 }
 
-export async function listExtractionsForUsers(userIds: string[]) {
+async function listExtractionsForUsers(userIds: string[]) {
   if (userIds.length === 0) return [];
   return getDb().select({
     extraction: extractionColumns,

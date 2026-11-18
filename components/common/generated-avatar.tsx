@@ -3,7 +3,7 @@ type GeneratedAvatarProps = {
   className?: string;
 };
 
-export function getUserInitials(name: string) {
+function getUserInitials(name: string) {
   const initials = name
     .split(" ")
     .filter(Boolean)
