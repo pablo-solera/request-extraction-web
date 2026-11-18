@@ -43,6 +43,7 @@ Variables principales:
 | `RENAULT_READER_DOWNLOAD_ORIGIN` | Origen HTTPS S3 permitido para redirecciones de descarga. |
 | `BMW_READER_BASE_URL` | URL interna de BMW Reader (`http://bmw-reader-api:3004` en Docker). Misma regla de HTTP que `RENAULT_READER_BASE_URL`. |
 | `BMW_READER_LANGUAGE` | Idioma de series y etiquetas BMW/MINI; por defecto `en-GB`. |
+| `MERCEDES_READER_BASE_URL` | URL interna de `mercedes-reader` (`http://mercedes-reader-api:3005` en Docker; misma regla de HTTP). Sin ella no se pueden solicitar extracciones Mercedes-Benz. |
 | `MERCEDES_TRANSFORMER_BASE_URL` | URL de `mercedes-transformer` (solo informes). De momento solo aparece en la página de infraestructura y está registrado en `lib/transformer/registry.ts`. |
 | `BMW_TRANSFORMER_BASE_URL` | URL de `bmw-transformer` (`http://bmw-transformer-api:3005` en Docker; misma regla de HTTP). Sin ella no se cargan datos ni se comparan `.LST`. |
 | `MAIL_ENABLED` | `true` para enviar correos; por defecto no se envía ninguno. |
