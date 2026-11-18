@@ -4,9 +4,9 @@ import { and, asc, eq, inArray, lt, or, sql } from "drizzle-orm";
 import { getDb } from "@/db";
 import { mailNotifications } from "@/db/schema";
 
-export const MAX_MAIL_ATTEMPTS = 3;
+const MAX_MAIL_ATTEMPTS = 3;
 /** A notification still marked as sending after this long was left behind by a crash, so it may be sent again. */
-export const STALE_SENDING_MS = 10 * 60 * 1000;
+const STALE_SENDING_MS = 10 * 60 * 1000;
 
 const retryable = (staleBefore: Date) => and(
   lt(mailNotifications.attempts, MAX_MAIL_ATTEMPTS),

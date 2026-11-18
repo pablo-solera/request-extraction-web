@@ -8,7 +8,7 @@ import { ChevronRightIcon } from "@/components/icons/chevron-right-icon";
 import { useDebouncedValue } from "@/lib/hooks/use-debounced-value";
 import { SyncUsersButton } from "./sync-users-button";
 
-export type UserCoordinatorOption = { email: string; id: string; name: string };
+type UserCoordinatorOption = { email: string; id: string; name: string };
 export type ManagedUser = { coordinator: UserCoordinatorOption | null; email: string; id: string; name: string; role: "admin" | "coordinator" | "employee"; wdNumber: string | null };
 type UsersTableProps = { currentUserId: string; page: number; query: string; totalPages: number; totalUsers: number; users: ManagedUser[] };
 

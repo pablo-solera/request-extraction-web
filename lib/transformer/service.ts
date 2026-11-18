@@ -17,7 +17,7 @@ import { notifyComparisonFailed, notifyLoadCompleted, notifyLoadFailed, notifyRe
 
 type Actor = { id: string; oracleEmpId: number | null; role: UserRole };
 
-export function isTransformerConfigured(key: TransformerKey = "bmw") {
+function isTransformerConfigured(key: TransformerKey = "bmw") {
   return Boolean(process.env[transformerDefinitions[key].envVar]?.trim());
 }
 
@@ -34,7 +34,7 @@ function mapStatus(state: TransformerState): TransformerJobStatus {
 
 const failureMessage = (state: TransformerState, fallback: string) => (state.status === "cancelled" ? "La operación ha sido cancelada." : state.error?.message.slice(0, 500)) || fallback;
 
-export const TRANSFORMER_START_INTERVAL_MS = 30_000;
+const TRANSFORMER_START_INTERVAL_MS = 30_000;
 const MAX_LOAD_START_FAILURES = 5;
 
 type ReadyRequest = Awaited<ReturnType<typeof listRequestsReadyForLoad>>[number];
@@ -240,7 +240,7 @@ async function pollComparisons(client: TransformerClient) {
   return updated;
 }
 
-export const TRANSFORMER_POLL_INTERVAL_MS = 5_000;
+const TRANSFORMER_POLL_INTERVAL_MS = 5_000;
 
 /**
  * Asks the transformer about the loads and comparisons of the given requests that are still running, so a technician

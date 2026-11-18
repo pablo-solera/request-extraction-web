@@ -3,7 +3,6 @@ import "server-only";
 import { findEmployeesByIds, type OracleEmployee } from "@/lib/employees/employee-repository";
 import { findTestAccountByEmpId } from "@/lib/employees/test-accounts";
 export type UserIdentityInput = { id: string; oracleEmpId: number | null; fallbackName: string | null; fallbackEmail: string | null };
-export type ResolvedIdentity = { name: string; email: string | null; wdNumber: string | null };
 
 const IDENTITY_TTL_MS = 60_000;
 type CachedIdentity = { expiresAt: number; value: OracleEmployee | null };

@@ -60,7 +60,7 @@ function buildSnapshot(rows: Awaited<ReturnType<typeof findOrganizationRows>>): 
   };
 }
 
-export async function getOrganizationSnapshot() {
+async function getOrganizationSnapshot() {
   const now = Date.now();
   if (state.snapshot && now - state.loadedAt < getTtlMs()) return state.snapshot;
   if (state.snapshot) {

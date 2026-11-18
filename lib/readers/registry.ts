@@ -11,10 +11,10 @@ import type { RenaultState } from "@/lib/readers/renault/types";
 
 const RUNNING_RENAULT_STATES = new Set(["authenticating", "discovering", "validating", "checking_remote", "submitted", "waiting", "downloading", "uploading", "running", "rate_limited", "rate-limited", "paused", "cancelling"]);
 
-export type ReaderSubmissionContext = Awaited<ReturnType<typeof getRenaultLabourOptions>> | undefined;
+type ReaderSubmissionContext = Awaited<ReturnType<typeof getRenaultLabourOptions>> | undefined;
 export type ExtractionReaderCapabilities = { cancel: boolean; resume: boolean; download: boolean };
 
-export type ExtractionReader = {
+type ExtractionReader = {
   prepareSubmission(): Promise<ReaderSubmissionContext>;
   create(extraction: Extraction, context?: ReaderSubmissionContext): Promise<{ requestId: string; status?: string }>;
   getState(requestId: string): Promise<{ status: string; stage?: string; progress?: number | null; readerStalled?: boolean; details?: unknown; dataDate?: string | null; error?: { message: string } | null }>;
