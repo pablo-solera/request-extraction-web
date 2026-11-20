@@ -159,9 +159,12 @@ Contexto ya creado: `PRODUCT.md`, `DESIGN.md` y `.impeccable/design.json` (coman
 - [x] **4.9 `extract`** (M) — hacerlo junto con 4.1 y 4.5
   - Sacar a tokens y componentes compartidos lo repetido. Actualizar `DESIGN.md` y `.impeccable/design.json` con los valores finales.
   - Commit: `docs(design): refresh DESIGN.md after extracting tokens and components`
-- [ ] **4.10 `critique`** (S) — sobre historial, formulario por pasos, aprobaciones y login
+- [x] **4.10 `critique`** (S) — sobre historial, formulario por pasos, aprobaciones y login
   - Puntuación heurística antes y después de 4.2 a 4.8. Anotar en esta lista los hallazgos nuevos que no se arreglen en el momento.
   - Sin commit si solo analiza.
+  - Hecho (2026-11-20, ejecución inline por no haber herramienta de subagentes; sin navegador porque solo `/login` es visitable; el detector se ejecuta una vez en 4.15). Puntuación **28/40 (Bueno)**; antes de 4.2 a 4.8 ≈ **21/40** (estimación retrospectiva a partir del historial de git: `window.confirm`, errores sin asociar, menú con listeners manuales). Detalle: visibilidad 3, lenguaje 3, control 3, consistencia 3, prevención de errores 3, reconocimiento 3, flexibilidad 2, minimalismo 3, recuperación 3, ayuda 2.
+  - Hallazgos que se arreglan en 4.12 a 4.14 y 5.6: **[P1]** el formulario por pasos y los paneles de BMW/Mercedes siguen con paleta cruda (`zinc/sky/red/amber`, `text-sm/xs/lg`) en vez de tokens; el azul se usa como relleno (paso activo, grupo y fabricante elegidos), contra la Quiet Accent Rule. **[P1]** la jerarquía de títulos no sigue la escala (`h1` en `text-3xl`, `h2` en `text-lg/xl`, tarjeta de resumen en `text-2xl`). **[P2]** aprobaciones: los modelos se muestran como una cadena separada por comas, ilegible con decenas de typekeys. **[P2]** alertas y avisos repetidos con clases en línea (5.6). **[P2]** el estado vacío del login/errores usa colores crudos.
+  - Hallazgos que **no** se arreglan ahora: **[P2]** el solicitante solo se ve al expandir una solicitud; coordinadores y administradores querrían verlo en la fila compacta. **[P2]** el filtro por estado actúa solo sobre las solicitudes cargadas (limitación conocida de 2.3). **[P3]** flexibilidad: sin atajos de teclado ni acciones masivas entre solicitudes. **[P3]** ayuda: no hay ayuda contextual más allá de los textos junto al campo; términos como «Completion» o «reader» sin glosario.
 - [ ] **4.11 `audit`** (S) — `components/` y `app/`
   - Accesibilidad, rendimiento y consistencia. Corregir lo bloqueante y anotar el resto.
   - Commit (si corrige): `fix(a11y): address impeccable audit findings`
