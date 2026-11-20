@@ -222,11 +222,11 @@ describe("request accordion", () => {
     expect(screen.getByRole("button", { name: /^AX-100/ })).toHaveAttribute("aria-expanded", "true");
   });
 
-  it("pulses the progress bars only while work is in progress", () => {
+  it("does not animate the progress bars with a pulse", () => {
     vi.stubGlobal("fetch", vi.fn().mockResolvedValue(Response.json([])));
     const { unmount } = render(<ExtractionHistory initialItems={[item({ requestGroupId: group, status: "running", progress: 40 })]} />);
     openAll();
-    for (const bar of screen.getAllByRole("progressbar")) expect(bar.firstElementChild).toHaveClass("motion-safe:animate-pulse");
+    for (const bar of screen.getAllByRole("progressbar")) expect(bar.firstElementChild).not.toHaveClass("motion-safe:animate-pulse");
     unmount();
 
     render(<ExtractionHistory initialItems={[item({ requestGroupId: group, status: "completed", progress: 100, readerStatus: "completed" })]} />);

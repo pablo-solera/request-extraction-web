@@ -471,7 +471,7 @@ export function ExtractionStepperForm({
 
   const summaryTitle = group === "BMW" ? `Tiempos ${brand}` : `Tiempos ${brand}`;
 
-  return <form action={action} className="overflow-hidden rounded-2xl border border-zinc-200 bg-white shadow-sm">
+  return <form action={action} className="overflow-hidden rounded-xl border border-zinc-200 bg-white">
 
     <div className="border-b border-zinc-200 px-5 py-4 sm:px-7">
       <nav aria-label="Progreso de la solicitud">

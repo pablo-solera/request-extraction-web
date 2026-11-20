@@ -8,9 +8,8 @@ export default async function LoginPage() {
   }
 
   return (
-    <main className="relative flex min-h-screen items-center justify-center overflow-hidden bg-zinc-100 px-5 py-12" id="main-content" tabIndex={-1}>
-      <div className="absolute inset-x-0 top-0 h-56 bg-zinc-950" />
-      <section className="relative w-full max-w-md rounded-2xl border border-zinc-200 bg-white p-8 shadow-xl shadow-zinc-950/10">
+    <main className="flex min-h-screen items-center justify-center bg-canvas px-5 py-12" id="main-content" tabIndex={-1}>
+      <section className="w-full max-w-md rounded-xl border border-line-soft bg-surface p-8">
         <div className="mb-8">
           <div aria-hidden="true" className="mb-5 flex h-11 w-11 items-center justify-center rounded-xl bg-zinc-950 text-sm font-bold text-white" translate="no">
             EX

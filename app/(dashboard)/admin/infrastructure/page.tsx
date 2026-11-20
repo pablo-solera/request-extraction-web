@@ -41,7 +41,7 @@ function summarize(manufacturer: ManufacturerInfrastructure) {
 function ManufacturerCard({ manufacturer }: { manufacturer: ManufacturerInfrastructure }) {
   const summary = summarize(manufacturer);
 
-  return <article aria-labelledby={`infrastructure-${manufacturer.key}`} className="rounded-2xl border border-zinc-200 bg-white p-6 shadow-sm"><div className="flex flex-wrap items-center justify-between gap-3"><h2 className="text-lg font-semibold text-zinc-950" id={`infrastructure-${manufacturer.key}`}>{manufacturer.name}</h2><Badge tone={summary.tone}>{summary.label}</Badge></div><div className="mt-5 grid gap-4 lg:grid-cols-2"><ServicePanel service={manufacturer.reader} /><ServicePanel service={manufacturer.transformer} /></div></article>;
+  return <article aria-labelledby={`infrastructure-${manufacturer.key}`} className="rounded-xl border border-zinc-200 bg-white p-6"><div className="flex flex-wrap items-center justify-between gap-3"><h2 className="text-lg font-semibold text-zinc-950" id={`infrastructure-${manufacturer.key}`}>{manufacturer.name}</h2><Badge tone={summary.tone}>{summary.label}</Badge></div><div className="mt-5 grid gap-4 lg:grid-cols-2"><ServicePanel service={manufacturer.reader} /><ServicePanel service={manufacturer.transformer} /></div></article>;
 }
 
 export default async function InfrastructurePage() {

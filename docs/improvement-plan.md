@@ -132,7 +132,7 @@ Rama: `feature/ui-refresh`. Orden: tokens (4.1) antes de componentes (4.5) y de 
 - [x] **4.5 Componentes `Badge` y `Button` compartidos** (M)
   - Eliminar las clases repetidas y los estilos de estado duplicados (`extraction-history.tsx:14-17`, `transformer-panel.tsx:10-13`, `infrastructure/page.tsx:19-22`, `users-table.tsx:16`). Icono además del color. Estilo propio para "completada con incidencias".
   - Commit: `refactor(ui): extract shared Badge and Button components`
-- [ ] **4.6 Retoques visuales de minimalist-ui** (S)
+- [x] **4.6 Retoques visuales de minimalist-ui** (S)
   - Quitar `shadow-sm/lg/xl`, bajar `rounded-2xl` a `rounded-xl`/`rounded-lg`, simplificar la franja oscura y la tarjeta del login. Quitar `animate-pulse` de las barras de progreso. Fondo cálido y bordes finos vía tokens.
   - Commit: `style(ui): flatten shadows and reduce corner radii`
 - [ ] **4.7 Accesibilidad del formulario por pasos** (S–M) — `extraction-stepper-form.tsx:494-497,149-150`
