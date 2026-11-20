@@ -68,7 +68,7 @@ Rama: `feature/database-hardening`. Probar cada migración en un clon antes de p
   - Un único camino con `drizzle-kit migrate`. Resolver la ausencia de snapshots en `meta/` (verificarla antes de actuar). `psql` con `--single-transaction` si se mantiene `docker:setup-db`. No generar nunca una migración con `when` menor que la última aplicada.
   - Hecho: `meta/` solo tiene `_journal.json` (verificado), así que `db:generate` queda desactivado (`scripts/db-generate-disabled.mjs`) y las migraciones se escriben a mano; `docker:setup-db` ahora es `drizzle-kit migrate` y se elimina `scripts/apply-migrations.ts`. `scripts/migrations.ts` se mantiene para `run-integration-tests.ts` (base temporal).
   - Commit: `build(db): unify migrations on drizzle-kit migrate`
-- [ ] **2.5 Timeouts del pool** (S) — `db/index.ts:34-47`
+- [x] **2.5 Timeouts del pool** (S) — `db/index.ts:34-47`
   - `statement_timeout` e `idle_in_transaction_session_timeout` en `connection`.
   - Commit: `fix(db): set statement and idle-in-transaction timeouts`
 - [ ] **2.6 Advisory lock de 64 bits** (S) — `lib/extractions/repository.ts:37`

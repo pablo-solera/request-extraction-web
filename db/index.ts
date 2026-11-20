@@ -36,6 +36,7 @@ export function getDb() {
       idle_timeout: 20,
       max_lifetime: 60 * 30,
       connect_timeout: 10,
+      connection: { statement_timeout: 30_000, idle_in_transaction_session_timeout: 60_000 },
       prepare: false,
       ssl: isLoopback || isComposePostgres
         ? false
