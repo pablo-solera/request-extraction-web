@@ -80,7 +80,7 @@ Rama: `feature/database-hardening`. Probar cada migración en un clon antes de p
 - [x] **2.8 Índices redundantes** (S) — `db/schema.ts`
   - `extractions_group_idx` pasa a `(request_group_id, created_at)`. Crear el nuevo antes de eliminar el antiguo.
   - Commit: `perf(db): replace redundant extraction indexes`
-- [ ] **2.9 Rol de aplicación sin permisos DDL** (M)
+- [x] **2.9 Rol de aplicación sin permisos DDL** (M)
   - Rol de migración y rol de aplicación con `SELECT/INSERT/UPDATE`. Actualizar `docker-compose.yml`, `.env.example` y `README.md`.
   - Commit: `feat(db): separate migration and application database roles`
 - [x] **2.10 Ajustes menores de base de datos** (S)

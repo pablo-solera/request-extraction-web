@@ -31,6 +31,8 @@ Variables principales:
 | Variable | Descripción |
 | --- | --- |
 | `DATABASE_URL` | Conexión PostgreSQL de la aplicación. |
+| `DATABASE_MIGRATION_URL` | Opcional. Conexión con permisos DDL (rol propietario) usada solo por `db:migrate`/`db:deploy`. Si falta, se usa `DATABASE_URL`. |
+| `POSTGRES_APP_USER`, `POSTGRES_APP_PASSWORD` | Opcionales, solo Docker Compose: credenciales del rol de aplicación para el contenedor `web`. Si faltan, usa `POSTGRES_USER`. |
 | `SESSION_SECRET` | Secreto aleatorio de al menos 32 caracteres. |
 | `INTEGRATION_LDAP_URL` | Endpoint obligatorio `ldap://`, normalmente Global Catalog en el puerto 3268. |
 | `INTEGRATION_LDAP_ACCESSACCOUNT_UPN` | UPN de la cuenta de servicio usada para buscar usuarios. |
@@ -83,6 +85,19 @@ npm run db:migrate
 ```
 
 El servicio solo publica PostgreSQL en `127.0.0.1:5432` y guarda los datos en el volumen `postgres_data`. Puedes personalizar `POSTGRES_DB`, `POSTGRES_USER` y `POSTGRES_PASSWORD` mediante `.env`.
+
+### Roles de base de datos (opcional)
+
+Por defecto una sola URL sirve para todo. Para que la aplicación no pueda alterar el esquema, separa dos roles:
+
+1. Rol propietario (el de `POSTGRES_USER`): crea las tablas y aplica las migraciones. Se usa en `DATABASE_MIGRATION_URL`.
+2. Rol de aplicación `request_extraction_app`: solo `SELECT`, `INSERT` y `UPDATE` (la aplicación no borra filas). Se crea tras migrar con el propietario:
+
+```bash
+psql "$DATABASE_MIGRATION_URL" -v ON_ERROR_STOP=1 -v app_password='...' -f db/roles/application-role.sql
+```
+
+Después apunta `DATABASE_URL` al rol de aplicación (en Compose: `POSTGRES_APP_USER=request_extraction_app` y `POSTGRES_APP_PASSWORD`) y deja `DATABASE_MIGRATION_URL` para `db:migrate` y `db:deploy`. El script es idempotente y fija privilegios por defecto para las tablas que cree el propietario en el futuro. Probarlo en un clon antes de producción.
 
 ### Despliegue: migraciones y cuentas de prueba
 
