@@ -28,7 +28,8 @@ export function proxy(request: NextRequest) {
     "font-src 'self'",
     "object-src 'none'",
     `script-src 'self' 'nonce-${nonce}' 'strict-dynamic'${isDevelopment ? " 'unsafe-eval'" : ""}`,
-    `style-src 'self' 'nonce-${nonce}'${isDevelopment ? " 'unsafe-inline'" : ""}`,
+    // A nonce makes browsers ignore 'unsafe-inline', which would block the Next dev overlay styles.
+    isDevelopment ? "style-src 'self' 'unsafe-inline'" : `style-src 'self' 'nonce-${nonce}'`,
     ...(isDevelopment ? [] : ["upgrade-insecure-requests"]),
   ].join("; ");
 
