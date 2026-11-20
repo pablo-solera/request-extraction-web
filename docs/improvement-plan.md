@@ -101,8 +101,9 @@ Rama: `feature/performance`. Consultar `node_modules/next/dist/docs/` antes de t
 - [x] **3.3 `matcher` en `proxy.ts`** (S)
   - Excluir estáticos y prefetch, según `content-security-policy.md` de la documentación de Next.
   - Commit: `perf(proxy): restrict proxy matcher to page requests`
-- [ ] **3.4 Carga diferida en el formulario por pasos** (M) — `components/extractions/extraction-stepper-form.tsx`
+- [x] **3.4 Carga diferida en el formulario por pasos** (M) — `components/extractions/extraction-stepper-form.tsx`
   - `next/dynamic` para los selectores por fabricante y `BmwSwapReview`. Medir el bundle antes y después; decidir si `zod` debe quedarse en el cliente.
+  - Resultado: `next build --webpack` (Turbopack no resuelve el `node_modules` enlazado en el worktree): JS total 1.130.081 B → 1.134.371 B (el reparto en chunks añade sobrecarga; BmwSwapReview y MercedesModelSelector salen del chunk de la página). `zod` se queda en el cliente (sin medir).
   - Commit: `perf(extractions): lazy-load manufacturer selectors in the stepper form`
 - [ ] **3.5 Agrupar con `Map` en el historial** (S) — `extraction-history.tsx:260-265`
   - Sustituir el `groups.find` dentro del bucle (O(n·g)) por un `Map`.
