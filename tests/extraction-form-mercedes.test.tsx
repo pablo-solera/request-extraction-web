@@ -27,7 +27,6 @@ function readerFetch() {
 beforeEach(() => {
   cleanup();
   localStorage.clear();
-  vi.stubGlobal("confirm", vi.fn(() => true));
 });
 
 afterEach(() => {

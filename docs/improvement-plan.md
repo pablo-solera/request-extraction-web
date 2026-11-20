@@ -120,7 +120,7 @@ Rama: `feature/ui-refresh`. Orden: tokens (4.1) antes de componentes (4.5) y de 
 - [x] **4.1 Tokens de diseño** (M) — `app/globals.css`
   - En `@theme`: colores de estado (pares pastel), bordes, fondo, texto secundario con contraste AA y escala tipográfica con nombre. Un solo estilo de foco (hoy hay dos y una regla duplicada en `globals.css:23-26` y `:59-64`).
   - Commit: `feat(ui): define design tokens for color, type and focus`
-- [ ] **4.2 `ConfirmDialog` con `<dialog>`** (M)
+- [x] **4.2 `ConfirmDialog` con `<dialog>`** (M)
   - Sustituir los 4 `window.confirm` (`extraction-history.tsx:73,131`, `extraction-stepper-form.tsx:311,323`) con consecuencias explícitas en el texto.
   - Commit: `feat(ui): replace window.confirm with a native dialog component`
 - [ ] **4.3 Historial con filas compactas, búsqueda y filtro por estado** (M) — `extraction-history.tsx:283-310`

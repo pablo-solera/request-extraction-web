@@ -76,7 +76,6 @@ describe("BMW extraction progress in history", () => {
 
   it("offers per-extraction actions in the accessible options menu and reports the result", async () => {
     const user = (await import("@testing-library/user-event")).default.setup();
-    vi.stubGlobal("confirm", vi.fn(() => true));
     extractionAction.mockResolvedValueOnce({ ok: true, status: "cancelled", readerStatus: "cancelled" });
     render(<ExtractionHistory initialItems={[item({ canCancel: true, canResume: true, progress: null })]} />);
     openAll();
@@ -84,10 +83,28 @@ describe("BMW extraction progress in history", () => {
     await user.click(screen.getAllByRole("button", { name: "Opciones para AX-100, X5 · G05, 41HZ" })[0]!);
     expect(screen.getByRole("button", { name: "Reanudar extracción" })).toBeInTheDocument();
     await user.click(screen.getByRole("button", { name: "Cancelar extracción" }));
+    const dialog = screen.getByRole("dialog", { name: "¿Cancelar la extracción?" });
+    expect(dialog).toHaveTextContent("tendrás que volver a solicitarla");
+    expect(extractionAction).not.toHaveBeenCalled();
+    await user.click(within(dialog).getByRole("button", { name: "Cancelar extracción" }));
 
     expect(extractionAction).toHaveBeenCalledWith({ id: expect.any(String), action: "cancel", force: false });
     expect(await screen.findByText("Extracción cancelada.")).toBeInTheDocument();
     expect(screen.getAllByText("Cancelada")).toHaveLength(2);
+  });
+
+  it("does not cancel when the user keeps the extraction in the dialog", async () => {
+    const user = (await import("@testing-library/user-event")).default.setup();
+    extractionAction.mockClear();
+    render(<ExtractionHistory initialItems={[item({ canCancel: true, progress: null })]} />);
+    openAll();
+
+    await user.click(screen.getAllByRole("button", { name: "Opciones para AX-100, X5 · G05, 41HZ" })[0]!);
+    await user.click(screen.getByRole("button", { name: "Cancelar extracción" }));
+    await user.click(within(screen.getByRole("dialog")).getByRole("button", { name: "Mantener" }));
+
+    expect(screen.queryByRole("dialog")).not.toBeInTheDocument();
+    expect(extractionAction).not.toHaveBeenCalled();
   });
 
   it("loads authorized per-typekey reader details", async () => {
@@ -174,7 +191,6 @@ describe("grouped request history", () => {
   it("cancels only the active items of the request after confirmation", async () => {
     const user = (await import("@testing-library/user-event")).default.setup();
     vi.stubGlobal("fetch", vi.fn().mockResolvedValue(Response.json([])));
-    vi.stubGlobal("confirm", vi.fn(() => true));
     extractionAction.mockResolvedValue({ ok: true, status: "cancelled", readerStatus: "cancelled" });
     render(<ExtractionHistory initialItems={[
       item({ id: "x", requestGroupId: group, status: "running", canCancel: true }),
@@ -184,6 +200,7 @@ describe("grouped request history", () => {
     openAll();
 
     await user.click(screen.getByRole("button", { name: "Cancelar solicitud" }));
+    await user.click(within(screen.getByRole("dialog", { name: "¿Cancelar la solicitud?" })).getByRole("button", { name: "Cancelar solicitud" }));
 
     expect(extractionAction.mock.calls.map(([call]) => call.id)).toEqual(["x", "z"]);
     expect(await screen.findByText("2 extracciones canceladas.")).toBeInTheDocument();

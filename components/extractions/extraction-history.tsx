@@ -10,6 +10,7 @@ import { formatSpanishDate, formatSpanishDateTime } from "@/lib/date-format";
 import { retryableItems, summarizeRequest, type RequestAggregateStatus } from "@/lib/extractions/request-summary";
 import { Badge, type BadgeTone } from "@/components/ui/badge";
 import { buttonStyles } from "@/components/ui/button";
+import { useConfirm, type Confirm } from "@/components/ui/confirm-dialog";
 import { extractionAction, extractionDetail } from "@/app/(dashboard)/history/actions";
 
 const statusTones: Record<ExtractionListItem["status"], BadgeTone> = { pending: "pending", running: "running", completed: "success", failed: "danger", cancelled: "neutral" };
@@ -34,7 +35,7 @@ function readerStatusNotice(item: ExtractionListItem) {
   return null;
 }
 
-function ExtractionActions({ item, detailsExpanded, onToggleDetails, onUpdated }: { item: ExtractionListItem; detailsExpanded: boolean; onToggleDetails(itemId: string): void; onUpdated(itemId: string, update: Partial<ExtractionListItem>): void }) {
+function ExtractionActions({ confirm, item, detailsExpanded, onToggleDetails, onUpdated }: { confirm: Confirm; item: ExtractionListItem; detailsExpanded: boolean; onToggleDetails(itemId: string): void; onUpdated(itemId: string, update: Partial<ExtractionListItem>): void }) {
   const containerRef = useRef<HTMLDivElement>(null);
   const triggerRef = useRef<HTMLButtonElement>(null);
   const [open, setOpen] = useState(false);
@@ -66,7 +67,7 @@ function ExtractionActions({ item, detailsExpanded, onToggleDetails, onUpdated }
   }, [open]);
 
   async function run(action: "cancel" | "resume", force = false) {
-    if (action === "cancel" && !window.confirm(`¿Cancelar la extracción ${item.axCode} · ${item.modelDescription}?`)) return;
+    if (action === "cancel" && !await confirm({ title: "¿Cancelar la extracción?", description: `Se detendrá la extracción de ${item.modelDescription} de la solicitud ${item.axCode}. Quedará como cancelada y, si la necesitas, tendrás que volver a solicitarla.`, confirmLabel: "Cancelar extracción", cancelLabel: "Mantener" })) return;
     setBusy(true);
     setFeedback("");
     const result = await extractionAction({ id: item.id, action, force });
@@ -115,7 +116,7 @@ function ExtractionActions({ item, detailsExpanded, onToggleDetails, onUpdated }
   </div>;
 }
 
-function RequestActions({ items, onUpdated }: { items: ExtractionListItem[]; onUpdated(itemId: string, update: Partial<ExtractionListItem>): void }) {
+function RequestActions({ confirm, items, onUpdated }: { confirm: Confirm; items: ExtractionListItem[]; onUpdated(itemId: string, update: Partial<ExtractionListItem>): void }) {
   const [busy, setBusy] = useState(false);
   const [feedback, setFeedback] = useState("");
   const cancellable = items.filter((item) => item.canCancel);
@@ -124,7 +125,7 @@ function RequestActions({ items, onUpdated }: { items: ExtractionListItem[]; onU
   const canRepeat = items[0]?.requestStatus !== "pending" && items.every((item) => item.status !== "pending" && item.status !== "running");
 
   async function runAll(action: "cancel" | "resume", targets: ExtractionListItem[]) {
-    if (action === "cancel" && !window.confirm(`¿Cancelar las ${targets.length} extracciones activas de la solicitud ${axCode}?`)) return;
+    if (action === "cancel" && !await confirm({ title: "¿Cancelar la solicitud?", description: `Se detendrán las ${targets.length} extracciones activas de la solicitud ${axCode}. Las ya completadas no se verán afectadas.`, confirmLabel: "Cancelar solicitud", cancelLabel: "Mantener" })) return;
     setBusy(true);
     setFeedback("");
     let succeeded = 0;
@@ -158,6 +159,7 @@ function visibleStatus(item: ExtractionListItem): { label: string; tone: BadgeTo
 
 export function ExtractionHistory({ createdId, openId, draftKey = "extraction-draft-v1", initialItems, initialTransformer = {} }: { createdId?: string; openId?: string; draftKey?: string; initialItems: ExtractionListItem[]; initialTransformer?: Record<string, TransformerRequestInfo> }) {
   const router = useRouter();
+  const [confirm, confirmDialog] = useConfirm();
   const [items, setItems] = useState(initialItems);
   const [previousInitialItems, setPreviousInitialItems] = useState(initialItems);
   const [refreshError, setRefreshError] = useState(false);
@@ -263,6 +265,7 @@ export function ExtractionHistory({ createdId, openId, draftKey = "extraction-dr
 
   return (
     <div className="space-y-4">
+      {confirmDialog}
       {createdId ? <p className="rounded-xl border border-emerald-200 bg-emerald-50 px-4 py-3 text-sm text-emerald-800" role="status">{hasPendingApproval ? "Solicitud enviada y pendiente de aprobación." : "Solicitud enviada correctamente."}</p> : null}
       {refreshError ? <p className="rounded-xl border border-amber-200 bg-amber-50 px-4 py-3 text-sm text-amber-900" role="status">No se pudo actualizar el estado. Se volverá a intentar automáticamente.</p> : null}
       <p className="sr-only" aria-live="polite">{items.filter((item) => item.status === "completed" || item.status === "failed" || item.requestStatus === "approved" || item.requestStatus === "rejected").map((item) => `${item.axCode}: ${visibleStatus(item).label}`).join(". ")}</p>
@@ -303,7 +306,7 @@ export function ExtractionHistory({ createdId, openId, draftKey = "extraction-dr
                   <p className="text-sm text-zinc-700">{summary.description}</p>
                   <div className="max-w-80"><div className="mb-1 flex justify-between text-xs text-zinc-600"><span>Progreso</span><span>{summary.progress}%</span></div><div aria-label={`Progreso de la solicitud ${first.axCode}`} aria-valuemax={100} aria-valuemin={0} aria-valuenow={summary.progress} className="h-2 overflow-hidden rounded-full bg-zinc-200" role="progressbar"><div className={`h-full rounded-full bg-sky-600 transition-[width] duration-500`} style={{ width: `${summary.progress}%` }} /></div></div>
                 </> : null}
-                <RequestActions items={group.items} onUpdated={updateItem} />
+                <RequestActions confirm={confirm} items={group.items} onUpdated={updateItem} />
                 {first.manufacturerGroup === "BMW" || first.manufacturerGroup === "Mercedes" ? <TransformerPanel allCompleted={group.items.every((item) => item.status === "completed")} initialInfo={initialTransformer[group.id]} requestGroupId={group.id} /> : null}
               </div>
               <div className="divide-y divide-zinc-200 border-t border-zinc-200 bg-zinc-50/50">
@@ -314,7 +317,7 @@ export function ExtractionHistory({ createdId, openId, draftKey = "extraction-dr
               <div className="grid min-w-0 gap-5 md:grid-cols-[1.6fr_1fr_auto] md:items-center">
               <div className="min-w-0"><p className="break-words text-sm font-medium text-zinc-900">{item.modelDescription}</p><p className="mt-1 break-words text-xs text-zinc-600"><span translate="no">{item.manufacturerGroup} / {item.brand} · {item.modelCode}</span> · {item.domain}</p></div>
               <div className="min-w-0"><Badge tone={status.tone}>{status.label}</Badge>{readerStatusNotice(item) ? <p className="mt-2 text-xs font-medium text-amber-800">{readerStatusNotice(item)}</p> : null}{item.progress !== null && item.progress !== undefined && (item.status === "pending" || item.status === "running") ? <div className="mt-3 max-w-56"><div className="mb-1 flex justify-between text-xs text-zinc-600"><span>Progreso</span><span>{item.progress}%</span></div><div aria-label={`Progreso de ${item.axCode}`} aria-valuemax={100} aria-valuemin={0} aria-valuenow={item.progress} className="h-2 overflow-hidden rounded-full bg-zinc-200" role="progressbar"><div className="h-full rounded-full bg-sky-600 transition-[width] duration-500" style={{ width: `${item.progress}%` }} /></div></div> : null}{item.errorMessage ? <p className="mt-2 break-words text-xs text-red-700">{item.errorMessage}</p> : null}</div>
-                <ExtractionActions item={item} detailsExpanded={openDetailId === item.id} onToggleDetails={(id) => void toggleReaderDetails(id)} onUpdated={updateItem} />
+                <ExtractionActions confirm={confirm} item={item} detailsExpanded={openDetailId === item.id} onToggleDetails={(id) => void toggleReaderDetails(id)} onUpdated={updateItem} />
               </div>
               {openDetailId === item.id ? <section aria-label={`Detalle de la extracción ${item.axCode}`} className="mt-5 rounded-lg border border-zinc-200 bg-zinc-50 p-4">
                 {detailState?.loading ? <p className="text-sm text-zinc-600" role="status">Cargando detalles del reader…</p> : null}

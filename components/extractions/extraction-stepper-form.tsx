@@ -5,6 +5,7 @@ import { z } from "zod";
 import { createExtractionAction, type ExtractionFormState } from "@/app/(dashboard)/extractions/actions";
 import { SubmitButton } from "@/components/common/submit-button";
 import { Button } from "@/components/ui/button";
+import { useConfirm } from "@/components/ui/confirm-dialog";
 import { BmwAvailabilityNotice } from "@/components/extractions/bmw-availability-notice";
 import { BmwSwapReview } from "@/components/extractions/bmw-swap-review";
 import { MercedesModelSelector } from "@/components/extractions/mercedes-model-selector";
@@ -72,6 +73,10 @@ function emptyVehicle(group: ManufacturerGroup, brand: ManufacturerBrand, id = c
   return group === "BMW"
     ? { id, manufacturerGroup: "BMW", brand: brand as "BMW" | "MINI", series: "", developmentCode: "", typekey: "", modelDescription: "" }
     : { id, manufacturerGroup: "Renault", brand: brand as "Renault" | "Dacia", modelDescription: "", modelCode: "" };
+}
+
+function selectedModelsLabel(count: number) {
+  return count === 1 ? "el modelo seleccionado" : `los ${count} modelos seleccionados`;
 }
 
 function FieldError({ children }: { children?: string }) {
@@ -211,6 +216,7 @@ export function ExtractionStepperForm({
   requiresApproval?: boolean;
 }) {
   const [state, action] = useActionState(createExtractionAction, initialState);
+  const [confirm, confirmDialog] = useConfirm();
   const formId = useId();
   const [group, setGroup] = useState<ManufacturerGroup | "">(initialValues?.group ?? "");
   const [brand, setBrand] = useState<ManufacturerBrand | "">(initialValues?.vehicles[0]?.brand ?? "");
@@ -304,24 +310,24 @@ export function ExtractionStepperForm({
     setStepError("");
   }
 
-  function selectGroup(nextGroup: ManufacturerGroup) {
+  async function selectGroup(nextGroup: ManufacturerGroup) {
     if (group === nextGroup) return;
     const hasModels = vehicles.some((vehicle) => vehicle.manufacturerGroup === "BMW"
       ? Boolean(vehicle.series || vehicle.developmentCode || vehicle.typekey)
       : Boolean(vehicle.modelCode));
-    if (hasModels && !window.confirm("Cambiar de grupo borrará los modelos seleccionados. ¿Quieres continuar?")) return;
+    if (hasModels && !await confirm({ title: "¿Cambiar de grupo?", description: `Se borrará ${selectedModelsLabel(vehicles.length)} y tendrás que volver a elegir modelos.`, confirmLabel: "Cambiar de grupo", cancelLabel: "Mantener grupo" })) return;
     setGroup(nextGroup);
     setBrand(nextGroup === "Mercedes" ? "Mercedes-Benz" : "");
     setVehicles([]);
     clearValidation();
   }
 
-  function selectBrand(nextBrand: ManufacturerBrand) {
+  async function selectBrand(nextBrand: ManufacturerBrand) {
     if (brand === nextBrand) return;
     const hasModels = vehicles.some((vehicle) => vehicle.manufacturerGroup === "BMW"
       ? Boolean(vehicle.series || vehicle.developmentCode || vehicle.typekey)
       : Boolean(vehicle.modelCode));
-    if (hasModels && !window.confirm("Cambiar de fabricante borrará los modelos seleccionados. ¿Quieres continuar?")) return;
+    if (hasModels && !await confirm({ title: "¿Cambiar de fabricante?", description: `Se borrará ${selectedModelsLabel(vehicles.length)} y tendrás que volver a elegir modelos.`, confirmLabel: "Cambiar de fabricante", cancelLabel: "Mantener fabricante" })) return;
     setBrand(nextBrand);
     setVehicles(group ? (group === "BMW" ? [emptyVehicle("BMW", nextBrand, `${formId}-model-0`)] : []) : []);
     clearValidation();
@@ -472,6 +478,7 @@ export function ExtractionStepperForm({
   const summaryTitle = group === "BMW" ? `Tiempos ${brand}` : `Tiempos ${brand}`;
 
   return <form action={action} className="overflow-hidden rounded-xl border border-zinc-200 bg-white">
+    {confirmDialog}
 
     <div className="border-b border-zinc-200 px-5 py-4 sm:px-7">
       <nav aria-label="Progreso de la solicitud">
@@ -503,12 +510,12 @@ export function ExtractionStepperForm({
         <StepHeading title="Grupo y fabricante" description="Una solicitud corresponde a una sola marca. Después podrás añadir varios modelos o familias de esa marca." />
         <fieldset className="space-y-3"><legend className="field-label">Grupo de fabricantes</legend>
           <div className="grid gap-3 sm:grid-cols-3">
-            {(["BMW", "Renault", "Mercedes"] as const).map((option) => <button aria-pressed={group === option} className={`min-h-16 rounded-xl border px-4 py-3 text-left text-sm font-semibold transition-colors ${group === option ? "border-sky-700 bg-sky-50 text-sky-950" : "border-zinc-300 bg-white text-zinc-800 hover:bg-zinc-50"}`} key={option} onClick={() => selectGroup(option)} type="button">{option === "BMW" ? "BMW Group" : option === "Renault" ? "Renault Group" : "Mercedes-Benz Group"}</button>)}
+            {(["BMW", "Renault", "Mercedes"] as const).map((option) => <button aria-pressed={group === option} className={`min-h-16 rounded-xl border px-4 py-3 text-left text-sm font-semibold transition-colors ${group === option ? "border-sky-700 bg-sky-50 text-sky-950" : "border-zinc-300 bg-white text-zinc-800 hover:bg-zinc-50"}`} key={option} onClick={() => void selectGroup(option)} type="button">{option === "BMW" ? "BMW Group" : option === "Renault" ? "Renault Group" : "Mercedes-Benz Group"}</button>)}
             <button aria-describedby="vag-disabled-description" aria-disabled="true" className="min-h-16 cursor-not-allowed rounded-xl border border-zinc-200 bg-zinc-100 px-4 py-3 text-left text-sm font-semibold text-zinc-500" disabled type="button">VAG <span className="mt-1 block text-xs font-normal">Deshabilitado</span></button>
           </div>
           <p className="text-xs text-zinc-500" id="vag-disabled-description">El reader VAG está disponible, pero las solicitudes siguen deshabilitadas en este formulario. Incluye Volkswagen, Audi, Škoda y SEAT.</p>
         </fieldset>
-        {group ? <fieldset className="space-y-3"><legend className="field-label">Fabricante</legend><div className="flex flex-wrap gap-2">{BRAND_OPTIONS[group].map((option) => <button aria-pressed={brand === option} className={`min-h-11 rounded-lg border px-4 py-2 text-sm font-semibold transition-colors ${brand === option ? "border-sky-700 bg-sky-700 text-white" : "border-zinc-300 bg-white text-zinc-800 hover:bg-zinc-50"}`} key={option} onClick={() => selectBrand(option)} type="button">{option}</button>)}</div></fieldset> : <p className="text-sm text-zinc-600">Selecciona un grupo para ver sus fabricantes.</p>}
+        {group ? <fieldset className="space-y-3"><legend className="field-label">Fabricante</legend><div className="flex flex-wrap gap-2">{BRAND_OPTIONS[group].map((option) => <button aria-pressed={brand === option} className={`min-h-11 rounded-lg border px-4 py-2 text-sm font-semibold transition-colors ${brand === option ? "border-sky-700 bg-sky-700 text-white" : "border-zinc-300 bg-white text-zinc-800 hover:bg-zinc-50"}`} key={option} onClick={() => void selectBrand(option)} type="button">{option}</button>)}</div></fieldset> : <p className="text-sm text-zinc-600">Selecciona un grupo para ver sus fabricantes.</p>}
         {stepError ? <p className="text-sm text-red-700" role="alert">{stepError}</p> : null}
       </section> : null}
 
