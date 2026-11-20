@@ -34,7 +34,7 @@ export async function insertExtractionsWithCapacity(userId: string, input: Extra
   const requestGroupId = crypto.randomUUID();
 
   return getDb().transaction(async (transaction) => {
-    await transaction.execute(sql`SELECT pg_advisory_xact_lock(hashtext(${userId}))`);
+    await transaction.execute(sql`SELECT pg_advisory_xact_lock(hashtextextended(${userId}, 0))`);
     const [{ active }] = await transaction
       .select({ active: count() })
       .from(extractions)

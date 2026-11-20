@@ -135,11 +135,39 @@
       "tag": "0018_mercedes_reports",
       "breakpoints": true
     },
-    {
+        {
       "idx": 19,
       "version": "7",
       "when": 1785177619000,
       "tag": "0019_revocable_sessions",
+      "breakpoints": true
+    },
+    {
+      "idx": 20,
+      "version": "7",
+      "when": 1785177620000,
+      "tag": "0030_loaded_table_lookup_idx",
+      "breakpoints": true
+    },
+    {
+      "idx": 21,
+      "version": "7",
+      "when": 1785177621000,
+      "tag": "0031_ready_requests_partial_idx",
+      "breakpoints": true
+    },
+    {
+      "idx": 22,
+      "version": "7",
+      "when": 1785177622000,
+      "tag": "0032_action_logs_restrict_fk",
+      "breakpoints": true
+    },
+    {
+      "idx": 23,
+      "version": "7",
+      "when": 1785177623000,
+      "tag": "0033_extractions_group_created_idx",
       "breakpoints": true
     }
   ]

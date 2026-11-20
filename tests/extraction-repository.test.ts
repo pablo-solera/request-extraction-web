@@ -1,3 +1,5 @@
+import { PgDialect } from "drizzle-orm/pg-core";
+import type { SQL } from "drizzle-orm";
 import { beforeEach, describe, expect, it, vi } from "vitest";
 
 const { returning, set, update, where, database, loaded } = vi.hoisted(() => {
@@ -89,6 +91,9 @@ describe("insertExtractionsWithCapacity reader persistence", () => {
       readerParams: { series: "F56", developmentCode: "F56", typekey: "11EH" },
     });
     expect(transaction.execute).toHaveBeenCalledOnce();
+    const lock = new PgDialect().sqlToQuery(transaction.execute.mock.calls[0][0] as SQL);
+    expect(lock.sql).toContain("pg_advisory_xact_lock(hashtextextended($1, 0))");
+    expect(lock.params).toEqual(["user-1"]);
   });
 
   it("stores Renault start date as request metadata rather than a reader filter and allows several families for one brand", async () => {

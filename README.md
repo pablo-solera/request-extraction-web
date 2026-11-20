@@ -31,6 +31,9 @@ Variables principales:
 | Variable | Descripción |
 | --- | --- |
 | `DATABASE_URL` | Conexión PostgreSQL de la aplicación. |
+| `DATABASE_MIGRATION_URL` | Opcional. Conexión con permisos DDL (rol propietario) usada solo por `db:migrate`/`db:deploy`. Si falta, se usa `DATABASE_URL`. |
+| `DATABASE_URL_DOCKER` | Opcional, solo Docker Compose: `DATABASE_URL` completa del contenedor `web`; úsala si la contraseña tiene caracteres que deben codificarse en una URL (`@ : / # ? %`). |
+| `POSTGRES_APP_USER`, `POSTGRES_APP_PASSWORD` | Opcionales, solo Docker Compose: credenciales del rol de aplicación para el contenedor `web`. Si faltan, usa `POSTGRES_USER`. |
 | `SESSION_SECRET` | Secreto aleatorio de al menos 32 caracteres. |
 | `INTEGRATION_LDAP_URL` | Endpoint obligatorio `ldap://`, normalmente Global Catalog en el puerto 3268. |
 | `INTEGRATION_LDAP_ACCESSACCOUNT_UPN` | UPN de la cuenta de servicio usada para buscar usuarios. |
@@ -85,6 +88,19 @@ npm run db:migrate
 
 El servicio solo publica PostgreSQL en `127.0.0.1:5432` y guarda los datos en el volumen `postgres_data`. Puedes personalizar `POSTGRES_DB`, `POSTGRES_USER` y `POSTGRES_PASSWORD` mediante `.env`.
 
+### Roles de base de datos (opcional)
+
+Por defecto una sola URL sirve para todo. Para que la aplicación no pueda alterar el esquema, separa dos roles:
+
+1. Rol propietario (el de `POSTGRES_USER`): crea las tablas y aplica las migraciones. Se usa en `DATABASE_MIGRATION_URL`.
+2. Rol de aplicación `request_extraction_app`: solo `SELECT`, `INSERT` y `UPDATE` (la aplicación no borra filas). Se crea tras migrar con el propietario:
+
+```bash
+psql "$DATABASE_MIGRATION_URL" -v ON_ERROR_STOP=1 -v app_password='...' -f db/roles/application-role.sql
+```
+
+Después apunta `DATABASE_URL` al rol de aplicación (en Compose: `POSTGRES_APP_USER=request_extraction_app` y `POSTGRES_APP_PASSWORD`) y deja `DATABASE_MIGRATION_URL` para `db:migrate` y `db:deploy`. El script es idempotente y fija privilegios por defecto para las tablas que cree el propietario en el futuro. Probarlo en un clon antes de producción.
+
 ### Despliegue: migraciones y cuentas de prueba
 
 En un servidor, la base de datos se prepara con `bun run db:deploy`, que es lo que ejecuta la imagen `request-extraction-web-migrate` (servicio `migrate` del compose, que termina antes de arrancar la web):
@@ -96,11 +112,13 @@ Las variables `TEST_ACCOUNT_*` solo definen quiénes son las cuentas; para inici
 
 Los usuarios reales (los empleados de TimerTask) se crean con la sincronización, que sí necesita Oracle: el botón de `/admin/users`, o `bun run sync:users` (simulación) y `bun run sync:users:apply`.
 
-Para generar una migración después de modificar `db/schema.ts`:
+Todas las migraciones se aplican con `drizzle-kit migrate` (`db:migrate`, `db:deploy` y `docker:setup-db` usan el mismo camino y registran lo aplicado en `drizzle.__drizzle_migrations`). Una base de datos preparada antes con `psql` (el antiguo `docker:setup-db`) no tiene ese registro: recréala o registra a mano las migraciones ya aplicadas antes de ejecutar `db:migrate`, o intentaría repetirlas.
 
-```bash
-npm run db:generate
-```
+`db/migrations/meta` solo contiene `_journal.json`, sin snapshots, así que `drizzle-kit generate` produciría una migración con todo el esquema; por eso `npm run db:generate` está desactivado. Para cambiar el esquema:
+
+1. Edita `db/schema.ts`.
+2. Escribe a mano `db/migrations/NNNN_nombre.sql` (separa sentencias con `--> statement-breakpoint`). Para restricciones sobre tablas con datos usa `ADD CONSTRAINT ... NOT VALID` y después `VALIDATE CONSTRAINT`. `CREATE INDEX CONCURRENTLY` no funciona dentro de la transacción de drizzle-kit.
+3. Añade la entrada a `db/migrations/meta/_journal.json` con un `when` mayor que el de la última migración (nunca menor: drizzle-kit omitiría la migración en bases que ya aplicaron una posterior).
 
 ## Desarrollo
 

@@ -60,35 +60,37 @@ Rama: `feature/security-hardening`
 
 Rama: `feature/database-hardening`. Probar cada migración en un clon antes de producción.
 
-- [ ] **2.1 Índice para `findLoadedTable`** (S) — `lib/transformer/repository.ts:26-35`
+- [x] **2.1 Índice para `findLoadedTable`** (S) — `lib/transformer/repository.ts:26-35`
   - `CREATE INDEX` sobre `(brand, imc_edition, upper(ax_code))` parcial (`manufacturer_group='BMW'` y `load_status IN ('queued','running','completed')`). `CONCURRENTLY` no puede ir en la transacción de `drizzle-kit migrate`: usar índice normal (tabla pequeña) o un archivo fuera de transacción.
   - Commit: `perf(db): add index for loaded table lookup`
-- [ ] **2.2 Índices parciales de "listas para cargar/informe"** (S) — `repository.ts:16-17,183-184`
+- [x] **2.2 Índices parciales de "listas para cargar/informe"** (S) — `repository.ts:16-17,183-184`
   - `(created_at) WHERE status='approved' AND manufacturer_group='BMW' AND load_status IS NULL` y el equivalente de Mercedes con `report_status IS NULL`.
   - Commit: `perf(db): add partial indexes for reconciliation queries`
 - [ ] **2.3 Paginación de los listados** (M) — `lib/extractions/repository.ts:257-278,316-324`
   - Paginación por keyset sobre `(created_at DESC, id DESC)`. `listPendingRequests` debe paginar por solicitud y no por fila del join. Índice `extractions_created_idx`. Cambia la API y la interfaz del historial: hacerlo en un solo cambio con la tarea 4.3.
   - Commit: `feat(extractions): paginate extraction and pending-request listings`
-- [ ] **2.4 Unificar el camino de migraciones** (M) — `scripts/apply-migrations.ts`, `scripts/migrations.ts`, `package.json`, `db/migrations/meta`
+- [x] **2.4 Unificar el camino de migraciones** (M) — `scripts/apply-migrations.ts`, `scripts/migrations.ts`, `package.json`, `db/migrations/meta`
   - Un único camino con `drizzle-kit migrate`. Resolver la ausencia de snapshots en `meta/` (verificarla antes de actuar). `psql` con `--single-transaction` si se mantiene `docker:setup-db`. No generar nunca una migración con `when` menor que la última aplicada.
+  - Hecho: `meta/` solo tiene `_journal.json` (verificado), así que `db:generate` queda desactivado (`scripts/db-generate-disabled.mjs`) y las migraciones se escriben a mano; `docker:setup-db` ahora es `drizzle-kit migrate` y se elimina `scripts/apply-migrations.ts`. `scripts/migrations.ts` se mantiene para `run-integration-tests.ts` (base temporal).
   - Commit: `build(db): unify migrations on drizzle-kit migrate`
-- [ ] **2.5 Timeouts del pool** (S) — `db/index.ts:34-47`
+- [x] **2.5 Timeouts del pool** (S) — `db/index.ts:34-47`
   - `statement_timeout` e `idle_in_transaction_session_timeout` en `connection`.
   - Commit: `fix(db): set statement and idle-in-transaction timeouts`
-- [ ] **2.6 Advisory lock de 64 bits** (S) — `lib/extractions/repository.ts:37`
+- [x] **2.6 Advisory lock de 64 bits** (S) — `lib/extractions/repository.ts:37`
   - Sustituir `hashtext(userId)` por `hashtextextended(userId, 0)`.
   - Commit: `fix(extractions): use 64-bit advisory lock key`
-- [ ] **2.7 `RESTRICT` en el FK de los logs de auditoría** (S) — `db/schema.ts:96,137,157,173`
+- [x] **2.7 `RESTRICT` en el FK de los logs de auditoría** (S) — `db/schema.ts:96,137,157,173`
   - `extraction_action_logs.extraction_id` pasa a `RESTRICT`. Migración con `NOT VALID` y luego `VALIDATE`.
   - Commit: `fix(db): protect audit logs from cascade deletion`
-- [ ] **2.8 Índices redundantes** (S) — `db/schema.ts`
+- [x] **2.8 Índices redundantes** (S) — `db/schema.ts`
   - `extractions_group_idx` pasa a `(request_group_id, created_at)`. Crear el nuevo antes de eliminar el antiguo.
   - Commit: `perf(db): replace redundant extraction indexes`
-- [ ] **2.9 Rol de aplicación sin permisos DDL** (M)
+- [x] **2.9 Rol de aplicación sin permisos DDL** (M)
   - Rol de migración y rol de aplicación con `SELECT/INSERT/UPDATE`. Actualizar `docker-compose.yml`, `.env.example` y `README.md`.
   - Commit: `feat(db): separate migration and application database roles`
-- [ ] **2.10 Ajustes menores de base de datos** (S)
+- [x] **2.10 Ajustes menores de base de datos** (S)
   - `drizzle.config.ts` no debe fallar al importarse sin `DATABASE_URL` en `generate`. Codificar la contraseña en `DATABASE_URL` de `docker-compose.yml`. Normalizar `fallback_email` a minúsculas en `findUserByFallbackEmail`. Valorar `now()` de la BD en `updated_at`.
+  - Hecho: `drizzle.config.ts` ya no lanza al importarse; `DATABASE_URL_DOCKER` permite una URL ya codificada en Compose (que no puede codificar); `findUserByFallbackEmail` normaliza a minúsculas. `now()` de la BD en `updated_at` se descarta por ahora: implica tocar muchos `set({ updatedAt: new Date() })` sin ganancia relevante.
   - Commit: `fix(db): tolerate missing DATABASE_URL on generate and normalize fallback emails`
 
 ---

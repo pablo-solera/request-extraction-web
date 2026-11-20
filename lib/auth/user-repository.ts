@@ -10,7 +10,7 @@ export async function findUserByOracleEmpId(oracleEmpId: number) {
 }
 
 export async function findUserByFallbackEmail(email: string) {
-  const [user] = await getDb().select().from(users).where(eq(users.fallbackEmail, email)).limit(1);
+  const [user] = await getDb().select().from(users).where(eq(users.fallbackEmail, email.trim().toLowerCase())).limit(1);
   return user ?? null;
 }
 
