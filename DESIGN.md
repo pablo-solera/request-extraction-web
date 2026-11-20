@@ -219,8 +219,17 @@ Un solo estilo en todo el sistema, definido en `@layer base` de `app/globals.css
 - Pastilla con lavado semántico, borde fino y texto del color intenso, más un icono de 14 px (reloj, flecha circular, check, aspa, triángulo, información, guion). Estados: pendiente, en curso, completada, con incidencias, fallida, rechazada, cancelada. Se distinguen por icono y texto, no solo por color.
 - **Implementación:** `components/ui/badge.tsx` (`Badge` con `tone`: `pending`, `running`, `success`, `danger`, `issue`, `info`, `neutral`, `solid`). `icon={false}` para etiquetas que no son estados (marca, rol).
 
+### Dialog
+- Confirmaciones con `<dialog>` nativo abierto con `showModal()` (`components/ui/confirm-dialog.tsx`, hook `useConfirm()`). Tarjeta blanca de 12 px con borde fino y `shadow-floating`, fondo `::backdrop` en tinta al 40 %. El título es una pregunta, el texto explica la consecuencia y el botón de confirmar repite el verbo ("Cancelar extracción"). La acción segura ("Mantener", "Volver") es la primera y recibe el foco inicial. Sin `role` ni trampa de foco manuales: lo da el navegador.
+
+### Popover Menu
+- Menús de acciones y de cuenta con `popover="auto"` y anclaje CSS (`components/ui/popover-menu.tsx`, clase `.popover-menu`): se abre debajo del disparador, alineado a su borde derecho, y se voltea si no cabe. Cierra con Escape y clic fuera sin JavaScript. Es un desplegable de disclosure (se recorre con Tab), no un `role="menu"`. Las acciones frecuentes (descargar, reanudar) van fuera, como botones visibles.
+
+### History Row
+- El historial muestra una fila compacta por solicitud: código AX en mono, marca, número de modelos, estado con progreso y fecha, y un chevron. El detalle (edición IMC, fechas, progreso, acciones, modelos) aparece al expandir. Cada grupo usa `content-visibility: auto`. Encima, búsqueda por AX y filtro por estado.
+
 ### Progress Bar (componente distintivo)
-- Barra fina con relleno de acento para seguir el avance de una extracción. Se actualiza sola en el historial y respeta `prefers-reduced-motion`.
+- Barra fina con relleno de Azul de Foco para seguir el avance de una extracción. Se actualiza sola en el historial y respeta `prefers-reduced-motion`. No pulsa ni parpadea: el movimiento solo comunica el cambio de valor.
 
 ## Do's and Don'ts
 
