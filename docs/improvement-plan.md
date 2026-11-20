@@ -159,24 +159,37 @@ Contexto ya creado: `PRODUCT.md`, `DESIGN.md` y `.impeccable/design.json` (coman
 - [x] **4.9 `extract`** (M) — hacerlo junto con 4.1 y 4.5
   - Sacar a tokens y componentes compartidos lo repetido. Actualizar `DESIGN.md` y `.impeccable/design.json` con los valores finales.
   - Commit: `docs(design): refresh DESIGN.md after extracting tokens and components`
-- [ ] **4.10 `critique`** (S) — sobre historial, formulario por pasos, aprobaciones y login
+- [x] **4.10 `critique`** (S) — sobre historial, formulario por pasos, aprobaciones y login
   - Puntuación heurística antes y después de 4.2 a 4.8. Anotar en esta lista los hallazgos nuevos que no se arreglen en el momento.
   - Sin commit si solo analiza.
-- [ ] **4.11 `audit`** (S) — `components/` y `app/`
+  - Hecho (2026-11-20, ejecución inline por no haber herramienta de subagentes; sin navegador porque solo `/login` es visitable; el detector se ejecuta una vez en 4.15). Puntuación **28/40 (Bueno)**; antes de 4.2 a 4.8 ≈ **21/40** (estimación retrospectiva a partir del historial de git: `window.confirm`, errores sin asociar, menú con listeners manuales). Detalle: visibilidad 3, lenguaje 3, control 3, consistencia 3, prevención de errores 3, reconocimiento 3, flexibilidad 2, minimalismo 3, recuperación 3, ayuda 2.
+  - Hallazgos que se arreglan en 4.12 a 4.14 y 5.6: **[P1]** el formulario por pasos y los paneles de BMW/Mercedes siguen con paleta cruda (`zinc/sky/red/amber`, `text-sm/xs/lg`) en vez de tokens; el azul se usa como relleno (paso activo, grupo y fabricante elegidos), contra la Quiet Accent Rule. **[P1]** la jerarquía de títulos no sigue la escala (`h1` en `text-3xl`, `h2` en `text-lg/xl`, tarjeta de resumen en `text-2xl`). **[P2]** aprobaciones: los modelos se muestran como una cadena separada por comas, ilegible con decenas de typekeys. **[P2]** alertas y avisos repetidos con clases en línea (5.6). **[P2]** el estado vacío del login/errores usa colores crudos.
+  - Hallazgos que **no** se arreglan ahora: **[P2]** el solicitante solo se ve al expandir una solicitud; coordinadores y administradores querrían verlo en la fila compacta. **[P2]** el filtro por estado actúa solo sobre las solicitudes cargadas (limitación conocida de 2.3). **[P3]** flexibilidad: sin atajos de teclado ni acciones masivas entre solicitudes. **[P3]** ayuda: no hay ayuda contextual más allá de los textos junto al campo; términos como «Completion» o «reader» sin glosario.
+- [x] **4.11 `audit`** (S) — `components/` y `app/`
   - Accesibilidad, rendimiento y consistencia. Corregir lo bloqueante y anotar el resto.
   - Commit (si corrige): `fix(a11y): address impeccable audit findings`
+  - Hecho (revisión de código; el detector queda para 4.15). Puntuación: accesibilidad 3, rendimiento 3, tema/tokens 2 → 3 tras la corrección, responsive n/a (solo escritorio), integridad 3.
+  - Corregido: 94 usos de paleta cruda (`zinc/sky/red/amber/emerald`, `bg-white`, `text-white`) sustituidos por tokens en 27 archivos (los textos `zinc-500` pasan a `ink-muted`, que sí cumple AA sobre el lienzo); `aria-labelledby` colgante en las secciones del formulario por pasos (los `h2` no tenían `id`); los cuatro «Reintentar» subrayados pasan a `Button` (objetivo de 44 px); `global-error` importa `globals.css`, sin lo cual se veía sin estilos; hover invisible del botón de sustituir typekey.
+  - Pendiente/anotado: el `prefers-reduced-motion` global fuerza `0.01ms` en todo (aceptable porque ninguna transición lleva información que no tenga también texto); restos de clases de móvil (`max-w-[calc(100vw-9rem)]` en el menú, prefijos `sm:`) sin efecto en escritorio; los enlaces «Descargar Excel» del panel del transformer son enlaces en línea de menos de 44 px; `global-error` no carga las fuentes del layout.
 - [ ] **4.12 `layout`, `typeset` y `clarify`** (M) — solo donde la crítica lo pida
+  - `typeset` hecho: `text-sm/xs` pasan a `text-body/meta`; títulos de sección y tarjeta a `text-title`/`text-headline`/`text-body`; `text-wrap: balance` en `h1-h3` y `pretty` en párrafos desde `@layer base`; eliminados los eyebrows (`PageHeader.Eyebrow`, «Portal interno», «404» sobre el título).
+  - `layout` hecho: en el formulario por pasos el azul deja de ser relleno (paso activo/completado, grupo y fabricante elegidos pasan a tinta, con icono de check además del color; el fabricante reutiliza `buttonStyles`; la marca del resumen es un `Badge`); rejilla de escritorio fija en grupos, resumen y barra de acciones; en aprobaciones los modelos son una lista desplazable y enfocable en vez de una cadena con comas.
+  - `clarify` hecho: «Completion» pasa a «Fecha de finalización» (formulario, resumen e historial, igual que los mensajes de validación) y el error de LDAP no disponible indica qué hacer.
   - `layout` en historial y formulario, `typeset` para la jerarquía de títulos, `clarify` para textos y errores.
   - Commit por comando: `style(ui): refine layout ...`, `style(ui): refine type hierarchy`, `fix(ui): clarify copy and error messages`
-- [ ] **4.13 `harden`** (S) — estados vacíos, de error y de carga del historial, aprobaciones y administración
+- [x] **4.13 `harden`** (S) — estados vacíos, de error y de carga del historial, aprobaciones y administración
   - Commit: `fix(ui): harden empty, error and loading states`
-- [ ] **4.14 `polish`** (S) — pasada final de toda la interfaz
+  - Hecho: `history/actions.ts` estaba guardado en Latin-1 (los acentos de los mensajes salían como `�`) y registraba el objeto de error completo; ahora es UTF-8 y usa `describeError`. El historial ofrece «Reintentar» tras un fallo de búsqueda o de «Cargar más» y avisa de que el filtro solo cubre lo cargado cuando quedan solicitudes sin cargar. Aprobaciones gana «Volver a la primera página» al paginar y un vacío específico en páginas posteriores. Ya existían y se revisan sin cambios: esqueletos de `loading.tsx` en historial, aprobaciones, usuarios e infraestructura, vacío del historial y de usuarios, error de sincronización y límite de errores del dashboard.
+- [x] **4.14 `polish`** (S) — pasada final de toda la interfaz
   - Commit: `style(ui): final polish pass`
-- [ ] **4.15 Detector** (S)
+  - Hecho: ritmo vertical único entre secciones (`space-y-6`, antes 6, 7 y 8 según la página, también en los esqueletos); eliminados los restos de móvil y tablet (`sm:`, `md:`, `lg:`, el ancho calculado del menú con desplazamiento) y las rejillas quedan fijas para escritorio.
+- [x] **4.15 Detector** (S)
   - `impeccable.cmd detect --json --changed` sobre la interfaz terminada, una sola vez. Arreglar los hallazgos reales y anotar los falsos positivos en `.impeccable/critique/ignore.md`.
+  - Hecho: sin hallazgos. `detect --json --changed` devolvió `[]` (árbol limpio tras los commits); se repitió con los 33 `.tsx` cambiados respecto a `main` y con `app/` y `components/` completos: `[]` en ambos. Sin falsos positivos, así que no se crea `.impeccable/critique/ignore.md`. No hay commit de código.
   - Commit: `style(ui): resolve design detector findings`
 - [ ] **4.16 Capturas con `impeccable shot`** (S) — solo `/login` sin sesión (el resto requiere LDAP)
   - Comprobar a 1280 y 1536 px de ancho que el login queda bien tras 4.6. Es solo de escritorio.
+  - **Bloqueada:** `npx next dev -p 3106` se niega a arrancar porque ya hay un `next dev` en este directorio (puerto 3000, PID ajeno): Next permite un solo servidor de desarrollo por proyecto. Alternativas descartadas por tocar el servidor del usuario (`next build` escribe en `.next`). Reintentar cuando el servidor del 3000 esté parado: `impeccable shot http://localhost:PUERTO/login --viewport 1280x800,1536x864`.
 
 ---
 
@@ -194,11 +207,13 @@ Rama: `feature/housekeeping`
 - [x] **5.4 Docker** (S)
   - Puerto 3000 en `127.0.0.1`, imágenes fijadas por digest y `HEALTHCHECK` en el `Dockerfile`.
   - Commit: `build(docker): pin images, bind loopback and add healthcheck`
-- [ ] **5.5 Serif editorial en los títulos de página** (S) — solo en los `h1`, vía `next/font`.
+- [x] **5.5 Serif editorial en los títulos de página** (S) — solo en los `h1`, vía `next/font`.
+  - Hecho: Newsreader (variable `--font-newsreader`, token `--font-serif` y `--text-display` en `@theme`) en `PageHeader.Title`, el `h1` del login, `not-found` y el error del dashboard. `global-error` queda en sans: no carga las fuentes del layout.
   - Commit: `style(ui): use a serif face for page titles`
-- [ ] **5.6 Refinamientos menores** (S)
+- [x] **5.6 Refinamientos menores** (S)
   - Debounce con `useDeferredValue` en los buscadores (`users-table.tsx:37`, `mercedes-model-selector.tsx:100`). Animar el progreso con `transform: scaleX`. Caché de `fetch` entre pasos del formulario. Unificar alertas con los tokens de color.
   - Commit: `perf(ui): defer search filtering and animate progress with transform`
+  - Hecho: `useDeferredValue` en los filtros locales del formulario (Mercedes, Renault y typekeys de BMW); `users-table` se queda con el debounce porque su búsqueda navega al servidor y `useDeferredValue` no reduce ese viaje. Barra de progreso con `transform: scaleX()`. Caché de 5 min en memoria de las listas de opciones entre pasos (`lib/client/cached-json.ts`; solo respuestas válidas). Componente `Alert` en `components/ui/alert.tsx` para unificar los avisos con tokens (login, aprobaciones, historial, formulario, disponibilidad BMW).
 - [ ] **5.7 Pasada autenticada** (M)
   - Revisar con `next-dev-loop` y un usuario de pruebas `/extractions`, `/history`, `/approvals` y `/admin/*` (consola y Web Vitals). No se pudo hacer en la auditoría.
 

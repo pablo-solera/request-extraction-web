@@ -56,6 +56,7 @@ describe("BMW extraction progress in history", () => {
     expect(screen.getAllByText("45%")).toHaveLength(2);
     expect(screen.getByRole("progressbar", { name: "Progreso de la solicitud AX-100" })).toHaveAttribute("aria-valuenow", "45");
     expect(screen.getByRole("progressbar", { name: "Progreso de AX-100" })).toHaveAttribute("aria-valuenow", "45");
+    expect(screen.getByRole("progressbar", { name: "Progreso de AX-100" }).firstElementChild).toHaveStyle({ transform: "scaleX(0.45)" });
   });
 
   it("shows queue and paused notices without displaying a completed progress bar", () => {
@@ -144,7 +145,7 @@ describe("grouped request history", () => {
     expect(screen.getByText("2 de 3 typekeys completados · 1 fallido")).toBeInTheDocument();
     expect(screen.getByText("Edición IMC").parentElement).toHaveTextContent("05/0");
     expect(screen.getByText("Inicio del desarrollo")).toBeInTheDocument();
-    expect(screen.getByText("Completion")).toBeInTheDocument();
+    expect(screen.getByText("Fecha de finalización")).toBeInTheDocument();
   });
 
   it("offers to repeat the whole request once nothing is running, even when everything completed", () => {

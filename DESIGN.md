@@ -50,6 +50,12 @@ typography:
     fontSize: "1.25rem"
     fontWeight: 600
     lineHeight: 1.3
+  display:
+    fontFamily: "Newsreader, Georgia, serif"
+    fontSize: "1.875rem"
+    fontWeight: 500
+    lineHeight: 1.15
+    letterSpacing: "-0.02em"
   headline:
     fontFamily: "Geist, Arial, Helvetica, sans-serif"
     fontSize: "1.5rem"
@@ -110,7 +116,7 @@ Un puesto de trabajo donde cada cosa tiene su sitio. La interfaz es neutra, plan
 El sistema parte de un lienzo gris muy claro con superficies blancas, tinta casi negra y un único acento azul reservado al foco y a las acciones secundarias. Los colores de estado (rojo, verde, azul) aparecen solo para comunicar significado. Las esquinas son amables, con radios de 8 a 12 px, y la separación se hace con bordes de 1 px en lugar de sombras.
 
 **Key Characteristics:**
-- Una sola familia tipográfica (Geist) con Geist Mono para códigos y metadatos técnicos.
+- Geist para la interfaz y Geist Mono para códigos y metadatos técnicos; una serif editorial (Newsreader) solo en los `h1` de página.
 - Superficies planas con borde fino; la profundidad solo aparece en lo que flota.
 - Botón primario oscuro y sólido; el acento azul solo en foco y acciones secundarias.
 - Objetivos de 44 px de alto como mínimo en todo control.
@@ -154,14 +160,15 @@ Cada par tiene además un borde (`*-line`) de un tono más claro. Todos están d
 
 ## Typography
 
-**Display Font:** Geist (con Arial, Helvetica como respaldo)
-**Body Font:** Geist
+**Display Font:** Newsreader (con Georgia como respaldo), solo en los `h1` de página
+**Body Font:** Geist (con Arial, Helvetica como respaldo)
 **Label/Mono Font:** Geist Mono, para AX Code, typekeys y datos técnicos
 
-**Character:** Una sola familia sans geométrica y neutra; la jerarquía se construye con el peso (400, 500, 600) y el tamaño, no con cambios de fuente.
+**Character:** Sans geométrica y neutra para todo el trabajo; la jerarquía se construye con el peso (400, 500, 600) y el tamaño. La serif aparece una sola vez por pantalla, en el título de página, y le da voz editorial sin competir con los datos.
 
 ### Hierarchy
-- **Headline** (600, 1.5rem, 1.25, `text-headline`): título de cada página.
+- **Display** (Newsreader 500, 1.875rem, 1.15, tracking -0.02em, `font-serif text-display`): `h1` de cada página y del inicio de sesión. Nunca en tarjetas, tablas ni botones.
+- **Headline** (600, 1.5rem, 1.25, `text-headline`): encabezados de sección destacados.
 - **Title** (600, 1.25rem, 1.3, `text-title`): títulos de tarjeta y de sección.
 - **Label** (600, 0.875rem): etiquetas de campo y texto de botón.
 - **Body** (400, 0.875rem, 1.5, `text-body`): contenido de tablas, listas y párrafos. Longitud de línea máxima de 65 a 75 caracteres en texto corrido.
@@ -219,6 +226,10 @@ Un solo estilo en todo el sistema, definido en `@layer base` de `app/globals.css
 - Pastilla con lavado semántico, borde fino y texto del color intenso, más un icono de 14 px (reloj, flecha circular, check, aspa, triángulo, información, guion). Estados: pendiente, en curso, completada, con incidencias, fallida, rechazada, cancelada. Se distinguen por icono y texto, no solo por color.
 - **Implementación:** `components/ui/badge.tsx` (`Badge` con `tone`: `pending`, `running`, `success`, `danger`, `issue`, `info`, `neutral`, `solid`). `icon={false}` para etiquetas que no son estados (marca, rol).
 
+### Alerts
+- Avisos en línea con el lavado semántico del tono (`danger`, `pending`, `success`, `info`), borde fino de 12 px de radio y texto del color intenso. Siempre llevan `role="alert"` (errores) o `role="status"` (avisos). Los de error con salida incluyen un botón «Reintentar».
+- **Implementación:** `components/ui/alert.tsx` (`Alert` con `tone`). No se escriben `border-*-line bg-*-wash` en línea.
+
 ### Dialog
 - Confirmaciones con `<dialog>` nativo abierto con `showModal()` (`components/ui/confirm-dialog.tsx`, hook `useConfirm()`). Tarjeta blanca de 12 px con borde fino y `shadow-floating`, fondo `::backdrop` en tinta al 40 %. El título es una pregunta, el texto explica la consecuencia y el botón de confirmar repite el verbo ("Cancelar extracción"). La acción segura ("Mantener", "Volver") es la primera y recibe el foco inicial. Sin `role` ni trampa de foco manuales: lo da el navegador.
 
@@ -229,7 +240,7 @@ Un solo estilo en todo el sistema, definido en `@layer base` de `app/globals.css
 - El historial muestra una fila compacta por solicitud: código AX en mono, marca, número de modelos, estado con progreso y fecha, y un chevron. El detalle (edición IMC, fechas, progreso, acciones, modelos) aparece al expandir. Cada grupo usa `content-visibility: auto`. Encima, búsqueda por AX y filtro por estado.
 
 ### Progress Bar (componente distintivo)
-- Barra fina con relleno de Azul de Foco para seguir el avance de una extracción. Se actualiza sola en el historial y respeta `prefers-reduced-motion`. No pulsa ni parpadea: el movimiento solo comunica el cambio de valor.
+- Barra fina con relleno de Azul de Foco para seguir el avance de una extracción. El relleno ocupa todo el ancho y se anima con `transform: scaleX()` desde la izquierda (sin transiciones de `width`). Se actualiza sola en el historial y respeta `prefers-reduced-motion`. No pulsa ni parpadea: el movimiento solo comunica el cambio de valor.
 
 ## Do's and Don'ts
 

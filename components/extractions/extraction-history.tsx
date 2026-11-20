@@ -8,6 +8,7 @@ import type { TransformerRequestInfo } from "@/lib/transformer/info";
 import type { ExtractionListItem, ExtractionReaderDetail } from "@/lib/extractions/types";
 import { formatSpanishDate, formatSpanishDateTime } from "@/lib/date-format";
 import { retryableItems, summarizeRequest, type RequestAggregateStatus } from "@/lib/extractions/request-summary";
+import { Alert } from "@/components/ui/alert";
 import { Badge, type BadgeTone } from "@/components/ui/badge";
 import { Button, buttonStyles } from "@/components/ui/button";
 import { useConfirm, type Confirm } from "@/components/ui/confirm-dialog";
@@ -156,7 +157,7 @@ function mergeUpdates(current: ExtractionListItem[], incoming: ExtractionListIte
 }
 
 function ProgressBar({ label, value, className = "" }: { label: string; value: number; className?: string }) {
-  return <div className={className}><div className="mb-1 flex justify-between text-meta text-ink-muted"><span>Progreso</span><span>{value}%</span></div><div aria-label={label} aria-valuemax={100} aria-valuemin={0} aria-valuenow={value} className="h-2 overflow-hidden rounded-full bg-line-soft" role="progressbar"><div className="h-full rounded-full bg-focus transition-[width] duration-500" style={{ width: `${value}%` }} /></div></div>;
+  return <div className={className}><div className="mb-1 flex justify-between text-meta text-ink-muted"><span>Progreso</span><span>{value}%</span></div><div aria-label={label} aria-valuemax={100} aria-valuemin={0} aria-valuenow={value} className="h-2 overflow-hidden rounded-full bg-line-soft" role="progressbar"><div className="h-full w-full origin-left bg-focus transition-transform duration-500" style={{ transform: `scaleX(${value / 100})` }} /></div></div>;
 }
 
 function ReaderDetail({ item, state }: { item: ExtractionListItem; state: { loading?: boolean; detail?: ExtractionReaderDetail; error?: string } | undefined }) {
@@ -183,6 +184,9 @@ export function ExtractionHistory({ createdId, openId, draftKey = "extraction-dr
   const [refreshError, setRefreshError] = useState(false);
   const [loadError, setLoadError] = useState("");
   const [loading, setLoading] = useState(false);
+  const [reloadKey, setReloadKey] = useState(0);
+  const failedAction = useRef<"search" | "more">("search");
+  const handledReload = useRef(0);
   const [search, setSearch] = useState("");
   const [appliedSearch, setAppliedSearch] = useState("");
   const [statusFilter, setStatusFilter] = useState<"all" | RequestAggregateStatus>("all");
@@ -215,7 +219,8 @@ export function ExtractionHistory({ createdId, openId, draftKey = "extraction-dr
   }, [createdId, draftKey, router]);
 
   useEffect(() => {
-    if (debouncedSearch === appliedSearch) return;
+    if (debouncedSearch === appliedSearch && reloadKey === handledReload.current) return;
+    handledReload.current = reloadKey;
     const requestId = ++latestLoad.current;
     void (async () => {
       setLoading(true);
@@ -224,6 +229,7 @@ export function ExtractionHistory({ createdId, openId, draftKey = "extraction-dr
       if (requestId !== latestLoad.current) return;
       setLoading(false);
       if (!result.ok) {
+        failedAction.current = "search";
         setLoadError(result.message);
         return;
       }
@@ -233,7 +239,7 @@ export function ExtractionHistory({ createdId, openId, draftKey = "extraction-dr
       setNextCursor(result.nextCursor);
       setTransformer(result.transformer);
     })();
-  }, [appliedSearch, debouncedSearch]);
+  }, [appliedSearch, debouncedSearch, reloadKey]);
 
   useEffect(() => {
     const ids = activeKey ? activeKey.split(",") : [];
@@ -318,6 +324,7 @@ export function ExtractionHistory({ createdId, openId, draftKey = "extraction-dr
     if (requestId !== latestLoad.current) return;
     setLoading(false);
     if (!result.ok) {
+      failedAction.current = "more";
       setLoadError(result.message);
       return;
     }
@@ -348,8 +355,8 @@ export function ExtractionHistory({ createdId, openId, draftKey = "extraction-dr
   return (
     <div className="space-y-4">
       {confirmDialog}
-      {createdId ? <p className="rounded-xl border border-success-line bg-success-wash px-4 py-3 text-body text-success-ink" role="status">{hasPendingApproval ? "Solicitud enviada y pendiente de aprobación." : "Solicitud enviada correctamente."}</p> : null}
-      {refreshError ? <p className="rounded-xl border border-pending-line bg-pending-wash px-4 py-3 text-body text-pending-ink" role="status">No se pudo actualizar el estado. Se volverá a intentar automáticamente.</p> : null}
+      {createdId ? <Alert role="status" tone="success">{hasPendingApproval ? "Solicitud enviada y pendiente de aprobación." : "Solicitud enviada correctamente."}</Alert> : null}
+      {refreshError ? <Alert role="status" tone="pending">No se pudo actualizar el estado. Se volverá a intentar automáticamente.</Alert> : null}
       <p className="sr-only" aria-live="polite">{items.filter((item) => item.status === "completed" || item.status === "failed" || item.requestStatus === "approved" || item.requestStatus === "rejected").map((item) => `${item.axCode}: ${visibleStatus(item).label}`).join(". ")}</p>
       <div className="flex flex-wrap items-end gap-4">
         <label className="block min-w-64 max-w-sm flex-1"><span className="field-label">Buscar por código AX</span><input autoComplete="off" className="field-control" name="search" onChange={(event) => setSearch(event.target.value)} placeholder="Ej.: 1XF" spellCheck={false} type="search" value={search} /></label>
@@ -357,8 +364,8 @@ export function ExtractionHistory({ createdId, openId, draftKey = "extraction-dr
         <p aria-live="polite" className="pb-3 text-body text-ink-muted" role="status">{summaryText}</p>
         {filtered || search ? <Button onClick={clearFilters} variant="ghost">Limpiar filtros</Button> : null}
       </div>
-      {loadError ? <p className="rounded-xl border border-danger-line bg-danger-wash px-4 py-3 text-body text-danger-ink" role="alert">{loadError}</p> : null}
-      {visibleGroups.length === 0 ? <p className="rounded-xl border border-dashed border-line bg-surface px-6 py-12 text-center text-body text-ink-muted">{loading ? "Buscando solicitudes…" : "Ninguna solicitud coincide con la búsqueda o el estado elegido."}</p> : null}
+      {loadError ? <Alert className="flex flex-wrap items-center justify-between gap-3" role="alert" tone="danger"><p>{loadError}</p><Button disabled={loading} onClick={() => failedAction.current === "more" ? void loadMore() : setReloadKey((current) => current + 1)}>Reintentar</Button></Alert> : null}
+      {visibleGroups.length === 0 ? <p className="rounded-xl border border-dashed border-line bg-surface px-6 py-12 text-center text-body text-ink-muted">{loading ? "Buscando solicitudes…" : `Ninguna solicitud cargada coincide con la búsqueda o el estado elegido.${nextCursor ? " Hay más solicitudes sin cargar: pulsa «Cargar más solicitudes» para ampliar la búsqueda." : ""}`}</p> : null}
       <div aria-busy={loading} className="space-y-3">
         {visibleGroups.map(([groupId, groupRows]) => {
           const first = groupRows[0]!;
@@ -381,10 +388,10 @@ export function ExtractionHistory({ createdId, openId, draftKey = "extraction-dr
             </h2>
             {expanded ? <div className="border-t border-line-soft" id={panelId}>
               <div className="space-y-3 px-5 py-4">
-                <dl className="grid grid-cols-2 gap-x-6 gap-y-3 md:grid-cols-5">
+                <dl className="grid grid-cols-5 gap-x-6 gap-y-3">
                   <div><dt className="text-meta text-ink-muted">Edición IMC</dt><dd className="mt-0.5 text-body font-medium text-ink" translate="no">{first.imcEdition}</dd></div>
                   <div><dt className="text-meta text-ink-muted">Inicio del desarrollo</dt><dd className="mt-0.5 text-body font-medium text-ink">{first.developmentStart ? formatSpanishDate(first.developmentStart) : "—"}</dd></div>
-                  <div><dt className="text-meta text-ink-muted">Completion</dt><dd className="mt-0.5 text-body font-medium text-ink">{formatSpanishDate(first.completion)}</dd></div>
+                  <div><dt className="text-meta text-ink-muted">Fecha de finalización</dt><dd className="mt-0.5 text-body font-medium text-ink">{formatSpanishDate(first.completion)}</dd></div>
                   <div><dt className="text-meta text-ink-muted">{noun === "familia" ? "Familias" : noun === "modelo" ? "Modelos" : "Typekeys"}</dt><dd className="mt-0.5 text-body font-medium text-ink">{groupRows.length}</dd></div>
                   <div><dt className="text-meta text-ink-muted">Solicitada</dt><dd className="mt-0.5 text-body font-medium text-ink"><time dateTime={first.createdAt}>{formatSpanishDateTime(first.createdAt)}</time>{first.requesterName ? ` · ${first.requesterName}` : ""}</dd></div>
                 </dl>

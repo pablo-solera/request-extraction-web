@@ -46,5 +46,5 @@ export default async function AdminUsersPage({ searchParams }: AdminUsersPagePro
   const page = Number.isInteger(requestedPage) ? Math.min(Math.max(requestedPage, 1), totalPages) : 1;
   const pagedUsers = filteredUsers.slice((page - 1) * pageSize, page * pageSize);
 
-  return <section className="space-y-8"><PageHeader><PageHeader.Title>Gestión de usuarios</PageHeader.Title><PageHeader.Description>Consulta las cuentas disponibles en la organización.</PageHeader.Description></PageHeader><UsersTable currentUserId={admin.id} page={page} query={queryParam} totalPages={totalPages} totalUsers={filteredUsers.length} users={pagedUsers} /></section>;
+  return <section className="space-y-6"><PageHeader><PageHeader.Title>Gestión de usuarios</PageHeader.Title><PageHeader.Description>Consulta las cuentas disponibles en la organización.</PageHeader.Description></PageHeader><UsersTable currentUserId={admin.id} page={page} query={queryParam} totalPages={totalPages} totalUsers={filteredUsers.length} users={pagedUsers} /></section>;
 }

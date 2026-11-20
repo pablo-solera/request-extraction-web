@@ -1,3 +1,4 @@
+import { clearCachedJson } from "@/lib/client/cached-json";
 import { cleanup, render, screen, waitFor } from "@testing-library/react";
 import userEvent from "@testing-library/user-event";
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
@@ -38,7 +39,7 @@ afterEach(() => {
 async function reachModels(user: ReturnType<typeof userEvent.setup>) {
   await user.type(screen.getAllByLabelText("Código AX")[0]!, "3f6");
   await user.type(screen.getAllByLabelText("Edición IMC")[0]!, "04/0");
-  await user.type(screen.getAllByLabelText(/Completion/)[0]!, "2026-10-20");
+  await user.type(screen.getAllByLabelText(/Fecha de finalización/)[0]!, "2026-10-20");
   await user.type(screen.getAllByLabelText(/Inicio del desarrollo/)[0]!, "2026-03-01");
   await user.click(screen.getByRole("button", { name: "Continuar" }));
   await user.click(screen.getByRole("button", { name: "Mercedes-Benz Group" }));
@@ -86,6 +87,7 @@ describe("extraction form for Mercedes-Benz", () => {
     expect(JSON.parse((container.querySelector('input[name="vehicles"]') as HTMLInputElement).value)).toEqual([]);
 
     cleanup();
+    clearCachedJson();
     vi.stubGlobal("fetch", vi.fn(async () => Response.json({ error: { message: "El servicio de Mercedes-Benz no está disponible." } }, { status: 502 })));
     render(<ExtractionForm />);
     await reachModels(user);

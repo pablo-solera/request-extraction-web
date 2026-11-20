@@ -1,15 +1,18 @@
 "use client";
 
 import dynamic from "next/dynamic";
-import { useActionState, useEffect, useId, useRef, useState } from "react";
+import { useActionState, useDeferredValue, useEffect, useId, useRef, useState } from "react";
 import { z } from "zod";
 import { createExtractionAction, type ExtractionFormState } from "@/app/(dashboard)/extractions/actions";
 import { SubmitButton } from "@/components/common/submit-button";
-import { Button } from "@/components/ui/button";
+import { Alert } from "@/components/ui/alert";
+import { Badge } from "@/components/ui/badge";
+import { Button, buttonStyles } from "@/components/ui/button";
 import { useConfirm } from "@/components/ui/confirm-dialog";
 import { BmwAvailabilityNotice } from "@/components/extractions/bmw-availability-notice";
 import { formatSpanishDate, formatSpanishDateTime } from "@/lib/date-format";
 import { extractionFormSchema, type ExtractionVehicle } from "@/lib/extractions/validation";
+import { loadCachedJson } from "@/lib/client/cached-json";
 import { useBmwAvailability, type AvailabilityTarget } from "@/lib/hooks/use-bmw-availability";
 
 const BmwSwapReview = dynamic(() => import("@/components/extractions/bmw-swap-review").then((module) => module.BmwSwapReview));
@@ -85,12 +88,21 @@ function FieldError({ children, id }: { children?: string; id: string }) {
   return children ? <span className="mt-1 block text-body text-danger-ink" id={id}>{children}</span> : null;
 }
 
+function CheckIcon() {
+  return <svg aria-hidden="true" className="size-4 shrink-0" fill="none" stroke="currentColor" strokeLinecap="round" strokeLinejoin="round" strokeWidth="2.5" viewBox="0 0 24 24"><path d="M5 12.5l4.5 4.5L19 7.5" /></svg>;
+}
+
+function hasOptionList(body: unknown) {
+  const options = body && typeof body === "object" ? (body as { options?: unknown }).options : null;
+  return Array.isArray(options) && options.every((option) => option && typeof option === "object" && "value" in option && typeof option.value === "string" && "label" in option && typeof option.label === "string");
+}
+
 function resultsLabel(count: number) {
   return count === 1 ? "1 resultado" : `${count} resultados`;
 }
 
-function StepHeading({ title, description }: { title: string; description: string }) {
-  return <div className="max-w-2xl"><h2 className="text-lg font-semibold text-zinc-950">{title}</h2><p className="mt-1 text-sm leading-6 text-zinc-600">{description}</p></div>;
+function StepHeading({ id, title, description }: { id: string; title: string; description: string }) {
+  return <div className="max-w-2xl"><h2 className="text-title font-semibold text-ink-strong" id={id}>{title}</h2><p className="mt-1 text-body text-ink-muted">{description}</p></div>;
 }
 
 function BmwOptionField({
@@ -118,22 +130,20 @@ function BmwOptionField({
   const options = currentResult?.options ?? [];
   const message = currentResult?.message ?? "";
   const loading = Boolean(url && !currentResult);
-  const filtered = search.trim()
-    ? options.filter((option) => `${option.value} ${option.label}`.toLocaleLowerCase("es-ES").includes(search.trim().toLocaleLowerCase("es-ES")))
+  const deferredSearch = useDeferredValue(search);
+  const filtered = deferredSearch.trim()
+    ? options.filter((option) => `${option.value} ${option.label}`.toLocaleLowerCase("es-ES").includes(deferredSearch.trim().toLocaleLowerCase("es-ES")))
     : options;
 
   useEffect(() => {
     if (!url) return;
     const controller = new AbortController();
-    void fetch(url, { cache: "no-store", signal: controller.signal })
-      .then(async (response) => {
-        const body: unknown = await response.json();
+    void loadCachedJson(url, controller.signal, hasOptionList)
+      .then(({ ok, body }) => {
         const envelope = body && typeof body === "object" ? body as { options?: unknown; error?: { message?: string } } : null;
-        if (!response.ok) throw new Error(envelope?.error?.message || `No se han podido cargar ${label.toLocaleLowerCase("es-ES")} BMW.`);
-        if (!Array.isArray(envelope?.options) || !envelope.options.every((option) => option && typeof option === "object" && "value" in option && typeof option.value === "string" && "label" in option && typeof option.label === "string")) {
-          throw new Error("BMW ha devuelto una lista de opciones no válida.");
-        }
-        setResult({ requestUrl: url, options: envelope.options as Option[], message: "" });
+        if (!ok) throw new Error(envelope?.error?.message || `No se han podido cargar ${label.toLocaleLowerCase("es-ES")} BMW.`);
+        if (!hasOptionList(body)) throw new Error("BMW ha devuelto una lista de opciones no válida.");
+        setResult({ requestUrl: url, options: (envelope?.options ?? []) as Option[], message: "" });
       })
       .catch((error: unknown) => {
         if (controller.signal.aborted) return;
@@ -157,19 +167,19 @@ function BmwOptionField({
   }
 
   return <div className={className}>
-    {searchable ? <div className="mb-3"><label className="field-label" htmlFor={`${id}-search`}>{`Buscar ${label.toLocaleLowerCase("es-ES")}`}</label><input autoComplete="off" className="field-control" disabled={!url || loading || Boolean(message)} id={`${id}-search`} onChange={(event) => setSearch(event.target.value)} placeholder="Por código o descripción" type="search" value={search} /><p aria-live="polite" className="sr-only" role="status">{search.trim() && options.length > 0 ? resultsLabel(filtered.length) : ""}</p></div> : null}
+    {searchable ? <div className="mb-3"><label className="field-label" htmlFor={`${id}-search`}>{`Buscar ${label.toLocaleLowerCase("es-ES")}`}</label><input autoComplete="off" className="field-control" disabled={!url || loading || Boolean(message)} id={`${id}-search`} onChange={(event) => setSearch(event.target.value)} placeholder="Por código o descripción" type="search" value={search} /><p aria-live="polite" className="sr-only" role="status">{deferredSearch.trim() && options.length > 0 ? resultsLabel(filtered.length) : ""}</p></div> : null}
     <label className="field-label" htmlFor={`${id}-select`}>{label}</label>
     <select aria-describedby={error ? `${id}-error` : undefined} aria-invalid={Boolean(error)} className="field-control" disabled={!url || loading || Boolean(message) || options.length === 0} id={`${id}-select`} onChange={(event) => onChange(event.target.value)} required value={value}>
-      <option value="">{!url ? initialText : loading ? loadingText : message ? "Opciones no disponibles" : options.length === 0 ? emptyText : searchable && search && filtered.length === 0 ? "No se encontraron typekeys" : `Selecciona ${label.toLocaleLowerCase("es-ES")}`}</option>
+      <option value="">{!url ? initialText : loading ? loadingText : message ? "Opciones no disponibles" : options.length === 0 ? emptyText : searchable && deferredSearch && filtered.length === 0 ? "No se encontraron typekeys" : `Selecciona ${label.toLocaleLowerCase("es-ES")}`}</option>
       {filtered.map((option) => <option key={option.value} value={option.value}>{option.label}</option>)}
     </select>
     <FieldError id={`${id}-error`}>{error}</FieldError>
-    {onAddMultiple ? <div className="mt-3 rounded-lg border border-zinc-200 bg-white p-3">
+    {onAddMultiple ? <div className="mt-3 rounded-lg border border-line-soft bg-surface p-3">
       <label><span className="field-label">Pegar varios typekeys</span><textarea className="field-control min-h-20 resize-y font-mono" disabled={!url || loading || Boolean(message) || options.length === 0} onChange={(event) => setPasteValue(event.target.value)} placeholder="Ej.: 11EH, 41HZ, 51HY" value={pasteValue} /></label>
-      <div className="mt-2 flex flex-wrap items-center gap-3"><Button disabled={!pasteValue.trim() || loading || options.length === 0} onClick={addPastedTypekeys}>Añadir typekeys</Button><span className="text-xs text-zinc-500">Separados por espacios, comas o punto y coma</span></div>
-      {pasteMessage ? <p className="mt-2 text-body text-zinc-600" role="status">{pasteMessage}</p> : null}
+      <div className="mt-2 flex flex-wrap items-center gap-3"><Button disabled={!pasteValue.trim() || loading || options.length === 0} onClick={addPastedTypekeys}>Añadir typekeys</Button><span className="text-meta text-ink-muted">Separados por espacios, comas o punto y coma</span></div>
+      {pasteMessage ? <p className="mt-2 text-body text-ink-muted" role="status">{pasteMessage}</p> : null}
     </div> : null}
-    {message ? <div className="mt-2 flex items-center gap-2 text-body text-danger-ink" role="status"><span>{message}</span><button className="font-semibold underline underline-offset-2" onClick={() => setRetry((current) => current + 1)} type="button">Reintentar</button></div> : null}
+    {message ? <div className="mt-2 flex items-center gap-2 text-body text-danger-ink" role="status"><span>{message}</span><Button onClick={() => setRetry((current) => current + 1)}>Reintentar</Button></div> : null}
   </div>;
 }
 
@@ -182,13 +192,12 @@ function RenaultFamilySelector({ brand, selected, onToggle }: { brand: "Renault"
 
   useEffect(() => {
     const controller = new AbortController();
-    void fetch(url, { cache: "no-store", signal: controller.signal })
-      .then(async (response) => {
-        const body: unknown = await response.json();
+    void loadCachedJson(url, controller.signal, hasOptionList)
+      .then(({ ok, body }) => {
         const envelope = body && typeof body === "object" ? body as { options?: unknown; error?: { message?: string } } : null;
-        if (!response.ok) throw new Error(envelope?.error?.message || `No se han podido cargar las familias de ${brand}.`);
-        if (!Array.isArray(envelope?.options) || !envelope.options.every((option) => option && typeof option === "object" && "value" in option && typeof option.value === "string" && "label" in option && typeof option.label === "string")) throw new Error("El reader ha devuelto una lista de familias no válida.");
-        setResult({ url, options: envelope.options as Option[], error: "" });
+        if (!ok) throw new Error(envelope?.error?.message || `No se han podido cargar las familias de ${brand}.`);
+        if (!hasOptionList(body)) throw new Error("El reader ha devuelto una lista de familias no válida.");
+        setResult({ url, options: (envelope?.options ?? []) as Option[], error: "" });
       })
       .catch((error: unknown) => {
         if (!controller.signal.aborted) setResult({ url, options: [], error: error instanceof Error ? error.message : "No se han podido cargar las familias." });
@@ -197,15 +206,16 @@ function RenaultFamilySelector({ brand, selected, onToggle }: { brand: "Renault"
   }, [url, retry, brand]);
 
   const options = current?.options ?? [];
-  const filtered = search.trim() ? options.filter((option) => `${option.value} ${option.label}`.toLocaleLowerCase("es-ES").includes(search.trim().toLocaleLowerCase("es-ES"))) : options;
+  const deferredSearch = useDeferredValue(search);
+  const filtered = deferredSearch.trim() ? options.filter((option) => `${option.value} ${option.label}`.toLocaleLowerCase("es-ES").includes(deferredSearch.trim().toLocaleLowerCase("es-ES"))) : options;
   return <div className="space-y-3">
     <label className="block"><span className="field-label">Buscar familias</span><input className="field-control" disabled={!current || Boolean(current.error)} onChange={(event) => setSearch(event.target.value)} placeholder="Escribe nombre o código" type="search" value={search} /></label>
-    <p aria-live="polite" className="sr-only" role="status">{search.trim() && options.length > 0 ? resultsLabel(filtered.length) : ""}</p>
-    {!current ? <p className="text-sm text-zinc-600" role="status">Cargando familias de {brand}…</p> : current.error ? <div className="flex flex-wrap items-center gap-3 text-sm text-red-700" role="alert"><span>{current.error}</span><button className="font-semibold underline" onClick={() => setRetry((value) => value + 1)} type="button">Reintentar</button></div> : options.length === 0 ? <p className="rounded-lg border border-dashed border-zinc-300 p-5 text-sm text-zinc-600">El reader no ha devuelto familias para {brand}.</p> : filtered.length === 0 ? <p className="text-sm text-zinc-600">No hay coincidencias.</p> : <ul className="max-h-96 divide-y divide-zinc-200 overflow-y-auto rounded-xl border border-zinc-200 bg-white">{filtered.map((option) => {
+    <p aria-live="polite" className="sr-only" role="status">{deferredSearch.trim() && options.length > 0 ? resultsLabel(filtered.length) : ""}</p>
+    {!current ? <p className="text-body text-ink-muted" role="status">Cargando familias de {brand}…</p> : current.error ? <div className="flex flex-wrap items-center gap-3 text-body text-danger-ink" role="alert"><span>{current.error}</span><Button onClick={() => setRetry((value) => value + 1)}>Reintentar</Button></div> : options.length === 0 ? <p className="rounded-lg border border-dashed border-line p-5 text-body text-ink-muted">El reader no ha devuelto familias para {brand}.</p> : filtered.length === 0 ? <p className="text-body text-ink-muted">No hay coincidencias.</p> : <ul className="max-h-96 divide-y divide-line-soft overflow-y-auto rounded-xl border border-line-soft bg-surface">{filtered.map((option) => {
       const checked = selected.some((vehicle) => vehicle.manufacturerGroup === "Renault" && vehicle.modelCode === option.value);
-      return <li key={option.value}><label className="flex min-h-12 cursor-pointer items-center gap-3 px-4 py-3 hover:bg-zinc-50"><input aria-label={`Seleccionar familia ${option.label}`} checked={checked} className="size-4 accent-sky-700" onChange={(event) => onToggle(option, event.target.checked)} type="checkbox" /><span className="min-w-0 text-sm text-zinc-900">{option.label}<span className="ml-2 font-mono text-xs text-zinc-500">{option.value}</span></span></label></li>;
+      return <li key={option.value}><label className="flex min-h-12 cursor-pointer items-center gap-3 px-4 py-3 hover:bg-surface-sunken"><input aria-label={`Seleccionar familia ${option.label}`} checked={checked} className="size-4 accent-focus" onChange={(event) => onToggle(option, event.target.checked)} type="checkbox" /><span className="min-w-0 text-body text-ink">{option.label}<span className="ml-2 font-mono text-meta text-ink-muted">{option.value}</span></span></label></li>;
     })}</ul>}
-    <p className="text-xs text-zinc-500">Cada familia seleccionada se enviará como una extracción independiente.</p>
+    <p className="text-meta text-ink-muted">Cada familia seleccionada se enviará como una extracción independiente.</p>
   </div>;
 }
 
@@ -492,98 +502,98 @@ export function ExtractionStepperForm({
 
   const summaryTitle = group === "BMW" ? "Serie y typekeys" : group === "Mercedes" ? "Serie y modelos" : "Familias";
 
-  return <form action={action} className="overflow-hidden rounded-xl border border-zinc-200 bg-white" ref={formRef}>
+  return <form action={action} className="overflow-hidden rounded-xl border border-line-soft bg-surface" ref={formRef}>
     {confirmDialog}
 
-    <div className="border-b border-zinc-200 px-5 py-4 sm:px-7">
+    <div className="border-b border-line-soft px-7 py-4">
       <nav aria-label="Progreso de la solicitud">
         <ol className="flex items-center">
           {STEP_TITLES.map((title, index) => <li className={`flex min-w-0 items-center ${index < STEP_TITLES.length - 1 ? "flex-1" : ""}`} key={title}>
-            <button aria-current={step === index ? "step" : undefined} className={`flex min-h-11 shrink-0 items-center gap-3 rounded-lg text-body transition-colors ${step === index ? "font-semibold text-zinc-950" : index < step ? "text-zinc-800 hover:text-sky-800" : "cursor-not-allowed text-zinc-500"}`} disabled={index > step} onClick={() => goToStep(index)} type="button">
-              <span className={`flex size-8 shrink-0 items-center justify-center rounded-full border text-sm font-medium tabular-nums ${step === index ? "border-2 border-sky-700 bg-white text-sky-800" : index < step ? "border-sky-700 bg-sky-700 text-white" : "border-zinc-400 bg-white text-zinc-700"}`}>{index < step ? <svg aria-hidden="true" className="size-4" fill="none" stroke="currentColor" strokeLinecap="round" strokeLinejoin="round" strokeWidth="3" viewBox="0 0 24 24"><path d="M5 12.5l4.5 4.5L19 7.5" /></svg> : index + 1}</span>
-              <span className={step === index ? "inline" : "hidden sm:inline"}>{title}</span>{index < step ? <span className="sr-only"> (completado)</span> : null}
+            <button aria-current={step === index ? "step" : undefined} className={`flex min-h-11 shrink-0 items-center gap-3 rounded-lg text-body transition-colors ${step === index ? "font-semibold text-ink-strong" : index < step ? "text-ink hover:text-ink-strong" : "cursor-not-allowed text-ink-muted"}`} disabled={index > step} onClick={() => goToStep(index)} type="button">
+              <span className={`flex size-8 shrink-0 items-center justify-center rounded-full border text-body font-medium tabular-nums ${step === index ? "border-2 border-ink-strong bg-surface text-ink-strong" : index < step ? "border-ink-strong bg-ink-strong text-surface" : "border-line bg-surface text-ink-muted"}`}>{index < step ? <svg aria-hidden="true" className="size-4" fill="none" stroke="currentColor" strokeLinecap="round" strokeLinejoin="round" strokeWidth="3" viewBox="0 0 24 24"><path d="M5 12.5l4.5 4.5L19 7.5" /></svg> : index + 1}</span>
+              <span>{title}</span>{index < step ? <span className="sr-only"> (completado)</span> : null}
             </button>
-            {index < STEP_TITLES.length - 1 ? <span aria-hidden="true" className={`mx-1 h-px min-w-3 flex-1 sm:mx-3 ${index < step ? "bg-sky-700" : "bg-zinc-300"}`} /> : null}
+            {index < STEP_TITLES.length - 1 ? <span aria-hidden="true" className={`mx-3 h-px min-w-3 flex-1 ${index < step ? "bg-ink-strong" : "bg-line"}`} /> : null}
           </li>)}
         </ol>
       </nav>
       <p aria-live="polite" className="sr-only">Paso {step + 1} de 4 · {STEP_TITLES[step]}</p>
     </div>
 
-    <div className="space-y-6 p-5 sm:p-7">
+    <div className="space-y-6 p-7">
       {step === 0 ? <section aria-labelledby="step-common" className="space-y-5">
-        <StepHeading title="Datos comunes" description="Estos datos se aplicarán a todas las extracciones de esta solicitud." />
-        <div className="grid gap-5 md:grid-cols-2">
+        <StepHeading id="step-common" title="Datos comunes" description="Estos datos se aplicarán a todas las extracciones de esta solicitud." />
+        <div className="grid grid-cols-2 gap-5">
           <div><label><span className="field-label">Código AX</span><input aria-describedby={localErrors.axCode || state.fieldErrors?.axCode ? `${formId}-axCode-error` : undefined} aria-invalid={Boolean(localErrors.axCode || state.fieldErrors?.axCode)} autoComplete="off" className="field-control font-mono uppercase" maxLength={4} minLength={3} onChange={(event) => setValues((current) => ({ ...current, axCode: normalizeAxCode(event.target.value) }))} pattern="[A-Za-z0-9]{3,4}" placeholder="Ej.: 1XF" required spellCheck={false} value={values.axCode} /></label><FieldError id={`${formId}-axCode-error`}>{localErrors.axCode ?? state.fieldErrors?.axCode}</FieldError></div>
           <div><label><span className="field-label">Edición IMC</span><input aria-describedby={localErrors.imcEdition || state.fieldErrors?.imcEdition ? `${formId}-imcEdition-error` : undefined} aria-invalid={Boolean(localErrors.imcEdition || state.fieldErrors?.imcEdition)} autoComplete="off" className="field-control font-mono" inputMode="numeric" maxLength={4} onChange={(event) => setValues((current) => ({ ...current, imcEdition: event.target.value }))} pattern="\d{2}/\d" placeholder="Ej.: 05/0" required spellCheck={false} value={values.imcEdition} /></label><FieldError id={`${formId}-imcEdition-error`}>{localErrors.imcEdition ?? state.fieldErrors?.imcEdition}</FieldError></div>
           <div><label><span className="field-label">Inicio del desarrollo</span><input aria-describedby={localErrors.laboursDevelopmentStart || state.fieldErrors?.laboursDevelopmentStart ? `${formId}-laboursDevelopmentStart-error` : undefined} aria-invalid={Boolean(localErrors.laboursDevelopmentStart || state.fieldErrors?.laboursDevelopmentStart)} autoComplete="off" className="field-control" lang="es-ES" onChange={(event) => setValues((current) => ({ ...current, laboursDevelopmentStart: event.target.value }))} required type="date" value={values.laboursDevelopmentStart} /></label><FieldError id={`${formId}-laboursDevelopmentStart-error`}>{localErrors.laboursDevelopmentStart ?? state.fieldErrors?.laboursDevelopmentStart}</FieldError></div>
-          <div><label><span className="field-label">Completion</span><input aria-describedby={localErrors.completion || state.fieldErrors?.completion ? `${formId}-completion-error` : undefined} aria-invalid={Boolean(localErrors.completion || state.fieldErrors?.completion)} autoComplete="off" className="field-control" lang="es-ES" onChange={(event) => setValues((current) => ({ ...current, completion: event.target.value }))} required type="date" value={values.completion} /></label><FieldError id={`${formId}-completion-error`}>{localErrors.completion ?? state.fieldErrors?.completion}</FieldError></div>
+          <div><label><span className="field-label">Fecha de finalización</span><input aria-describedby={localErrors.completion || state.fieldErrors?.completion ? `${formId}-completion-error` : undefined} aria-invalid={Boolean(localErrors.completion || state.fieldErrors?.completion)} autoComplete="off" className="field-control" lang="es-ES" onChange={(event) => setValues((current) => ({ ...current, completion: event.target.value }))} required type="date" value={values.completion} /></label><FieldError id={`${formId}-completion-error`}>{localErrors.completion ?? state.fieldErrors?.completion}</FieldError></div>
         </div>
       </section> : null}
 
       {step === 1 ? <section aria-labelledby="step-manufacturer" className="space-y-6">
-        <StepHeading title="Grupo y fabricante" description="Una solicitud corresponde a una sola marca. Después podrás añadir varios modelos o familias de esa marca." />
+        <StepHeading id="step-manufacturer" title="Grupo y fabricante" description="Una solicitud corresponde a una sola marca. Después podrás añadir varios modelos o familias de esa marca." />
         <fieldset className="space-y-3"><legend className="field-label">Grupo de fabricantes</legend>
-          <div className="grid gap-3 sm:grid-cols-3">
-            {(["BMW", "Renault", "Mercedes"] as const).map((option) => <button aria-pressed={group === option} className={`min-h-16 rounded-xl border px-4 py-3 text-left text-sm font-semibold transition-colors ${group === option ? "border-sky-700 bg-sky-50 text-sky-950" : "border-zinc-300 bg-white text-zinc-800 hover:bg-zinc-50"}`} key={option} onClick={() => void selectGroup(option)} type="button">{option === "BMW" ? "BMW Group" : option === "Renault" ? "Renault Group" : "Mercedes-Benz Group"}</button>)}
-            <button aria-describedby="vag-disabled-description" aria-disabled="true" className="min-h-16 cursor-not-allowed rounded-xl border border-zinc-200 bg-zinc-100 px-4 py-3 text-left text-sm font-semibold text-zinc-500" disabled type="button">VAG <span className="mt-1 block text-xs font-normal">Deshabilitado</span></button>
+          <div className="grid grid-cols-4 gap-3">
+            {(["BMW", "Renault", "Mercedes"] as const).map((option) => <button aria-pressed={group === option} className={`flex min-h-16 items-center justify-between gap-2 rounded-xl border px-4 py-3 text-left text-body font-semibold transition-colors ${group === option ? "border-2 border-ink-strong bg-surface-sunken text-ink-strong" : "border-line bg-surface text-ink hover:bg-surface-sunken"}`} key={option} onClick={() => void selectGroup(option)} type="button">{option === "BMW" ? "BMW Group" : option === "Renault" ? "Renault Group" : "Mercedes-Benz Group"}{group === option ? <CheckIcon /> : null}</button>)}
+            <button aria-describedby="vag-disabled-description" aria-disabled="true" className="min-h-16 cursor-not-allowed rounded-xl border border-line-soft bg-canvas px-4 py-3 text-left text-body font-semibold text-ink-muted" disabled type="button">VAG <span className="mt-1 block text-meta font-normal">Deshabilitado</span></button>
           </div>
-          <p className="text-body text-zinc-600" id="vag-disabled-description">El reader VAG está disponible, pero las solicitudes siguen deshabilitadas en este formulario. Incluye Volkswagen, Audi, Škoda y SEAT.</p>
+          <p className="text-body text-ink-muted" id="vag-disabled-description">El reader VAG está disponible, pero las solicitudes siguen deshabilitadas en este formulario. Incluye Volkswagen, Audi, Škoda y SEAT.</p>
         </fieldset>
-        {group ? <fieldset className="space-y-3"><legend className="field-label">Fabricante</legend><div className="flex flex-wrap gap-2">{BRAND_OPTIONS[group].map((option) => <button aria-pressed={brand === option} className={`min-h-11 rounded-lg border px-4 py-2 text-sm font-semibold transition-colors ${brand === option ? "border-sky-700 bg-sky-700 text-white" : "border-zinc-300 bg-white text-zinc-800 hover:bg-zinc-50"}`} key={option} onClick={() => void selectBrand(option)} type="button">{option}</button>)}</div></fieldset> : <p className="text-sm text-zinc-600">Selecciona un grupo para ver sus fabricantes.</p>}
-        {stepError ? <p className="text-sm text-red-700" role="alert">{stepError}</p> : null}
+        {group ? <fieldset className="space-y-3"><legend className="field-label">Fabricante</legend><div className="flex flex-wrap gap-2">{BRAND_OPTIONS[group].map((option) => <button aria-pressed={brand === option} className={buttonStyles(brand === option ? "primary" : "secondary")} key={option} onClick={() => void selectBrand(option)} type="button">{brand === option ? <CheckIcon /> : null}{option}</button>)}</div></fieldset> : <p className="text-body text-ink-muted">Selecciona un grupo para ver sus fabricantes.</p>}
+        {stepError ? <p className="text-body text-danger-ink" role="alert">{stepError}</p> : null}
       </section> : null}
 
       {step === 2 ? <section aria-labelledby="step-models" className="space-y-5">
-        <StepHeading title={summaryTitle} description={group === "BMW" ? "Elige la serie, el código de desarrollo y los typekeys. Cada typekey genera una extracción." : group === "Mercedes" ? "Elige la serie y uno o varios modelos. Se creará una extracción independiente por cada modelo." : "Selecciona una o varias familias. Se creará una extracción independiente por cada familia."} />
+        <StepHeading id="step-models" title={summaryTitle} description={group === "BMW" ? "Elige la serie, el código de desarrollo y los typekeys. Cada typekey genera una extracción." : group === "Mercedes" ? "Elige la serie y uno o varios modelos. Se creará una extracción independiente por cada modelo." : "Selecciona una o varias familias. Se creará una extracción independiente por cada familia."} />
         {group === "Renault" && (brand === "Renault" || brand === "Dacia") ? <RenaultFamilySelector brand={brand} onToggle={toggleRenaultFamily} selected={vehicles} /> : null}
         {group === "Mercedes" ? <MercedesModelSelector initialSeries={vehicles[0]?.manufacturerGroup === "Mercedes" ? vehicles[0].series : ""} onSeriesChange={changeMercedesSeries} onToggle={toggleMercedesModel} selected={vehicles.flatMap((vehicle) => vehicle.manufacturerGroup === "Mercedes" ? [{ series: vehicle.series, modelCode: vehicle.modelCode }] : [])} /> : null}
         {group === "BMW" ? <>
-          {vehicles.length === 0 ? <p className="text-sm text-zinc-600">Añade el primer typekey para continuar.</p> : <div className="space-y-4">{vehicles.map((vehicle, index) => vehicle.manufacturerGroup === "BMW" ? <fieldset className="grid min-w-0 gap-3 rounded-xl border border-zinc-200 bg-zinc-50 p-4 md:grid-cols-[0.65fr_0.8fr_1fr_1fr_1.7fr_auto]" key={vehicle.id}>
+          {vehicles.length === 0 ? <p className="text-body text-ink-muted">Añade el primer typekey para continuar.</p> : <div className="space-y-4">{vehicles.map((vehicle, index) => vehicle.manufacturerGroup === "BMW" ? <fieldset className="grid min-w-0 gap-3 rounded-xl border border-line-soft bg-surface-sunken p-4 grid-cols-[0.65fr_0.8fr_1fr_1fr_1.7fr_auto]" key={vehicle.id}>
             <legend className="sr-only">Typekey {index + 1}</legend>
             <label><span className="field-label">Fabricante</span><span className="field-control flex items-center">{brand}</span></label>
             <BmwOptionField emptyText="No hay series disponibles" error={fieldError(state, localErrors, `vehicle.${index}.series`)} initialText="Carga series" label="Serie" loadingText="Cargando series…" onChange={(value) => updateBmwVehicle(vehicle.id, { series: value, developmentCode: "", typekey: "" })} url={`/api/readers/bmw/series?brand=${encodeURIComponent(brand)}`} value={vehicle.series} />
             <BmwOptionField emptyText="No hay códigos para esta serie" error={vehicleError(index, "developmentCode")} initialText="Selecciona primero una serie" label="Código de desarrollo" loadingText="Cargando códigos…" onChange={(value) => updateBmwVehicle(vehicle.id, { developmentCode: value, typekey: "" })} url={vehicle.series ? `/api/readers/bmw/development-codes?${new URLSearchParams({ brand, series: vehicle.series })}` : null} value={vehicle.developmentCode} />
-            <BmwOptionField className="md:col-span-2" emptyText="No hay typekeys para esta selección" error={vehicleError(index, "typekey")} initialText="Selecciona primero un código" label="Typekey" loadingText="Cargando typekeys…" onAddMultiple={(codes) => addBmwTypekeys(vehicle.id, codes)} onChange={(value) => updateBmwVehicle(vehicle.id, { typekey: value })} searchable url={vehicle.series && vehicle.developmentCode ? `/api/readers/bmw/typekeys?${new URLSearchParams({ brand, series: vehicle.series, developmentCode: vehicle.developmentCode })}` : null} value={vehicle.typekey} />
-            <div className="flex items-end gap-2 md:flex-col md:items-stretch"><Button aria-label={`Duplicar typekey ${index + 1}`} disabled={vehicles.length >= 50} onClick={() => duplicateBmwVehicle(vehicle.id)}>Duplicar</Button><Button aria-label={`Quitar typekey ${index + 1}`} disabled={vehicles.length === 1} onClick={() => removeBmwVehicle(vehicle.id)} variant="danger">Quitar</Button></div>
+            <BmwOptionField className="col-span-2" emptyText="No hay typekeys para esta selección" error={vehicleError(index, "typekey")} initialText="Selecciona primero un código" label="Typekey" loadingText="Cargando typekeys…" onAddMultiple={(codes) => addBmwTypekeys(vehicle.id, codes)} onChange={(value) => updateBmwVehicle(vehicle.id, { typekey: value })} searchable url={vehicle.series && vehicle.developmentCode ? `/api/readers/bmw/typekeys?${new URLSearchParams({ brand, series: vehicle.series, developmentCode: vehicle.developmentCode })}` : null} value={vehicle.typekey} />
+            <div className="flex flex-col items-stretch gap-2"><Button aria-label={`Duplicar typekey ${index + 1}`} disabled={vehicles.length >= 50} onClick={() => duplicateBmwVehicle(vehicle.id)}>Duplicar</Button><Button aria-label={`Quitar typekey ${index + 1}`} disabled={vehicles.length === 1} onClick={() => removeBmwVehicle(vehicle.id)} variant="danger">Quitar</Button></div>
           </fieldset> : null)}</div>}
           <Button disabled={vehicles.length >= 50} onClick={addBlankBmwVehicle}>Añadir otro typekey</Button>
         </> : null}
         <BmwSwapReview items={reviewItems} onRemove={removeUnavailableVehicle} onSwap={replaceWithBaseType} />
-        {stepError ? <p className="text-sm text-red-700" role="alert">{stepError}</p> : null}
+        {stepError ? <p className="text-body text-danger-ink" role="alert">{stepError}</p> : null}
       </section> : null}
 
       {step === 3 ? <section aria-labelledby="step-summary" className="space-y-5">
-        <StepHeading title="Revisa e inicia" description="Confirma los datos comunes y los modelos antes de crear las extracciones." />
-        <div className="overflow-hidden rounded-xl border border-zinc-200 bg-white">
-          <div className="flex flex-wrap items-center justify-between gap-3 border-b border-zinc-200 bg-zinc-50 px-5 py-4">
-            <div><p className="text-xs font-medium text-zinc-500">Código AX</p><p className="mt-0.5 font-mono text-2xl font-semibold tracking-wide text-zinc-950">{values.axCode}</p></div>
-            <span className="rounded-full border border-sky-200 bg-sky-50 px-3 py-1 text-sm font-semibold text-sky-900">{brand}</span>
+        <StepHeading id="step-summary" title="Revisa e inicia" description="Confirma los datos comunes y los modelos antes de crear las extracciones." />
+        <div className="overflow-hidden rounded-xl border border-line-soft bg-surface">
+          <div className="flex flex-wrap items-center justify-between gap-3 border-b border-line-soft bg-surface-sunken px-5 py-4">
+            <div><p className="text-meta font-medium text-ink-muted">Código AX</p><p className="mt-0.5 font-mono text-headline font-semibold text-ink-strong">{values.axCode}</p></div>
+            <Badge icon={false} tone="info">{brand}</Badge>
           </div>
-          <dl className="grid divide-y divide-zinc-200 text-sm sm:grid-cols-3 sm:divide-x sm:divide-y-0">
-            <div className="px-5 py-4"><dt className="text-xs font-medium text-zinc-500">Edición IMC</dt><dd className="mt-1 font-medium text-zinc-900">{values.imcEdition}</dd></div>
-            <div className="px-5 py-4"><dt className="text-xs font-medium text-zinc-500">Inicio del desarrollo</dt><dd className="mt-1 font-medium text-zinc-900">{formatSpanishDate(values.laboursDevelopmentStart)}</dd></div>
-            <div className="px-5 py-4"><dt className="text-xs font-medium text-zinc-500">Completion</dt><dd className="mt-1 font-medium text-zinc-900">{formatSpanishDate(values.completion)}</dd></div>
+          <dl className="grid grid-cols-3 divide-x divide-line-soft text-body">
+            <div className="px-5 py-4"><dt className="text-meta font-medium text-ink-muted">Edición IMC</dt><dd className="mt-1 font-medium text-ink">{values.imcEdition}</dd></div>
+            <div className="px-5 py-4"><dt className="text-meta font-medium text-ink-muted">Inicio del desarrollo</dt><dd className="mt-1 font-medium text-ink">{formatSpanishDate(values.laboursDevelopmentStart)}</dd></div>
+            <div className="px-5 py-4"><dt className="text-meta font-medium text-ink-muted">Fecha de finalización</dt><dd className="mt-1 font-medium text-ink">{formatSpanishDate(values.completion)}</dd></div>
           </dl>
         </div>
-        <div className="overflow-hidden rounded-xl border border-zinc-200 bg-white">
-          <div className="flex flex-wrap items-baseline justify-between gap-2 border-b border-zinc-200 px-5 py-4"><h3 className="font-semibold text-zinc-950">Modelos seleccionados</h3><span className="rounded-full bg-zinc-100 px-2.5 py-0.5 text-xs font-medium tabular-nums text-zinc-700">{vehicles.length} {vehicles.length === 1 ? "extracción" : "extracciones"}</span></div>
-          <ul className="divide-y divide-zinc-100">{vehicles.map((vehicle, index) => {
+        <div className="overflow-hidden rounded-xl border border-line-soft bg-surface">
+          <div className="flex flex-wrap items-baseline justify-between gap-2 border-b border-line-soft px-5 py-4"><h3 className="text-body font-semibold text-ink-strong">Modelos seleccionados</h3><span className="rounded-full bg-canvas px-2.5 py-0.5 text-meta font-medium tabular-nums text-ink-secondary">{vehicles.length} {vehicles.length === 1 ? "extracción" : "extracciones"}</span></div>
+          <ul className="divide-y divide-line-soft">{vehicles.map((vehicle, index) => {
             const target = availabilityTargets.get(vehicle.id);
-            return <li className="px-5 py-3 text-sm" key={vehicle.id}>
-              <div className="flex items-center gap-3"><span aria-hidden="true" className="flex size-6 shrink-0 items-center justify-center rounded-full bg-zinc-100 text-xs font-medium tabular-nums text-zinc-600">{index + 1}</span><span className="min-w-0 flex-1 font-medium text-zinc-900">{vehicle.modelDescription || "Modelo seleccionado"}</span><span className="shrink-0 rounded-md border border-zinc-200 bg-zinc-50 px-2 py-1 font-mono text-xs text-zinc-700">{vehicle.manufacturerGroup === "BMW" ? `${vehicle.series} · ${vehicle.developmentCode} · ${vehicle.typekey}` : vehicle.manufacturerGroup === "Mercedes" ? `${vehicle.series} · ${vehicle.modelCode}` : vehicle.modelCode}</span></div>
+            return <li className="px-5 py-3 text-body" key={vehicle.id}>
+              <div className="flex items-center gap-3"><span aria-hidden="true" className="flex size-6 shrink-0 items-center justify-center rounded-full bg-canvas text-meta font-medium tabular-nums text-ink-muted">{index + 1}</span><span className="min-w-0 flex-1 font-medium text-ink">{vehicle.modelDescription || "Modelo seleccionado"}</span><span className="shrink-0 rounded-md border border-line-soft bg-surface-sunken px-2 py-1 font-mono text-meta text-ink-secondary">{vehicle.manufacturerGroup === "BMW" ? `${vehicle.series} · ${vehicle.developmentCode} · ${vehicle.typekey}` : vehicle.manufacturerGroup === "Mercedes" ? `${vehicle.series} · ${vehicle.modelCode}` : vehicle.modelCode}</span></div>
               {target ? <div className="mt-2 pl-9"><BmwAvailabilityNotice entry={availability.entryFor(target)} onRetry={() => availability.retry(target)} onUseBaseType={(baseTypekey) => replaceWithBaseType(vehicle.id, baseTypekey)} typekey={target.typekey} /></div> : null}
             </li>;
           })}</ul>
         </div>
-        {replacesTable ? <label className="flex items-start gap-3 rounded-lg border border-amber-300 bg-amber-50 px-4 py-3 text-sm text-amber-950">
+        {replacesTable ? <Alert tone="pending"><label className="flex items-start gap-3">
           <input checked={replaceConfirmed} className="mt-1 size-4" onChange={(event) => setReplaceConfirmed(event.target.checked)} type="checkbox" />
           <span>Ya hay datos cargados en BMW_Labour para el código AX <strong className="font-mono">{values.axCode}</strong> y la edición <strong className="font-mono">{values.imcEdition}</strong>{conflict?.loadedAt ? ` (${formatSpanishDateTime(conflict.loadedAt)})` : ""}. Al terminar esta extracción se reemplazará la tabla completa por los typekeys de esta solicitud. Entiendo que se perderán los datos anteriores.</span>
-        </label> : null}
-        {unavailableTypekeys.length ? <p className="rounded-lg border border-red-200 bg-red-50 px-4 py-3 text-sm text-red-800" role="alert">BMW no tiene tiempos para {unavailableTypekeys.join(", ")}. Quita esos typekeys o sustitúyelos por un tipo base sugerido para poder iniciar la extracción.</p> : null}
-        {requiresApproval ? <p className="rounded-lg border border-amber-200 bg-amber-50 px-4 py-3 text-sm text-amber-900">La solicitud quedará pendiente de aprobación de tu coordinador.</p> : null}
+        </label></Alert> : null}
+        {unavailableTypekeys.length ? <Alert role="alert" tone="danger">BMW no tiene tiempos para {unavailableTypekeys.join(", ")}. Quita esos typekeys o sustitúyelos por un tipo base sugerido para poder iniciar la extracción.</Alert> : null}
+        {requiresApproval ? <Alert tone="pending">La solicitud quedará pendiente de aprobación de tu coordinador.</Alert> : null}
         <label className="block"><span className="field-label">Comentarios (opcional)</span><textarea autoComplete="off" className="field-control min-h-24 resize-y" maxLength={4_000} onChange={(event) => setValues((current) => ({ ...current, comments: event.target.value }))} placeholder="Añade información útil para la extracción…" value={values.comments} /></label>
-        {state.error ? <div aria-live="polite" className="rounded-xl border border-red-200 bg-red-50 px-4 py-3 text-sm text-red-700" role="alert"><p>{state.error}</p>{state.fieldErrors ? <ul className="mt-2 list-inside list-disc">{Object.entries(state.fieldErrors).map(([field, message]) => <li key={field}>{message}</li>)}</ul> : null}</div> : null}
+        {state.error ? <Alert aria-live="polite" role="alert" tone="danger"><p>{state.error}</p>{state.fieldErrors ? <ul className="mt-2 list-inside list-disc">{Object.entries(state.fieldErrors).map(([field, message]) => <li key={field}>{message}</li>)}</ul> : null}</Alert> : null}
       </section> : null}
 
       <input name="axCode" type="hidden" value={values.axCode} />
@@ -593,9 +603,9 @@ export function ExtractionStepperForm({
       <input name="comments" type="hidden" value={values.comments} />
       <input name="confirmReplace" type="hidden" value={replacesTable && replaceConfirmed ? "true" : "false"} />
       <input name="vehicles" type="hidden" value={JSON.stringify(vehicles)} />
-      <div className="flex flex-col-reverse gap-3 sm:flex-row sm:items-center sm:justify-between">
+      <div className="flex items-center justify-between gap-3">
         <div className="flex items-center gap-2"><Button hidden={step === 0} onClick={() => { setStep((current) => Math.max(0, current - 1)); clearValidation(); }} variant="ghost">Atrás</Button><span aria-live="polite" className="text-meta text-ink-muted" role="status">{draftReady ? draftSaved ? "Borrador guardado" : "Guardando borrador…" : "Cargando borrador…"}</span></div>
-        {step < 3 ? <Button aria-busy={checking !== null} disabled={checking !== null} onClick={nextStep} variant="primary">{checking ? `Comprobando disponibilidad (${checking.done}/${checking.total})…` : "Continuar"}</Button> : <SubmitButton className="sm:min-w-52" disabled={unavailableTypekeys.length > 0 || (replacesTable && !replaceConfirmed)} pendingLabel="Iniciando…">Iniciar extracción</SubmitButton>}
+        {step < 3 ? <Button aria-busy={checking !== null} disabled={checking !== null} onClick={nextStep} variant="primary">{checking ? `Comprobando disponibilidad (${checking.done}/${checking.total})…` : "Continuar"}</Button> : <SubmitButton className="min-w-52" disabled={unavailableTypekeys.length > 0 || (replacesTable && !replaceConfirmed)} pendingLabel="Iniciando…">Iniciar extracción</SubmitButton>}
       </div>
     </div>
   </form>;

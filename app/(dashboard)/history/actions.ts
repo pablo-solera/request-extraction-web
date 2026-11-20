@@ -13,7 +13,7 @@ const inputSchema = z.object({ id: z.uuid(), action: z.enum(["cancel", "resume"]
 export async function extractionAction(input: unknown) {
   const user = await requireUser();
   const parsed = inputSchema.safeParse(input);
-  if (!parsed.success) return { ok: false as const, message: "La acción solicitada no es válida." };
+  if (!parsed.success) return { ok: false as const, message: "La acciÃ³n solicitada no es vÃ¡lida." };
 
   try {
     const result = await performExtractionAction(parsed.data.id, parsed.data.action, user, parsed.data.force ?? false);
@@ -22,31 +22,31 @@ export async function extractionAction(input: unknown) {
   } catch (error) {
     if (error instanceof ReaderError) return { ok: false as const, message: error.message };
     console.error("Extraction reader action failed.", describeError(error));
-    return { ok: false as const, message: "No se ha podido completar la acción. Inténtalo de nuevo." };
+    return { ok: false as const, message: "No se ha podido completar la acciÃ³n. IntÃ©ntalo de nuevo." };
   }
 }
 
 export async function extractionDetail(input: unknown) {
   const user = await requireUser();
   const parsed = z.uuid().safeParse(input);
-  if (!parsed.success) return { ok: false as const, message: "El identificador de la extracción no es válido." };
+  if (!parsed.success) return { ok: false as const, message: "El identificador de la extracciÃ³n no es vÃ¡lido." };
   try {
     return { ok: true as const, detail: await getExtractionReaderDetail(parsed.data, user) };
   } catch (error) {
     if (error instanceof ReaderError) return { ok: false as const, message: error.message };
     console.error("Extraction details lookup failed.", describeError(error));
-    return { ok: false as const, message: "No se han podido cargar los detalles de esta extracción." };
+    return { ok: false as const, message: "No se han podido cargar los detalles de esta extracciÃ³n." };
   }
 }
 
 export async function loadHistory(input: unknown) {
   const user = await requireUser();
   const parsed = historyPageInputSchema.safeParse(input);
-  if (!parsed.success) return { ok: false as const, message: "La b�squeda no es v�lida." };
+  if (!parsed.success) return { ok: false as const, message: "La búsqueda no es válida." };
   try {
     return { ok: true as const, ...await loadHistoryPage(user, parsed.data) };
   } catch (error) {
-    console.error("History page lookup failed.", error);
-    return { ok: false as const, message: "No se ha podido cargar el historial. Int�ntalo de nuevo." };
+    console.error("History page lookup failed.", describeError(error));
+    return { ok: false as const, message: "No se ha podido cargar el historial. Inténtalo de nuevo." };
   }
 }

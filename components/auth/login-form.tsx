@@ -3,6 +3,7 @@
 import { useActionState, useState } from "react";
 import { loginAction, type LoginFormState } from "@/app/(auth)/login/actions";
 import { SubmitButton } from "@/components/common/submit-button";
+import { Alert } from "@/components/ui/alert";
 import { Button } from "@/components/ui/button";
 
 const initialState: LoginFormState = {};
@@ -44,9 +45,9 @@ export function LoginForm() {
         </Button>
       </div>
       {state.error ? (
-        <p role="alert" className="rounded-lg border border-danger-line bg-danger-wash px-3 py-2 text-body text-danger-ink">
+        <Alert role="alert" tone="danger">
           {state.error}
-        </p>
+        </Alert>
       ) : null}
       <SubmitButton className="w-full" pendingLabel="Entrando…">
         Entrar

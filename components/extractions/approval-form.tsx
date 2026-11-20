@@ -2,6 +2,7 @@
 
 import { useActionState, useEffect, useId, useRef, useState } from "react";
 import { SubmitButton } from "@/components/common/submit-button";
+import { Alert } from "@/components/ui/alert";
 import { Button } from "@/components/ui/button";
 import type { DecisionState } from "@/app/(dashboard)/approvals/actions";
 
@@ -25,7 +26,7 @@ export function ApprovalForm({ requestGroupId, axCode, action }: { requestGroupI
       <SubmitButton formNoValidate name="decision" value="approved" pendingLabel="Aprobando…">Aprobar</SubmitButton>
       {rejecting ? <><Button disabled={pending} name="decision" type="submit" value="rejected" variant="danger">{pending ? "Rechazando…" : "Confirmar rechazo"}</Button><Button disabled={pending} onClick={() => setRejecting(false)} variant="ghost">Cancelar</Button></> : <Button disabled={pending} onClick={() => setRejecting(true)} variant="danger">Rechazar…</Button>}
     </div>
-    {state.error ? <p className="rounded-lg border border-danger-line bg-danger-wash px-3 py-2 text-body text-danger-ink" role="alert">{state.error}</p> : null}
-    {state.success ? <p className="rounded-lg border border-success-line bg-success-wash px-3 py-2 text-body text-success-ink" role="status">{state.success}</p> : null}
+    {state.error ? <Alert role="alert" tone="danger">{state.error}</Alert> : null}
+    {state.success ? <Alert role="status" tone="success">{state.success}</Alert> : null}
   </form>;
 }

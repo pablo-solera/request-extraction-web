@@ -21,7 +21,7 @@ afterEach(() => {
 async function completeCommonStep(user: ReturnType<typeof userEvent.setup>) {
   await user.type(screen.getAllByLabelText("Código AX")[0]!, "1xf");
   await user.type(screen.getAllByLabelText("Edición IMC")[0]!, "05/0");
-  await user.type(screen.getAllByLabelText(/Completion/)[0]!, "2026-10-20");
+  await user.type(screen.getAllByLabelText(/Fecha de finalización/)[0]!, "2026-10-20");
   await user.type(screen.getAllByLabelText(/Inicio del desarrollo/)[0]!, "2026-03-01");
   await user.click(screen.getByRole("button", { name: "Continuar" }));
 }

@@ -11,7 +11,8 @@
       "success-ink": { "role": "tertiary", "displayName": "Éxito", "canonical": "#065f46", "tonalRamp": ["#022c22", "#064e3b", "#065f46", "#047857", "#059669", "#34d399", "#a7f3d0", "#ecfdf5"] }
     },
     "typographyMeta": {
-      "headline": { "displayName": "Headline", "purpose": "Título de cada página." },
+      "display": { "displayName": "Display", "purpose": "h1 de cada página, en serif editorial (Newsreader).", "family": "Newsreader, Georgia, serif" },
+      "headline": { "displayName": "Headline", "purpose": "Encabezados de sección destacados." },
       "body": { "displayName": "Body", "purpose": "Contenido de tablas, listas y formularios." },
       "code": { "displayName": "Code", "purpose": "AX Code, typekeys y datos técnicos." }
     },
@@ -66,6 +67,14 @@
       "description": "Estado de una solicitud, siempre con icono y texto. Implementado en components/ui/badge.tsx.",
       "html": "<span class=\"ds-badge ds-badge-ok\">Completada</span> <span class=\"ds-badge ds-badge-issue\">Con incidencias</span> <span class=\"ds-badge ds-badge-bad\">Fallida</span>",
       "css": ".ds-badge { display: inline-flex; align-items: center; gap: 4px; padding: 2px 10px; border: 1px solid transparent; border-radius: 9999px; font: 600 12px Geist, Arial, sans-serif; } .ds-badge-ok { background: #ecfdf5; border-color: #a7f3d0; color: #065f46; } .ds-badge-issue { background: #fff7ed; border-color: #fed7aa; color: #9a3412; } .ds-badge-bad { background: #fef2f2; border-color: #fecaca; color: #991b1b; }"
+    },
+    {
+      "name": "Alert",
+      "kind": "alert",
+      "refersTo": "card",
+      "description": "Aviso en línea con lavado semántico. Implementado en components/ui/alert.tsx.",
+      "html": "<div class=\"ds-alert\" role=\"alert\">No se ha podido cargar el historial.</div>",
+      "css": ".ds-alert { padding: 12px 16px; background: #fef2f2; border: 1px solid #fecaca; border-radius: 12px; color: #991b1b; font: 400 14px/1.5 Geist, Arial, sans-serif; }"
     },
     {
       "name": "Card",
