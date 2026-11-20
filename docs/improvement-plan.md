@@ -11,6 +11,10 @@ Esfuerzo: **S** pequeño · **M** medio · **L** grande.
 - Marcar `[x]` la tarea en el mismo commit que la implementa, o en un commit `docs(plan)` posterior.
 - Una rama por fase siguiendo GitFlow (`feature/<fase>`), fusionada con merge. Preguntar antes de cada commit y de cada push.
 - Las tareas de base de datos requieren probar la migración en un clon antes de tocar producción.
+- Ejecución autorizada por el usuario el 2026-11-20: commits locales en la rama de cada fase y fusión con `--no-ff` a `main` al terminar la fase. **Nunca se hace push** sin pedirlo.
+- Si durante una tarea aparece trabajo nuevo, se añade a este archivo en el mismo commit (en la fase que corresponda) para que no se olvide.
+- `DISABLE_TELEMETRY=1` en cualquier comando de `modern-web-guidance`, `skills` o `impeccable`.
+- Los comandos largos de instalación pueden cortarse si el servidor de OpenCode se reinicia: comprobar el resultado antes de commitear.
 
 ## Decisiones tomadas
 
@@ -137,6 +141,32 @@ Rama: `feature/ui-refresh`. Orden: tokens (4.1) antes de componentes (4.5) y de 
 - [ ] **4.8 Copy y flujo** (S)
   - `<Link>` en lugar de `<a href>` (`approvals/page.tsx:28`). Enfocar y exigir el comentario al rechazar (`approval-form.tsx`). Etiqueta corta del comentario. Etiquetas del login con `.field-label` y botón "Mostrar contraseña". Página de error con salida al inicio y `digest`. Título de paso por grupo en lugar de "Tiempos X". "Atrás" con `hidden` en lugar de `invisible`. Hora local en infraestructura. `aria-live` para "Guardando borrador…". `text-xs` solo en metadatos.
   - Commit: `fix(ui): improve copy, links and flow in approvals, login and error pages`
+
+### Pasadas de impeccable (cierre de la Fase 4)
+
+Contexto ya creado: `PRODUCT.md`, `DESIGN.md` y `.impeccable/design.json` (comandos `init` y `document`). Cada comando se ejecuta con el launcher `.agents/skills/impeccable/scripts/impeccable.cmd` y la variable `DISABLE_TELEMETRY=1`. Las pasadas que editan código se commitean aparte, una por comando.
+
+- [ ] **4.9 `extract`** (M) — hacerlo junto con 4.1 y 4.5
+  - Sacar a tokens y componentes compartidos lo repetido. Actualizar `DESIGN.md` y `.impeccable/design.json` con los valores finales.
+  - Commit: `docs(design): refresh DESIGN.md after extracting tokens and components`
+- [ ] **4.10 `critique`** (S) — sobre historial, formulario por pasos, aprobaciones y login
+  - Puntuación heurística antes y después de 4.2 a 4.8. Anotar en esta lista los hallazgos nuevos que no se arreglen en el momento.
+  - Sin commit si solo analiza.
+- [ ] **4.11 `audit`** (S) — `components/` y `app/`
+  - Accesibilidad, rendimiento y consistencia. Corregir lo bloqueante y anotar el resto.
+  - Commit (si corrige): `fix(a11y): address impeccable audit findings`
+- [ ] **4.12 `layout`, `typeset` y `clarify`** (M) — solo donde la crítica lo pida
+  - `layout` en historial y formulario, `typeset` para la jerarquía de títulos, `clarify` para textos y errores.
+  - Commit por comando: `style(ui): refine layout ...`, `style(ui): refine type hierarchy`, `fix(ui): clarify copy and error messages`
+- [ ] **4.13 `harden`** (S) — estados vacíos, de error y de carga del historial, aprobaciones y administración
+  - Commit: `fix(ui): harden empty, error and loading states`
+- [ ] **4.14 `polish`** (S) — pasada final de toda la interfaz
+  - Commit: `style(ui): final polish pass`
+- [ ] **4.15 Detector** (S)
+  - `impeccable.cmd detect --json --changed` sobre la interfaz terminada, una sola vez. Arreglar los hallazgos reales y anotar los falsos positivos en `.impeccable/critique/ignore.md`.
+  - Commit: `style(ui): resolve design detector findings`
+- [ ] **4.16 Capturas con `impeccable shot`** (S) — solo `/login` sin sesión (el resto requiere LDAP)
+  - Comprobar a 1280 y 1536 px de ancho que el login queda bien tras 4.6. Es solo de escritorio.
 
 ---
 
