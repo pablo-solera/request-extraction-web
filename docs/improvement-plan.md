@@ -187,9 +187,10 @@ Contexto ya creado: `PRODUCT.md`, `DESIGN.md` y `.impeccable/design.json` (coman
   - `impeccable.cmd detect --json --changed` sobre la interfaz terminada, una sola vez. Arreglar los hallazgos reales y anotar los falsos positivos en `.impeccable/critique/ignore.md`.
   - Hecho: sin hallazgos. `detect --json --changed` devolvió `[]` (árbol limpio tras los commits); se repitió con los 33 `.tsx` cambiados respecto a `main` y con `app/` y `components/` completos: `[]` en ambos. Sin falsos positivos, así que no se crea `.impeccable/critique/ignore.md`. No hay commit de código.
   - Commit: `style(ui): resolve design detector findings`
-- [ ] **4.16 Capturas con `impeccable shot`** (S) — solo `/login` sin sesión (el resto requiere LDAP)
+- [x] **4.16 Capturas con `impeccable shot`** (S) — solo `/login` sin sesión (el resto requiere LDAP)
   - Comprobar a 1280 y 1536 px de ancho que el login queda bien tras 4.6. Es solo de escritorio.
   - **Bloqueada:** `npx next dev -p 3106` se niega a arrancar porque ya hay un `next dev` en este directorio (puerto 3000, PID ajeno): Next permite un solo servidor de desarrollo por proyecto. Alternativas descartadas por tocar el servidor del usuario (`next build` escribe en `.next`). Reintentar cuando el servidor del 3000 esté parado: `impeccable shot http://localhost:PUERTO/login --viewport 1280x800,1536x864`.
+  - Hecho el 2026-11-20 contra el servidor de producción con agent-browser (no con `impeccable shot`): /login a 1280 y 1536 px en tema claro y oscuro, sin errores de consola. El login queda bien; ver detalle menor en 5.7.
 
 ---
 
@@ -216,8 +217,15 @@ Rama: `feature/housekeeping`
   - Debounce con `useDeferredValue` en los buscadores (`users-table.tsx:37`, `mercedes-model-selector.tsx:100`). Animar el progreso con `transform: scaleX`. Caché de `fetch` entre pasos del formulario. Unificar alertas con los tokens de color.
   - Commit: `perf(ui): defer search filtering and animate progress with transform`
   - Hecho: `useDeferredValue` en los filtros locales del formulario (Mercedes, Renault y typekeys de BMW); `users-table` se queda con el debounce porque su búsqueda navega al servidor y `useDeferredValue` no reduce ese viaje. Barra de progreso con `transform: scaleX()`. Caché de 5 min en memoria de las listas de opciones entre pasos (`lib/client/cached-json.ts`; solo respuestas válidas). Componente `Alert` en `components/ui/alert.tsx` para unificar los avisos con tokens (login, aprobaciones, historial, formulario, disponibilidad BMW).
-- [ ] **5.7 Pasada autenticada** (M)
+- [x] **5.7 Pasada autenticada** (M)
   - Revisar con `next-dev-loop` y un usuario de pruebas `/extractions`, `/history`, `/approvals` y `/admin/*` (consola y Web Vitals). No se pudo hacer en la auditoría.
+  - Hecho el 2026-11-20 con agent-browser sobre el servidor de producción (cuenta de prueba `test.manager`, rol admin; migraciones ya aplicadas). Inicio de sesión correcto, sin errores ni mensajes de consola en `/extractions`, `/history`, `/approvals`, `/admin/users` y `/admin/infrastructure`, en tema claro y oscuro.
+  - Verificado en pantalla: serif en los `h1`, modo oscuro, badges, barra de progreso llena (tras corregir la clase `scale-x-0`), historial compacto con fila expandida, menú de usuario y menú de fila con anclaje nativo (el de fila se voltea hacia arriba si no cabe).
+  - Corregido: el pie de página no bajaba al fondo (`min-h-full` en un `body` sin altura definida; fallo anterior a esta rama) → `min-h-dvh` en `app/(dashboard)/layout.tsx`.
+  - Pendiente menor: el botón «Mostrar contraseña» del login (variante `ghost`) tiene relleno horizontal y su texto queda desalineado con los campos.
+  - Pendiente menor: el placeholder del Código AX sale en mayúsculas («EJ.: 1XF») y el de Edición IMC no («Ej.: 05/0»); uniformarlos.
+  - No probado: el flujo completo de «Nueva extracción» (los readers BMW y Renault están caídos en este entorno), el diálogo de confirmación (solo aparece al cancelar o reanudar) y las pantallas de aprobación con solicitudes pendientes.
+  - Nota de herramienta: el clic por referencia de agent-browser no abría la fila del historial; con `element.click()` desde `eval` sí. No es un fallo de la aplicación (la página está hidratada).
 
 ---
 
