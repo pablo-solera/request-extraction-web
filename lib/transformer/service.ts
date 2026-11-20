@@ -325,12 +325,21 @@ export async function downloadRequestReport(requestGroupId: string, actor: Actor
 }
 
 const lstName = /\.(lst|zip)$/i;
+const ZIP_SIGNATURE = [0x50, 0x4b, 0x03, 0x04];
+
+/** The extension is only a claim: a .ZIP must start with the ZIP signature and a .LST must be text (no NUL bytes). */
+export function hasValidLstContent(name: string, bytes: Uint8Array) {
+  if (/\.zip$/i.test(name)) return ZIP_SIGNATURE.every((byte, index) => bytes[index] === byte);
+  if (ZIP_SIGNATURE.every((byte, index) => bytes[index] === byte)) return false;
+  return !bytes.subarray(0, 8192).includes(0);
+}
 
 export async function uploadComparison(requestGroupId: string, actor: Actor, file: { name: string; bytes: Uint8Array }, client: TransformerClient = getTransformerClient()) {
   const request = await requireManageableRequest(requestGroupId, actor);
   if (request.loadStatus !== "completed" || !request.loadRemoteId) throw new ReaderError("Los datos de la solicitud todavía no están cargados.", "LOAD_NOT_COMPLETED", false, 409);
   if (!lstName.test(file.name)) throw new ReaderError("El fichero debe ser un .LST o un .ZIP con un único .LST.", "INVALID_LST_FILE", false, 400);
   if (file.bytes.byteLength === 0 || file.bytes.byteLength > MAX_LST_BYTES) throw new ReaderError("El fichero está vacío o supera el tamaño permitido.", "INVALID_LST_FILE", false, 400);
+  if (!hasValidLstContent(file.name, file.bytes)) throw new ReaderError("El contenido del fichero no corresponde a un .LST de texto o a un .ZIP válido.", "INVALID_LST_FILE", false, 400);
   const comparison = await insertComparison({ requestGroupId, uploadedById: actor.id, sourceFilename: file.name.slice(0, 200) });
   try {
     const { reportId } = await client.createComparison({ loadId: request.loadRemoteId, axCode: request.axCode, imcEdition: request.imcEdition }, file);

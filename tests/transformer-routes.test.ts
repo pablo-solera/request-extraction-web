@@ -121,6 +121,18 @@ describe("transformer routes", () => {
   });
 });
 
+describe("upload size limit", () => {
+  it("rejects a body larger than the limit even without a trustworthy Content-Length", async () => {
+    const big = new Uint8Array(25 * 1024 * 1024 + 70 * 1024);
+    const stream = new ReadableStream({ start(controller) { controller.enqueue(big); controller.close(); } });
+    const request = new Request(`http://localhost/api/requests/${id}/comparisons`, {
+      method: "POST", body: stream, duplex: "half", headers: { origin: "http://localhost", host: "localhost", "content-type": "multipart/form-data; boundary=x" },
+    } as RequestInit);
+    expect((await uploadRoute(request, context())).status).toBe(413);
+    expect(mocks.uploadComparison).not.toHaveBeenCalled();
+  });
+});
+
 describe("cross-origin protection", () => {
   it("rejects state-changing requests from another origin before authenticating", async () => {
     const foreign = () => new Request("http://localhost", { method: "POST", headers: { origin: "https://evil.example" } });

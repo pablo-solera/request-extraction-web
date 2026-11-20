@@ -37,8 +37,9 @@ Rama: `feature/security-hardening`
   - Helper común que valide `Origin` contra `APP_BASE_URL` en `requests/[id]/comparisons`, `report/retry`, `load/retry` e `internal/reconcile`. Revisar `allowedOrigins` si hay proxy inverso.
   - Hecho: el helper `lib/security/origin.ts` acepta `Origin` igual a `Host`, `X-Forwarded-Host` o `APP_BASE_URL`. `internal/reconcile` queda fuera a propósito: se autentica con `Bearer` (sin cookie, no hay CSRF) y sus llamadores no envían `Origin`. Pendiente: si hay proxy inverso, `serverActions.allowedOrigins` en `next.config.ts` solo hace falta si el proxy reescribe `Host` sin `X-Forwarded-Host`.
   - Commit: `fix(api): validate request origin on state-changing route handlers`
-- [ ] **1.3 Subida de ficheros más segura** (M) — `app/api/requests/[id]/comparisons/route.ts:16-28`, `next.config.ts:8`
+- [x] **1.3 Subida de ficheros más segura** (M) — `app/api/requests/[id]/comparisons/route.ts:16-28`, `next.config.ts:8`
   - Contar los bytes leídos del stream, comprobar la firma `PK\x03\x04` del ZIP y que el LST sea texto. Verificar contra la documentación de `node_modules/next/dist/docs/` que `proxyClientMaxBodySize` en `experimental` es válido en esta versión.
+  - Hecho: `experimental.proxyClientMaxBodySize` es válido (documentado en `proxyClientMaxBodySize.md`, versión experimental), se mantiene en `26mb`. El tamaño se cuenta ahora sobre los bytes leídos del stream y la firma se valida en `uploadComparison`.
   - Commit: `fix(api): enforce streamed size limit and validate uploaded file signatures`
 - [ ] **1.4 Límite de uso de los lectores externos** (S) — `app/api/readers/*`
   - Limitar el consumo por usuario y cachear respuestas. Confirmar que `extractions/[id]/route.ts` comprueba propiedad con `getManageableExtraction`.
