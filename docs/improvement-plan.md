@@ -64,8 +64,9 @@ Rama: `feature/database-hardening`. Probar cada migración en un clon antes de p
 - [ ] **2.3 Paginación de los listados** (M) — `lib/extractions/repository.ts:257-278,316-324`
   - Paginación por keyset sobre `(created_at DESC, id DESC)`. `listPendingRequests` debe paginar por solicitud y no por fila del join. Índice `extractions_created_idx`. Cambia la API y la interfaz del historial: hacerlo en un solo cambio con la tarea 4.3.
   - Commit: `feat(extractions): paginate extraction and pending-request listings`
-- [ ] **2.4 Unificar el camino de migraciones** (M) — `scripts/apply-migrations.ts`, `scripts/migrations.ts`, `package.json`, `db/migrations/meta`
+- [x] **2.4 Unificar el camino de migraciones** (M) — `scripts/apply-migrations.ts`, `scripts/migrations.ts`, `package.json`, `db/migrations/meta`
   - Un único camino con `drizzle-kit migrate`. Resolver la ausencia de snapshots en `meta/` (verificarla antes de actuar). `psql` con `--single-transaction` si se mantiene `docker:setup-db`. No generar nunca una migración con `when` menor que la última aplicada.
+  - Hecho: `meta/` solo tiene `_journal.json` (verificado), así que `db:generate` queda desactivado (`scripts/db-generate-disabled.mjs`) y las migraciones se escriben a mano; `docker:setup-db` ahora es `drizzle-kit migrate` y se elimina `scripts/apply-migrations.ts`. `scripts/migrations.ts` se mantiene para `run-integration-tests.ts` (base temporal).
   - Commit: `build(db): unify migrations on drizzle-kit migrate`
 - [ ] **2.5 Timeouts del pool** (S) — `db/index.ts:34-47`
   - `statement_timeout` e `idle_in_transaction_session_timeout` en `connection`.

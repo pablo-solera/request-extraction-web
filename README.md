@@ -95,11 +95,13 @@ Las variables `TEST_ACCOUNT_*` solo definen quiénes son las cuentas; para inici
 
 Los usuarios reales (los empleados de TimerTask) se crean con la sincronización, que sí necesita Oracle: el botón de `/admin/users`, o `bun run sync:users` (simulación) y `bun run sync:users:apply`.
 
-Para generar una migración después de modificar `db/schema.ts`:
+Todas las migraciones se aplican con `drizzle-kit migrate` (`db:migrate`, `db:deploy` y `docker:setup-db` usan el mismo camino y registran lo aplicado en `drizzle.__drizzle_migrations`). Una base de datos preparada antes con `psql` (el antiguo `docker:setup-db`) no tiene ese registro: recréala o registra a mano las migraciones ya aplicadas antes de ejecutar `db:migrate`, o intentaría repetirlas.
 
-```bash
-npm run db:generate
-```
+`db/migrations/meta` solo contiene `_journal.json`, sin snapshots, así que `drizzle-kit generate` produciría una migración con todo el esquema; por eso `npm run db:generate` está desactivado. Para cambiar el esquema:
+
+1. Edita `db/schema.ts`.
+2. Escribe a mano `db/migrations/NNNN_nombre.sql` (separa sentencias con `--> statement-breakpoint`). Para restricciones sobre tablas con datos usa `ADD CONSTRAINT ... NOT VALID` y después `VALIDATE CONSTRAINT`. `CREATE INDEX CONCURRENTLY` no funciona dentro de la transacción de drizzle-kit.
+3. Añade la entrada a `db/migrations/meta/_journal.json` con un `when` mayor que el de la última migración (nunca menor: drizzle-kit omitiría la migración en bases que ya aplicaron una posterior).
 
 ## Desarrollo
 

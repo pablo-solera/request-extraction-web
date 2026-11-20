@@ -20,7 +20,7 @@
     "test:watch": "vitest",
     "test:coverage": "vitest run --coverage",
     "test:integration": "bun run scripts/run-integration-tests.ts",
-    "db:generate": "drizzle-kit generate",
+    "db:generate": "node scripts/db-generate-disabled.mjs",
     "db:migrate": "drizzle-kit migrate",
     "db:deploy": "drizzle-kit migrate && bun --conditions=react-server run scripts/seed-test-users.ts",
     "sync:users": "bun --conditions=react-server run scripts/sync-users-timertask.ts",
@@ -28,7 +28,7 @@
     "docker:build": "docker build -t request-extraction-web:latest .",
     "docker:up": "docker compose up -d --build",
     "docker:down": "docker compose down",
-    "docker:setup-db": "bun run scripts/apply-migrations.ts"
+    "docker:setup-db": "drizzle-kit migrate"
   },
   "dependencies": {
     "drizzle-orm": "0.45.4",
