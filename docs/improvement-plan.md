@@ -45,8 +45,9 @@ Rama: `feature/security-hardening`
   - Limitar el consumo por usuario y cachear respuestas. Confirmar que `extractions/[id]/route.ts` comprueba propiedad con `getManageableExtraction`.
   - Hecho: tope de 120 consultas/min por usuario en memoria (`lib/readers/usage.ts`, 429 con `Retry-After`; válido mientras la app sea una sola instancia). BMW y Mercedes ya cachean en sus clientes; se añadió caché de 1 h a las familias de Renault. `extractions/[id]/route.ts` comprueba propiedad con `listOwnedExtractions(user.id)` (solo el propietario, más estricto que `getManageableExtraction`).
   - Commit: `feat(readers): cap per-user reader usage and cache responses`
-- [ ] **1.5 Completar variables de entorno** (S)
+- [x] **1.5 Completar variables de entorno** (S)
   - Faltan en `.env`: `BMW_READER_LANGUAGE`, `MERCEDES_READER_BASE_URL`, `MERCEDES_TRANSFORMER_BASE_URL`, `RENAULT_TRANSFORMER_BASE_URL`, `VAG_READER_BASE_URL`, `VAG_TRANSFORMER_BASE_URL`. Confirmar si son opcionales; si no, definirlas y documentarlas en `.env.example` y `README.md`.
+  - Hecho: `BMW_READER_LANGUAGE` (por defecto `en-GB`), `MERCEDES_TRANSFORMER_BASE_URL`, `RENAULT_TRANSFORMER_BASE_URL` y las dos de VAG son opcionales; `MERCEDES_READER_BASE_URL` es obligatoria para pedir extracciones Mercedes-Benz. Documentado en `.env.example` y `README.md`; no se ha tocado `.env`.
   - Commit: `docs(config): document reader and transformer environment variables`
 - [ ] **1.6 Logs sin el objeto de error completo** (S) — `login/actions.ts:38`, `reconcile/route.ts:31`, `history/actions.ts:22`
   - Registrar solo `error.name` y `error.code`, como `mail/notifications.ts:44`.

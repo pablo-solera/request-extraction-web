@@ -43,9 +43,10 @@ Variables principales:
 | `RENAULT_READER_RANGE` | Rango Renault, inicialmente `active`. |
 | `RENAULT_READER_DOWNLOAD_ORIGIN` | Origen HTTPS S3 permitido para redirecciones de descarga. |
 | `BMW_READER_BASE_URL` | URL interna de BMW Reader (`http://bmw-reader-api:3004` en Docker). Misma regla de HTTP que `RENAULT_READER_BASE_URL`. |
-| `BMW_READER_LANGUAGE` | Idioma de series y etiquetas BMW/MINI; por defecto `en-GB`. |
+| `BMW_READER_LANGUAGE` | Opcional. Idioma de series y etiquetas BMW/MINI; si falta o está vacía se usa `en-GB`. |
 | `MERCEDES_READER_BASE_URL` | URL interna de `mercedes-reader` (`http://mercedes-reader-api:3005` en Docker; misma regla de HTTP). Sin ella no se pueden solicitar extracciones Mercedes-Benz. |
-| `MERCEDES_TRANSFORMER_BASE_URL` | URL de `mercedes-transformer` (solo informes). Sin ella no se piden los informes de Mercedes-Benz. También aparece en la página de infraestructura. |
+| `MERCEDES_TRANSFORMER_BASE_URL` | Opcional. URL de `mercedes-transformer` (solo informes). Sin ella no se piden los informes de Mercedes-Benz y la página de infraestructura lo muestra como no configurado. |
+| `RENAULT_TRANSFORMER_BASE_URL`, `VAG_READER_BASE_URL`, `VAG_TRANSFORMER_BASE_URL` | Opcionales. Servicios que solo comprueba la página de infraestructura (ninguna funcionalidad los usa todavía; las solicitudes VAG están deshabilitadas). Si faltan o están vacías, la página los muestra como no configurados y no pasa nada más. |
 | `BMW_TRANSFORMER_BASE_URL` | URL de `bmw-transformer` (`http://bmw-transformer-api:3005` en Docker; misma regla de HTTP). Sin ella no se cargan datos ni se comparan `.LST`. |
 | `MAIL_ENABLED` | `true` para enviar correos; por defecto no se envía ninguno. |
 | `SMTP_HOST`, `SMTP_PORT` | Relay SMTP interno (puerto 25 por defecto, sin usuario ni contraseña; se usa STARTTLS si el servidor lo ofrece). |
