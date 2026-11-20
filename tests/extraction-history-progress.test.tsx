@@ -81,7 +81,8 @@ describe("BMW extraction progress in history", () => {
     openAll();
 
     await user.click(screen.getAllByRole("button", { name: "Opciones para AX-100, X5 · G05, 41HZ" })[0]!);
-    expect(screen.getByRole("button", { name: "Reanudar extracción" })).toBeInTheDocument();
+    expect(screen.getByRole("button", { name: "Reanudar extracción de 41HZ" })).toBeVisible();
+    expect(screen.getByRole("button", { name: "Opciones para AX-100, X5 · G05, 41HZ" })).toHaveAttribute("aria-expanded", "true");
     await user.click(screen.getByRole("button", { name: "Cancelar extracción" }));
     const dialog = screen.getByRole("dialog", { name: "¿Cancelar la extracción?" });
     expect(dialog).toHaveTextContent("tendrás que volver a solicitarla");

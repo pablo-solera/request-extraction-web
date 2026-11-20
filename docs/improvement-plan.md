@@ -126,7 +126,7 @@ Rama: `feature/ui-refresh`. Orden: tokens (4.1) antes de componentes (4.5) y de 
 - [ ] **4.3 Historial con filas compactas, búsqueda y filtro por estado** (M) — `extraction-history.tsx:283-310`
   - Fila compacta (AX, marca, estado, progreso, fecha) con detalle al expandir, búsqueda por AX y filtro por estado. Hacerlo junto con 2.3. `content-visibility: auto` en cada grupo.
   - Commit: `feat(history): compact rows with search and status filter`
-- [ ] **4.4 Menú de acciones con `popover` y anclaje** (M) — `extraction-history.tsx:41-120`
+- [x] **4.4 Menú de acciones con `popover` y anclaje** (M) — `extraction-history.tsx:41-120`
   - Sustituir los listeners y el cálculo manual de posición. Descargar y reanudar como botones visibles. Aplicar el mismo patrón a `components/layout/user-menu.tsx`.
   - Commit: `feat(history): use native popover for row actions and user menu`
 - [x] **4.5 Componentes `Badge` y `Button` compartidos** (M)

@@ -1,7 +1,7 @@
 "use client";
 
 import Link from "next/link";
-import { startTransition, useEffect, useRef, useState } from "react";
+import { startTransition, useEffect, useState } from "react";
 import { useRouter } from "next/navigation";
 import { TransformerPanel } from "@/components/extractions/transformer-panel";
 import type { TransformerRequestInfo } from "@/lib/transformer/info";
@@ -11,6 +11,7 @@ import { retryableItems, summarizeRequest, type RequestAggregateStatus } from "@
 import { Badge, type BadgeTone } from "@/components/ui/badge";
 import { buttonStyles } from "@/components/ui/button";
 import { useConfirm, type Confirm } from "@/components/ui/confirm-dialog";
+import { PopoverMenu } from "@/components/ui/popover-menu";
 import { extractionAction, extractionDetail } from "@/app/(dashboard)/history/actions";
 
 const statusTones: Record<ExtractionListItem["status"], BadgeTone> = { pending: "pending", running: "running", completed: "success", failed: "danger", cancelled: "neutral" };
@@ -36,35 +37,8 @@ function readerStatusNotice(item: ExtractionListItem) {
 }
 
 function ExtractionActions({ confirm, item, detailsExpanded, onToggleDetails, onUpdated }: { confirm: Confirm; item: ExtractionListItem; detailsExpanded: boolean; onToggleDetails(itemId: string): void; onUpdated(itemId: string, update: Partial<ExtractionListItem>): void }) {
-  const containerRef = useRef<HTMLDivElement>(null);
-  const triggerRef = useRef<HTMLButtonElement>(null);
-  const [open, setOpen] = useState(false);
   const [busy, setBusy] = useState(false);
   const [feedback, setFeedback] = useState("");
-  const [menuPosition, setMenuPosition] = useState({ top: 0, left: 0 });
-
-  useEffect(() => {
-    if (!open) return;
-    const onPointerDown = (event: PointerEvent) => {
-      if (event.target instanceof Node && !containerRef.current?.contains(event.target)) setOpen(false);
-    };
-    const onKeyDown = (event: KeyboardEvent) => {
-      if (event.key !== "Escape") return;
-      setOpen(false);
-      triggerRef.current?.focus();
-    };
-    const onScroll = () => setOpen(false);
-    document.addEventListener("pointerdown", onPointerDown);
-    document.addEventListener("keydown", onKeyDown);
-    document.addEventListener("scroll", onScroll, true);
-    window.addEventListener("resize", onScroll);
-    return () => {
-      document.removeEventListener("pointerdown", onPointerDown);
-      document.removeEventListener("keydown", onKeyDown);
-      document.removeEventListener("scroll", onScroll, true);
-      window.removeEventListener("resize", onScroll);
-    };
-  }, [open]);
 
   async function run(action: "cancel" | "resume", force = false) {
     if (action === "cancel" && !await confirm({ title: "¿Cancelar la extracción?", description: `Se detendrá la extracción de ${item.modelDescription} de la solicitud ${item.axCode}. Quedará como cancelada y, si la necesitas, tendrás que volver a solicitarla.`, confirmLabel: "Cancelar extracción", cancelLabel: "Mantener" })) return;
@@ -72,7 +46,6 @@ function ExtractionActions({ confirm, item, detailsExpanded, onToggleDetails, on
     setFeedback("");
     const result = await extractionAction({ id: item.id, action, force });
     setBusy(false);
-    setOpen(false);
     if (!result.ok) {
       setFeedback(result.message);
       return;
@@ -82,37 +55,28 @@ function ExtractionActions({ confirm, item, detailsExpanded, onToggleDetails, on
     setFeedback(action === "cancel" ? result.status === "cancelled" ? "Extracción cancelada." : "Cancelación solicitada." : "Reanudación solicitada.");
   }
 
-  function toggleMenu() {
-    if (open) {
-      setOpen(false);
-      return;
-    }
-    const rect = triggerRef.current?.getBoundingClientRect();
-    if (rect) {
-      const menuWidth = 224;
-      const left = Math.max(8, Math.min(rect.right - menuWidth, window.innerWidth - menuWidth - 8));
-      const top = window.innerHeight - rect.bottom < 260 ? Math.max(8, rect.top - 200) : rect.bottom + 4;
-      setMenuPosition({ top, left });
-    }
-    setOpen(true);
-  }
-
-  const hasAction = item.canCancel || item.canResume || item.canForceResume || item.downloadReady || item.canViewDetails;
-  return <div className="relative flex flex-col items-end gap-2" ref={containerRef}>
-    <button aria-expanded={open} aria-label={`Opciones para ${item.axCode}, ${item.modelDescription}, ${item.modelCode}`} className="inline-flex min-h-11 min-w-11 items-center justify-center rounded-lg border border-zinc-300 bg-white text-zinc-800 hover:bg-zinc-50 disabled:opacity-50" disabled={busy} onClick={toggleMenu} ref={triggerRef} type="button">
-      <svg aria-hidden="true" fill="currentColor" height="20" viewBox="0 0 20 20" width="20"><circle cx="4" cy="10" r="1.5"/><circle cx="10" cy="10" r="1.5"/><circle cx="16" cy="10" r="1.5"/></svg>
-    </button>
-    {busy ? <span className="text-xs text-zinc-600" role="status">Procesando…</span> : null}
-    {open ? <div className="fixed z-50 max-h-[70vh] min-w-52 overflow-y-auto rounded-lg border border-zinc-200 bg-white p-1 shadow-floating" aria-label={`Acciones para ${item.axCode}`} style={menuPosition}>
-      {item.downloadReady ? <a className="flex min-h-10 items-center rounded-md px-3 text-left text-sm text-zinc-800 hover:bg-zinc-100" href={`/api/extractions/${item.id}/download`}>Descargar ZIP de {item.modelCode}</a> : null}
-      {item.canViewDetails ? <button className="flex min-h-10 w-full items-center rounded-md px-3 text-left text-sm text-zinc-800 hover:bg-zinc-100" onClick={() => { onToggleDetails(item.id); setOpen(false); }} type="button">{detailsExpanded ? "Ocultar detalles" : "Ver detalles"}</button> : null}
-      {item.canCancel ? <button className="flex min-h-10 w-full items-center rounded-md px-3 text-left text-sm text-red-700 hover:bg-red-50" onClick={() => void run("cancel")} type="button">Cancelar extracción</button> : null}
-      {item.canResume ? <button className="flex min-h-10 w-full items-center rounded-md px-3 text-left text-sm text-zinc-800 hover:bg-zinc-100" onClick={() => void run("resume")} type="button">Reanudar extracción</button> : null}
-      {item.canForceResume ? <button className="flex min-h-10 w-full items-center rounded-md px-3 text-left text-sm text-amber-900 hover:bg-amber-50" onClick={() => void run("resume", true)} type="button">Reanudar a la fuerza</button> : null}
-      {item.canForceResume ? <p className="px-3 pb-2 text-xs leading-5 text-zinc-500">Recupera una extracción que el reader detecta atascada; conserva los typekeys ya completados.</p> : null}
-      {!hasAction ? <p className="px-3 py-2 text-sm text-zinc-500">No hay acciones disponibles</p> : null}
-    </div> : null}
-    {feedback ? <p className="max-w-56 text-right text-xs text-zinc-600" role="status">{feedback}</p> : null}
+  const hasMenu = item.canCancel || item.canForceResume || item.canViewDetails;
+  const itemClass = "flex min-h-11 w-full items-center rounded-md px-3 text-left text-body hover:bg-canvas";
+  return <div className="flex flex-col items-end gap-2">
+    <div className="flex items-center gap-2">
+      {item.downloadReady ? <a aria-label={`Descargar ZIP de ${item.modelCode}`} className={buttonStyles("secondary")} href={`/api/extractions/${item.id}/download`}>Descargar ZIP</a> : null}
+      {item.canResume ? <button aria-label={`Reanudar extracción de ${item.modelCode}`} className={buttonStyles("secondary")} disabled={busy} onClick={() => void run("resume")} type="button">Reanudar</button> : null}
+      {hasMenu ? <PopoverMenu
+        panelClassName="w-56"
+        panelLabel={`Acciones para ${item.axCode}`}
+        trigger={<svg aria-hidden="true" fill="currentColor" height="20" viewBox="0 0 20 20" width="20"><circle cx="4" cy="10" r="1.5"/><circle cx="10" cy="10" r="1.5"/><circle cx="16" cy="10" r="1.5"/></svg>}
+        triggerClassName={buttonStyles("secondary", "min-w-11 px-0")}
+        triggerDisabled={busy}
+        triggerLabel={`Opciones para ${item.axCode}, ${item.modelDescription}, ${item.modelCode}`}
+      >{(close) => <>
+        {item.canViewDetails ? <button {...close} className={`${itemClass} text-ink`} onClick={() => onToggleDetails(item.id)} type="button">{detailsExpanded ? "Ocultar detalles" : "Ver detalles"}</button> : null}
+        {item.canCancel ? <button {...close} className={`${itemClass} text-danger-ink`} onClick={() => void run("cancel")} type="button">Cancelar extracción</button> : null}
+        {item.canForceResume ? <button {...close} className={`${itemClass} text-pending-ink`} onClick={() => void run("resume", true)} type="button">Reanudar a la fuerza</button> : null}
+        {item.canForceResume ? <p className="px-3 pb-2 text-meta text-ink-muted">Recupera una extracción que el reader detecta atascada; conserva los typekeys ya completados.</p> : null}
+      </>}</PopoverMenu> : null}
+    </div>
+    {busy ? <span className="text-meta text-ink-muted" role="status">Procesando…</span> : null}
+    {feedback ? <p className="max-w-56 text-right text-meta text-ink-muted" role="status">{feedback}</p> : null}
   </div>;
 }
 

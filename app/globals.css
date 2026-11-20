@@ -105,6 +105,13 @@
     transform: translateY(0);
   }
 
+  .popover-menu {
+    inset: auto;
+    margin: 0.25rem 0;
+    position-area: block-end span-inline-start;
+    position-try-fallbacks: flip-block, flip-inline;
+  }
+
   .field-control {
     width: 100%;
     min-height: 2.75rem;
