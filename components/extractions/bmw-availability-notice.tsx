@@ -19,7 +19,7 @@ export function BmwAvailabilityNotice({
   if (entry.state === "error") {
     return <p className="mt-2 text-body text-pending-ink" role="status">
       No se ha podido comprobar la disponibilidad de {typekey}; se volverá a comprobar al enviar.{" "}
-      <button className="font-semibold underline underline-offset-2" onClick={onRetry} type="button">Reintentar</button>
+      <Button onClick={onRetry}>Reintentar</Button>
     </p>;
   }
 
@@ -28,7 +28,7 @@ export function BmwAvailabilityNotice({
   if (notice.kind === "unknown") return <p className="mt-2 text-body text-pending-ink" role="status">{notice.message}</p>;
   return <div className="mt-2 space-y-1 rounded-lg border border-danger-line bg-danger-wash px-3 py-2 text-body text-danger-ink" role="alert">
     <p className="font-semibold">{typekey}: {notice.message}</p>
-    {notice.baseTypeMessage ? <p className={notice.suggestedTypekey ? "text-zinc-800" : "text-red-800"}>{notice.baseTypeMessage}</p> : null}
+    {notice.baseTypeMessage ? <p className={notice.suggestedTypekey ? "text-ink" : "text-danger-ink"}>{notice.baseTypeMessage}</p> : null}
     {notice.suggestedTypekey ? <Button onClick={() => onUseBaseType(notice.suggestedTypekey!)}>Usar tipo base {notice.suggestedTypekey}</Button> : null}
   </div>;
 }

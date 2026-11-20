@@ -5,10 +5,10 @@ import type { UserRole } from "@/lib/auth/session";
 
 export function AppHeader({ user }: { user: { email: string | null; name: string | null; role: UserRole } }) {
   return (
-    <header className="border-b border-zinc-200 bg-white">
+    <header className="border-b border-line-soft bg-surface">
       <div className="mx-auto flex w-full max-w-6xl flex-wrap items-center justify-between gap-3 px-4 py-4 sm:px-6">
         <div className="flex items-center gap-4">
-          <Link className="cursor-pointer text-title font-semibold text-zinc-950" href="/extractions">
+          <Link className="cursor-pointer text-title font-semibold text-ink-strong" href="/extractions">
             Extracciones
           </Link>
         </div>

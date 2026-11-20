@@ -11,11 +11,11 @@ export default async function LoginPage() {
     <main className="flex min-h-screen items-center justify-center bg-canvas px-5 py-12" id="main-content" tabIndex={-1}>
       <section className="w-full max-w-md rounded-xl border border-line-soft bg-surface p-8">
         <div className="mb-8">
-          <div aria-hidden="true" className="mb-5 flex h-11 w-11 items-center justify-center rounded-xl bg-zinc-950 text-body font-bold text-white" translate="no">
+          <div aria-hidden="true" className="mb-5 flex h-11 w-11 items-center justify-center rounded-xl bg-ink-strong text-body font-bold text-surface" translate="no">
             EX
           </div>
-          <h1 className="font-serif text-display font-medium text-zinc-950">Extracciones</h1>
-          <p className="mt-3 text-body text-zinc-600">
+          <h1 className="font-serif text-display font-medium text-ink-strong">Extracciones</h1>
+          <p className="mt-3 text-body text-ink-muted">
             Portal interno. Accede con las credenciales de tu cuenta corporativa.
           </p>
         </div>

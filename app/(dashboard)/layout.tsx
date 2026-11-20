@@ -4,7 +4,7 @@ import { DashboardHeader, DashboardHeaderFallback } from "@/components/layout/da
 
 export default function DashboardLayout({ children }: { children: React.ReactNode }) {
   return (
-    <div className="flex min-h-full flex-col bg-zinc-100">
+    <div className="flex min-h-full flex-col bg-canvas">
       <Suspense fallback={<DashboardHeaderFallback />}>
         <DashboardHeader />
       </Suspense>

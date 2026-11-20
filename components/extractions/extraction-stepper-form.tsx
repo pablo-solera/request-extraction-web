@@ -94,8 +94,8 @@ function resultsLabel(count: number) {
   return count === 1 ? "1 resultado" : `${count} resultados`;
 }
 
-function StepHeading({ title, description }: { title: string; description: string }) {
-  return <div className="max-w-2xl"><h2 className="text-title font-semibold text-zinc-950">{title}</h2><p className="mt-1 text-body text-zinc-600">{description}</p></div>;
+function StepHeading({ id, title, description }: { id: string; title: string; description: string }) {
+  return <div className="max-w-2xl"><h2 className="text-title font-semibold text-ink-strong" id={id}>{title}</h2><p className="mt-1 text-body text-ink-muted">{description}</p></div>;
 }
 
 function BmwOptionField({
@@ -169,12 +169,12 @@ function BmwOptionField({
       {filtered.map((option) => <option key={option.value} value={option.value}>{option.label}</option>)}
     </select>
     <FieldError id={`${id}-error`}>{error}</FieldError>
-    {onAddMultiple ? <div className="mt-3 rounded-lg border border-zinc-200 bg-white p-3">
+    {onAddMultiple ? <div className="mt-3 rounded-lg border border-line-soft bg-surface p-3">
       <label><span className="field-label">Pegar varios typekeys</span><textarea className="field-control min-h-20 resize-y font-mono" disabled={!url || loading || Boolean(message) || options.length === 0} onChange={(event) => setPasteValue(event.target.value)} placeholder="Ej.: 11EH, 41HZ, 51HY" value={pasteValue} /></label>
-      <div className="mt-2 flex flex-wrap items-center gap-3"><Button disabled={!pasteValue.trim() || loading || options.length === 0} onClick={addPastedTypekeys}>Añadir typekeys</Button><span className="text-meta text-zinc-500">Separados por espacios, comas o punto y coma</span></div>
-      {pasteMessage ? <p className="mt-2 text-body text-zinc-600" role="status">{pasteMessage}</p> : null}
+      <div className="mt-2 flex flex-wrap items-center gap-3"><Button disabled={!pasteValue.trim() || loading || options.length === 0} onClick={addPastedTypekeys}>Añadir typekeys</Button><span className="text-meta text-ink-muted">Separados por espacios, comas o punto y coma</span></div>
+      {pasteMessage ? <p className="mt-2 text-body text-ink-muted" role="status">{pasteMessage}</p> : null}
     </div> : null}
-    {message ? <div className="mt-2 flex items-center gap-2 text-body text-danger-ink" role="status"><span>{message}</span><button className="font-semibold underline underline-offset-2" onClick={() => setRetry((current) => current + 1)} type="button">Reintentar</button></div> : null}
+    {message ? <div className="mt-2 flex items-center gap-2 text-body text-danger-ink" role="status"><span>{message}</span><Button onClick={() => setRetry((current) => current + 1)}>Reintentar</Button></div> : null}
   </div>;
 }
 
@@ -206,11 +206,11 @@ function RenaultFamilySelector({ brand, selected, onToggle }: { brand: "Renault"
   return <div className="space-y-3">
     <label className="block"><span className="field-label">Buscar familias</span><input className="field-control" disabled={!current || Boolean(current.error)} onChange={(event) => setSearch(event.target.value)} placeholder="Escribe nombre o código" type="search" value={search} /></label>
     <p aria-live="polite" className="sr-only" role="status">{search.trim() && options.length > 0 ? resultsLabel(filtered.length) : ""}</p>
-    {!current ? <p className="text-body text-zinc-600" role="status">Cargando familias de {brand}…</p> : current.error ? <div className="flex flex-wrap items-center gap-3 text-body text-red-700" role="alert"><span>{current.error}</span><button className="font-semibold underline" onClick={() => setRetry((value) => value + 1)} type="button">Reintentar</button></div> : options.length === 0 ? <p className="rounded-lg border border-dashed border-zinc-300 p-5 text-body text-zinc-600">El reader no ha devuelto familias para {brand}.</p> : filtered.length === 0 ? <p className="text-body text-zinc-600">No hay coincidencias.</p> : <ul className="max-h-96 divide-y divide-zinc-200 overflow-y-auto rounded-xl border border-zinc-200 bg-white">{filtered.map((option) => {
+    {!current ? <p className="text-body text-ink-muted" role="status">Cargando familias de {brand}…</p> : current.error ? <div className="flex flex-wrap items-center gap-3 text-body text-danger-ink" role="alert"><span>{current.error}</span><Button onClick={() => setRetry((value) => value + 1)}>Reintentar</Button></div> : options.length === 0 ? <p className="rounded-lg border border-dashed border-line p-5 text-body text-ink-muted">El reader no ha devuelto familias para {brand}.</p> : filtered.length === 0 ? <p className="text-body text-ink-muted">No hay coincidencias.</p> : <ul className="max-h-96 divide-y divide-line-soft overflow-y-auto rounded-xl border border-line-soft bg-surface">{filtered.map((option) => {
       const checked = selected.some((vehicle) => vehicle.manufacturerGroup === "Renault" && vehicle.modelCode === option.value);
-      return <li key={option.value}><label className="flex min-h-12 cursor-pointer items-center gap-3 px-4 py-3 hover:bg-zinc-50"><input aria-label={`Seleccionar familia ${option.label}`} checked={checked} className="size-4 accent-sky-700" onChange={(event) => onToggle(option, event.target.checked)} type="checkbox" /><span className="min-w-0 text-body text-zinc-900">{option.label}<span className="ml-2 font-mono text-meta text-zinc-500">{option.value}</span></span></label></li>;
+      return <li key={option.value}><label className="flex min-h-12 cursor-pointer items-center gap-3 px-4 py-3 hover:bg-surface-sunken"><input aria-label={`Seleccionar familia ${option.label}`} checked={checked} className="size-4 accent-focus" onChange={(event) => onToggle(option, event.target.checked)} type="checkbox" /><span className="min-w-0 text-body text-ink">{option.label}<span className="ml-2 font-mono text-meta text-ink-muted">{option.value}</span></span></label></li>;
     })}</ul>}
-    <p className="text-meta text-zinc-500">Cada familia seleccionada se enviará como una extracción independiente.</p>
+    <p className="text-meta text-ink-muted">Cada familia seleccionada se enviará como una extracción independiente.</p>
   </div>;
 }
 
@@ -497,10 +497,10 @@ export function ExtractionStepperForm({
 
   const summaryTitle = group === "BMW" ? "Serie y typekeys" : group === "Mercedes" ? "Serie y modelos" : "Familias";
 
-  return <form action={action} className="overflow-hidden rounded-xl border border-zinc-200 bg-white" ref={formRef}>
+  return <form action={action} className="overflow-hidden rounded-xl border border-line-soft bg-surface" ref={formRef}>
     {confirmDialog}
 
-    <div className="border-b border-zinc-200 px-7 py-4">
+    <div className="border-b border-line-soft px-7 py-4">
       <nav aria-label="Progreso de la solicitud">
         <ol className="flex items-center">
           {STEP_TITLES.map((title, index) => <li className={`flex min-w-0 items-center ${index < STEP_TITLES.length - 1 ? "flex-1" : ""}`} key={title}>
@@ -517,7 +517,7 @@ export function ExtractionStepperForm({
 
     <div className="space-y-6 p-7">
       {step === 0 ? <section aria-labelledby="step-common" className="space-y-5">
-        <StepHeading title="Datos comunes" description="Estos datos se aplicarán a todas las extracciones de esta solicitud." />
+        <StepHeading id="step-common" title="Datos comunes" description="Estos datos se aplicarán a todas las extracciones de esta solicitud." />
         <div className="grid gap-5 md:grid-cols-2">
           <div><label><span className="field-label">Código AX</span><input aria-describedby={localErrors.axCode || state.fieldErrors?.axCode ? `${formId}-axCode-error` : undefined} aria-invalid={Boolean(localErrors.axCode || state.fieldErrors?.axCode)} autoComplete="off" className="field-control font-mono uppercase" maxLength={4} minLength={3} onChange={(event) => setValues((current) => ({ ...current, axCode: normalizeAxCode(event.target.value) }))} pattern="[A-Za-z0-9]{3,4}" placeholder="Ej.: 1XF" required spellCheck={false} value={values.axCode} /></label><FieldError id={`${formId}-axCode-error`}>{localErrors.axCode ?? state.fieldErrors?.axCode}</FieldError></div>
           <div><label><span className="field-label">Edición IMC</span><input aria-describedby={localErrors.imcEdition || state.fieldErrors?.imcEdition ? `${formId}-imcEdition-error` : undefined} aria-invalid={Boolean(localErrors.imcEdition || state.fieldErrors?.imcEdition)} autoComplete="off" className="field-control font-mono" inputMode="numeric" maxLength={4} onChange={(event) => setValues((current) => ({ ...current, imcEdition: event.target.value }))} pattern="\d{2}/\d" placeholder="Ej.: 05/0" required spellCheck={false} value={values.imcEdition} /></label><FieldError id={`${formId}-imcEdition-error`}>{localErrors.imcEdition ?? state.fieldErrors?.imcEdition}</FieldError></div>
@@ -527,24 +527,24 @@ export function ExtractionStepperForm({
       </section> : null}
 
       {step === 1 ? <section aria-labelledby="step-manufacturer" className="space-y-6">
-        <StepHeading title="Grupo y fabricante" description="Una solicitud corresponde a una sola marca. Después podrás añadir varios modelos o familias de esa marca." />
+        <StepHeading id="step-manufacturer" title="Grupo y fabricante" description="Una solicitud corresponde a una sola marca. Después podrás añadir varios modelos o familias de esa marca." />
         <fieldset className="space-y-3"><legend className="field-label">Grupo de fabricantes</legend>
           <div className="grid grid-cols-4 gap-3">
             {(["BMW", "Renault", "Mercedes"] as const).map((option) => <button aria-pressed={group === option} className={`flex min-h-16 items-center justify-between gap-2 rounded-xl border px-4 py-3 text-left text-body font-semibold transition-colors ${group === option ? "border-2 border-ink-strong bg-surface-sunken text-ink-strong" : "border-line bg-surface text-ink hover:bg-surface-sunken"}`} key={option} onClick={() => void selectGroup(option)} type="button">{option === "BMW" ? "BMW Group" : option === "Renault" ? "Renault Group" : "Mercedes-Benz Group"}{group === option ? <CheckIcon /> : null}</button>)}
-            <button aria-describedby="vag-disabled-description" aria-disabled="true" className="min-h-16 cursor-not-allowed rounded-xl border border-zinc-200 bg-zinc-100 px-4 py-3 text-left text-body font-semibold text-zinc-500" disabled type="button">VAG <span className="mt-1 block text-meta font-normal">Deshabilitado</span></button>
+            <button aria-describedby="vag-disabled-description" aria-disabled="true" className="min-h-16 cursor-not-allowed rounded-xl border border-line-soft bg-canvas px-4 py-3 text-left text-body font-semibold text-ink-muted" disabled type="button">VAG <span className="mt-1 block text-meta font-normal">Deshabilitado</span></button>
           </div>
-          <p className="text-body text-zinc-600" id="vag-disabled-description">El reader VAG está disponible, pero las solicitudes siguen deshabilitadas en este formulario. Incluye Volkswagen, Audi, Škoda y SEAT.</p>
+          <p className="text-body text-ink-muted" id="vag-disabled-description">El reader VAG está disponible, pero las solicitudes siguen deshabilitadas en este formulario. Incluye Volkswagen, Audi, Škoda y SEAT.</p>
         </fieldset>
-        {group ? <fieldset className="space-y-3"><legend className="field-label">Fabricante</legend><div className="flex flex-wrap gap-2">{BRAND_OPTIONS[group].map((option) => <button aria-pressed={brand === option} className={buttonStyles(brand === option ? "primary" : "secondary")} key={option} onClick={() => void selectBrand(option)} type="button">{brand === option ? <CheckIcon /> : null}{option}</button>)}</div></fieldset> : <p className="text-body text-zinc-600">Selecciona un grupo para ver sus fabricantes.</p>}
-        {stepError ? <p className="text-body text-red-700" role="alert">{stepError}</p> : null}
+        {group ? <fieldset className="space-y-3"><legend className="field-label">Fabricante</legend><div className="flex flex-wrap gap-2">{BRAND_OPTIONS[group].map((option) => <button aria-pressed={brand === option} className={buttonStyles(brand === option ? "primary" : "secondary")} key={option} onClick={() => void selectBrand(option)} type="button">{brand === option ? <CheckIcon /> : null}{option}</button>)}</div></fieldset> : <p className="text-body text-ink-muted">Selecciona un grupo para ver sus fabricantes.</p>}
+        {stepError ? <p className="text-body text-danger-ink" role="alert">{stepError}</p> : null}
       </section> : null}
 
       {step === 2 ? <section aria-labelledby="step-models" className="space-y-5">
-        <StepHeading title={summaryTitle} description={group === "BMW" ? "Elige la serie, el código de desarrollo y los typekeys. Cada typekey genera una extracción." : group === "Mercedes" ? "Elige la serie y uno o varios modelos. Se creará una extracción independiente por cada modelo." : "Selecciona una o varias familias. Se creará una extracción independiente por cada familia."} />
+        <StepHeading id="step-models" title={summaryTitle} description={group === "BMW" ? "Elige la serie, el código de desarrollo y los typekeys. Cada typekey genera una extracción." : group === "Mercedes" ? "Elige la serie y uno o varios modelos. Se creará una extracción independiente por cada modelo." : "Selecciona una o varias familias. Se creará una extracción independiente por cada familia."} />
         {group === "Renault" && (brand === "Renault" || brand === "Dacia") ? <RenaultFamilySelector brand={brand} onToggle={toggleRenaultFamily} selected={vehicles} /> : null}
         {group === "Mercedes" ? <MercedesModelSelector initialSeries={vehicles[0]?.manufacturerGroup === "Mercedes" ? vehicles[0].series : ""} onSeriesChange={changeMercedesSeries} onToggle={toggleMercedesModel} selected={vehicles.flatMap((vehicle) => vehicle.manufacturerGroup === "Mercedes" ? [{ series: vehicle.series, modelCode: vehicle.modelCode }] : [])} /> : null}
         {group === "BMW" ? <>
-          {vehicles.length === 0 ? <p className="text-body text-zinc-600">Añade el primer typekey para continuar.</p> : <div className="space-y-4">{vehicles.map((vehicle, index) => vehicle.manufacturerGroup === "BMW" ? <fieldset className="grid min-w-0 gap-3 rounded-xl border border-zinc-200 bg-zinc-50 p-4 md:grid-cols-[0.65fr_0.8fr_1fr_1fr_1.7fr_auto]" key={vehicle.id}>
+          {vehicles.length === 0 ? <p className="text-body text-ink-muted">Añade el primer typekey para continuar.</p> : <div className="space-y-4">{vehicles.map((vehicle, index) => vehicle.manufacturerGroup === "BMW" ? <fieldset className="grid min-w-0 gap-3 rounded-xl border border-line-soft bg-surface-sunken p-4 md:grid-cols-[0.65fr_0.8fr_1fr_1fr_1.7fr_auto]" key={vehicle.id}>
             <legend className="sr-only">Typekey {index + 1}</legend>
             <label><span className="field-label">Fabricante</span><span className="field-control flex items-center">{brand}</span></label>
             <BmwOptionField emptyText="No hay series disponibles" error={fieldError(state, localErrors, `vehicle.${index}.series`)} initialText="Carga series" label="Serie" loadingText="Cargando series…" onChange={(value) => updateBmwVehicle(vehicle.id, { series: value, developmentCode: "", typekey: "" })} url={`/api/readers/bmw/series?brand=${encodeURIComponent(brand)}`} value={vehicle.series} />
@@ -555,40 +555,40 @@ export function ExtractionStepperForm({
           <Button disabled={vehicles.length >= 50} onClick={addBlankBmwVehicle}>Añadir otro typekey</Button>
         </> : null}
         <BmwSwapReview items={reviewItems} onRemove={removeUnavailableVehicle} onSwap={replaceWithBaseType} />
-        {stepError ? <p className="text-body text-red-700" role="alert">{stepError}</p> : null}
+        {stepError ? <p className="text-body text-danger-ink" role="alert">{stepError}</p> : null}
       </section> : null}
 
       {step === 3 ? <section aria-labelledby="step-summary" className="space-y-5">
-        <StepHeading title="Revisa e inicia" description="Confirma los datos comunes y los modelos antes de crear las extracciones." />
-        <div className="overflow-hidden rounded-xl border border-zinc-200 bg-white">
-          <div className="flex flex-wrap items-center justify-between gap-3 border-b border-zinc-200 bg-zinc-50 px-5 py-4">
-            <div><p className="text-meta font-medium text-zinc-500">Código AX</p><p className="mt-0.5 font-mono text-headline font-semibold text-zinc-950">{values.axCode}</p></div>
+        <StepHeading id="step-summary" title="Revisa e inicia" description="Confirma los datos comunes y los modelos antes de crear las extracciones." />
+        <div className="overflow-hidden rounded-xl border border-line-soft bg-surface">
+          <div className="flex flex-wrap items-center justify-between gap-3 border-b border-line-soft bg-surface-sunken px-5 py-4">
+            <div><p className="text-meta font-medium text-ink-muted">Código AX</p><p className="mt-0.5 font-mono text-headline font-semibold text-ink-strong">{values.axCode}</p></div>
             <Badge icon={false} tone="info">{brand}</Badge>
           </div>
-          <dl className="grid grid-cols-3 divide-x divide-zinc-200 text-body">
-            <div className="px-5 py-4"><dt className="text-meta font-medium text-zinc-500">Edición IMC</dt><dd className="mt-1 font-medium text-zinc-900">{values.imcEdition}</dd></div>
-            <div className="px-5 py-4"><dt className="text-meta font-medium text-zinc-500">Inicio del desarrollo</dt><dd className="mt-1 font-medium text-zinc-900">{formatSpanishDate(values.laboursDevelopmentStart)}</dd></div>
-            <div className="px-5 py-4"><dt className="text-meta font-medium text-zinc-500">Fecha de finalización</dt><dd className="mt-1 font-medium text-zinc-900">{formatSpanishDate(values.completion)}</dd></div>
+          <dl className="grid grid-cols-3 divide-x divide-line-soft text-body">
+            <div className="px-5 py-4"><dt className="text-meta font-medium text-ink-muted">Edición IMC</dt><dd className="mt-1 font-medium text-ink">{values.imcEdition}</dd></div>
+            <div className="px-5 py-4"><dt className="text-meta font-medium text-ink-muted">Inicio del desarrollo</dt><dd className="mt-1 font-medium text-ink">{formatSpanishDate(values.laboursDevelopmentStart)}</dd></div>
+            <div className="px-5 py-4"><dt className="text-meta font-medium text-ink-muted">Fecha de finalización</dt><dd className="mt-1 font-medium text-ink">{formatSpanishDate(values.completion)}</dd></div>
           </dl>
         </div>
-        <div className="overflow-hidden rounded-xl border border-zinc-200 bg-white">
-          <div className="flex flex-wrap items-baseline justify-between gap-2 border-b border-zinc-200 px-5 py-4"><h3 className="text-body font-semibold text-zinc-950">Modelos seleccionados</h3><span className="rounded-full bg-zinc-100 px-2.5 py-0.5 text-meta font-medium tabular-nums text-zinc-700">{vehicles.length} {vehicles.length === 1 ? "extracción" : "extracciones"}</span></div>
-          <ul className="divide-y divide-zinc-100">{vehicles.map((vehicle, index) => {
+        <div className="overflow-hidden rounded-xl border border-line-soft bg-surface">
+          <div className="flex flex-wrap items-baseline justify-between gap-2 border-b border-line-soft px-5 py-4"><h3 className="text-body font-semibold text-ink-strong">Modelos seleccionados</h3><span className="rounded-full bg-canvas px-2.5 py-0.5 text-meta font-medium tabular-nums text-ink-secondary">{vehicles.length} {vehicles.length === 1 ? "extracción" : "extracciones"}</span></div>
+          <ul className="divide-y divide-line-soft">{vehicles.map((vehicle, index) => {
             const target = availabilityTargets.get(vehicle.id);
             return <li className="px-5 py-3 text-body" key={vehicle.id}>
-              <div className="flex items-center gap-3"><span aria-hidden="true" className="flex size-6 shrink-0 items-center justify-center rounded-full bg-zinc-100 text-meta font-medium tabular-nums text-zinc-600">{index + 1}</span><span className="min-w-0 flex-1 font-medium text-zinc-900">{vehicle.modelDescription || "Modelo seleccionado"}</span><span className="shrink-0 rounded-md border border-zinc-200 bg-zinc-50 px-2 py-1 font-mono text-meta text-zinc-700">{vehicle.manufacturerGroup === "BMW" ? `${vehicle.series} · ${vehicle.developmentCode} · ${vehicle.typekey}` : vehicle.manufacturerGroup === "Mercedes" ? `${vehicle.series} · ${vehicle.modelCode}` : vehicle.modelCode}</span></div>
+              <div className="flex items-center gap-3"><span aria-hidden="true" className="flex size-6 shrink-0 items-center justify-center rounded-full bg-canvas text-meta font-medium tabular-nums text-ink-muted">{index + 1}</span><span className="min-w-0 flex-1 font-medium text-ink">{vehicle.modelDescription || "Modelo seleccionado"}</span><span className="shrink-0 rounded-md border border-line-soft bg-surface-sunken px-2 py-1 font-mono text-meta text-ink-secondary">{vehicle.manufacturerGroup === "BMW" ? `${vehicle.series} · ${vehicle.developmentCode} · ${vehicle.typekey}` : vehicle.manufacturerGroup === "Mercedes" ? `${vehicle.series} · ${vehicle.modelCode}` : vehicle.modelCode}</span></div>
               {target ? <div className="mt-2 pl-9"><BmwAvailabilityNotice entry={availability.entryFor(target)} onRetry={() => availability.retry(target)} onUseBaseType={(baseTypekey) => replaceWithBaseType(vehicle.id, baseTypekey)} typekey={target.typekey} /></div> : null}
             </li>;
           })}</ul>
         </div>
-        {replacesTable ? <label className="flex items-start gap-3 rounded-lg border border-amber-300 bg-amber-50 px-4 py-3 text-body text-amber-950">
+        {replacesTable ? <label className="flex items-start gap-3 rounded-lg border border-pending-line bg-pending-wash px-4 py-3 text-body text-pending-ink">
           <input checked={replaceConfirmed} className="mt-1 size-4" onChange={(event) => setReplaceConfirmed(event.target.checked)} type="checkbox" />
           <span>Ya hay datos cargados en BMW_Labour para el código AX <strong className="font-mono">{values.axCode}</strong> y la edición <strong className="font-mono">{values.imcEdition}</strong>{conflict?.loadedAt ? ` (${formatSpanishDateTime(conflict.loadedAt)})` : ""}. Al terminar esta extracción se reemplazará la tabla completa por los typekeys de esta solicitud. Entiendo que se perderán los datos anteriores.</span>
         </label> : null}
-        {unavailableTypekeys.length ? <p className="rounded-lg border border-red-200 bg-red-50 px-4 py-3 text-body text-red-800" role="alert">BMW no tiene tiempos para {unavailableTypekeys.join(", ")}. Quita esos typekeys o sustitúyelos por un tipo base sugerido para poder iniciar la extracción.</p> : null}
-        {requiresApproval ? <p className="rounded-lg border border-amber-200 bg-amber-50 px-4 py-3 text-body text-amber-900">La solicitud quedará pendiente de aprobación de tu coordinador.</p> : null}
+        {unavailableTypekeys.length ? <p className="rounded-lg border border-danger-line bg-danger-wash px-4 py-3 text-body text-danger-ink" role="alert">BMW no tiene tiempos para {unavailableTypekeys.join(", ")}. Quita esos typekeys o sustitúyelos por un tipo base sugerido para poder iniciar la extracción.</p> : null}
+        {requiresApproval ? <p className="rounded-lg border border-pending-line bg-pending-wash px-4 py-3 text-body text-pending-ink">La solicitud quedará pendiente de aprobación de tu coordinador.</p> : null}
         <label className="block"><span className="field-label">Comentarios (opcional)</span><textarea autoComplete="off" className="field-control min-h-24 resize-y" maxLength={4_000} onChange={(event) => setValues((current) => ({ ...current, comments: event.target.value }))} placeholder="Añade información útil para la extracción…" value={values.comments} /></label>
-        {state.error ? <div aria-live="polite" className="rounded-xl border border-red-200 bg-red-50 px-4 py-3 text-body text-red-700" role="alert"><p>{state.error}</p>{state.fieldErrors ? <ul className="mt-2 list-inside list-disc">{Object.entries(state.fieldErrors).map(([field, message]) => <li key={field}>{message}</li>)}</ul> : null}</div> : null}
+        {state.error ? <div aria-live="polite" className="rounded-xl border border-danger-line bg-danger-wash px-4 py-3 text-body text-danger-ink" role="alert"><p>{state.error}</p>{state.fieldErrors ? <ul className="mt-2 list-inside list-disc">{Object.entries(state.fieldErrors).map(([field, message]) => <li key={field}>{message}</li>)}</ul> : null}</div> : null}
       </section> : null}
 
       <input name="axCode" type="hidden" value={values.axCode} />

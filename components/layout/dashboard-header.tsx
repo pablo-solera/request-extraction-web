@@ -9,9 +9,9 @@ export async function DashboardHeader() {
 
 export function DashboardHeaderFallback() {
   return (
-    <header className="border-b border-zinc-200 bg-white">
+    <header className="border-b border-line-soft bg-surface">
       <div className="mx-auto flex w-full max-w-6xl items-center px-4 py-4 sm:px-6">
-        <span className="text-title font-semibold text-zinc-950">Extracciones</span>
+        <span className="text-title font-semibold text-ink-strong">Extracciones</span>
       </div>
     </header>
   );
