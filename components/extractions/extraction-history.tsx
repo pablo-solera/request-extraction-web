@@ -381,7 +381,7 @@ export function ExtractionHistory({ createdId, openId, draftKey = "extraction-dr
             </h2>
             {expanded ? <div className="border-t border-line-soft" id={panelId}>
               <div className="space-y-3 px-5 py-4">
-                <dl className="grid grid-cols-2 gap-x-6 gap-y-3 md:grid-cols-5">
+                <dl className="grid grid-cols-5 gap-x-6 gap-y-3">
                   <div><dt className="text-meta text-ink-muted">Edición IMC</dt><dd className="mt-0.5 text-body font-medium text-ink" translate="no">{first.imcEdition}</dd></div>
                   <div><dt className="text-meta text-ink-muted">Inicio del desarrollo</dt><dd className="mt-0.5 text-body font-medium text-ink">{first.developmentStart ? formatSpanishDate(first.developmentStart) : "—"}</dd></div>
                   <div><dt className="text-meta text-ink-muted">Completion</dt><dd className="mt-0.5 text-body font-medium text-ink">{formatSpanishDate(first.completion)}</dd></div>

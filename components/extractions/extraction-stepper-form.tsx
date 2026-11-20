@@ -5,7 +5,8 @@ import { useActionState, useEffect, useId, useRef, useState } from "react";
 import { z } from "zod";
 import { createExtractionAction, type ExtractionFormState } from "@/app/(dashboard)/extractions/actions";
 import { SubmitButton } from "@/components/common/submit-button";
-import { Button } from "@/components/ui/button";
+import { Badge } from "@/components/ui/badge";
+import { Button, buttonStyles } from "@/components/ui/button";
 import { useConfirm } from "@/components/ui/confirm-dialog";
 import { BmwAvailabilityNotice } from "@/components/extractions/bmw-availability-notice";
 import { formatSpanishDate, formatSpanishDateTime } from "@/lib/date-format";
@@ -83,6 +84,10 @@ function selectedModelsLabel(count: number) {
 
 function FieldError({ children, id }: { children?: string; id: string }) {
   return children ? <span className="mt-1 block text-body text-danger-ink" id={id}>{children}</span> : null;
+}
+
+function CheckIcon() {
+  return <svg aria-hidden="true" className="size-4 shrink-0" fill="none" stroke="currentColor" strokeLinecap="round" strokeLinejoin="round" strokeWidth="2.5" viewBox="0 0 24 24"><path d="M5 12.5l4.5 4.5L19 7.5" /></svg>;
 }
 
 function resultsLabel(count: number) {
@@ -495,22 +500,22 @@ export function ExtractionStepperForm({
   return <form action={action} className="overflow-hidden rounded-xl border border-zinc-200 bg-white" ref={formRef}>
     {confirmDialog}
 
-    <div className="border-b border-zinc-200 px-5 py-4 sm:px-7">
+    <div className="border-b border-zinc-200 px-7 py-4">
       <nav aria-label="Progreso de la solicitud">
         <ol className="flex items-center">
           {STEP_TITLES.map((title, index) => <li className={`flex min-w-0 items-center ${index < STEP_TITLES.length - 1 ? "flex-1" : ""}`} key={title}>
-            <button aria-current={step === index ? "step" : undefined} className={`flex min-h-11 shrink-0 items-center gap-3 rounded-lg text-body transition-colors ${step === index ? "font-semibold text-zinc-950" : index < step ? "text-zinc-800 hover:text-sky-800" : "cursor-not-allowed text-zinc-500"}`} disabled={index > step} onClick={() => goToStep(index)} type="button">
-              <span className={`flex size-8 shrink-0 items-center justify-center rounded-full border text-body font-medium tabular-nums ${step === index ? "border-2 border-sky-700 bg-white text-sky-800" : index < step ? "border-sky-700 bg-sky-700 text-white" : "border-zinc-400 bg-white text-zinc-700"}`}>{index < step ? <svg aria-hidden="true" className="size-4" fill="none" stroke="currentColor" strokeLinecap="round" strokeLinejoin="round" strokeWidth="3" viewBox="0 0 24 24"><path d="M5 12.5l4.5 4.5L19 7.5" /></svg> : index + 1}</span>
-              <span className={step === index ? "inline" : "hidden sm:inline"}>{title}</span>{index < step ? <span className="sr-only"> (completado)</span> : null}
+            <button aria-current={step === index ? "step" : undefined} className={`flex min-h-11 shrink-0 items-center gap-3 rounded-lg text-body transition-colors ${step === index ? "font-semibold text-ink-strong" : index < step ? "text-ink hover:text-ink-strong" : "cursor-not-allowed text-ink-muted"}`} disabled={index > step} onClick={() => goToStep(index)} type="button">
+              <span className={`flex size-8 shrink-0 items-center justify-center rounded-full border text-body font-medium tabular-nums ${step === index ? "border-2 border-ink-strong bg-surface text-ink-strong" : index < step ? "border-ink-strong bg-ink-strong text-surface" : "border-line bg-surface text-ink-muted"}`}>{index < step ? <svg aria-hidden="true" className="size-4" fill="none" stroke="currentColor" strokeLinecap="round" strokeLinejoin="round" strokeWidth="3" viewBox="0 0 24 24"><path d="M5 12.5l4.5 4.5L19 7.5" /></svg> : index + 1}</span>
+              <span>{title}</span>{index < step ? <span className="sr-only"> (completado)</span> : null}
             </button>
-            {index < STEP_TITLES.length - 1 ? <span aria-hidden="true" className={`mx-1 h-px min-w-3 flex-1 sm:mx-3 ${index < step ? "bg-sky-700" : "bg-zinc-300"}`} /> : null}
+            {index < STEP_TITLES.length - 1 ? <span aria-hidden="true" className={`mx-3 h-px min-w-3 flex-1 ${index < step ? "bg-ink-strong" : "bg-line"}`} /> : null}
           </li>)}
         </ol>
       </nav>
       <p aria-live="polite" className="sr-only">Paso {step + 1} de 4 · {STEP_TITLES[step]}</p>
     </div>
 
-    <div className="space-y-6 p-5 sm:p-7">
+    <div className="space-y-6 p-7">
       {step === 0 ? <section aria-labelledby="step-common" className="space-y-5">
         <StepHeading title="Datos comunes" description="Estos datos se aplicarán a todas las extracciones de esta solicitud." />
         <div className="grid gap-5 md:grid-cols-2">
@@ -524,13 +529,13 @@ export function ExtractionStepperForm({
       {step === 1 ? <section aria-labelledby="step-manufacturer" className="space-y-6">
         <StepHeading title="Grupo y fabricante" description="Una solicitud corresponde a una sola marca. Después podrás añadir varios modelos o familias de esa marca." />
         <fieldset className="space-y-3"><legend className="field-label">Grupo de fabricantes</legend>
-          <div className="grid gap-3 sm:grid-cols-3">
-            {(["BMW", "Renault", "Mercedes"] as const).map((option) => <button aria-pressed={group === option} className={`min-h-16 rounded-xl border px-4 py-3 text-left text-body font-semibold transition-colors ${group === option ? "border-sky-700 bg-sky-50 text-sky-950" : "border-zinc-300 bg-white text-zinc-800 hover:bg-zinc-50"}`} key={option} onClick={() => void selectGroup(option)} type="button">{option === "BMW" ? "BMW Group" : option === "Renault" ? "Renault Group" : "Mercedes-Benz Group"}</button>)}
+          <div className="grid grid-cols-4 gap-3">
+            {(["BMW", "Renault", "Mercedes"] as const).map((option) => <button aria-pressed={group === option} className={`flex min-h-16 items-center justify-between gap-2 rounded-xl border px-4 py-3 text-left text-body font-semibold transition-colors ${group === option ? "border-2 border-ink-strong bg-surface-sunken text-ink-strong" : "border-line bg-surface text-ink hover:bg-surface-sunken"}`} key={option} onClick={() => void selectGroup(option)} type="button">{option === "BMW" ? "BMW Group" : option === "Renault" ? "Renault Group" : "Mercedes-Benz Group"}{group === option ? <CheckIcon /> : null}</button>)}
             <button aria-describedby="vag-disabled-description" aria-disabled="true" className="min-h-16 cursor-not-allowed rounded-xl border border-zinc-200 bg-zinc-100 px-4 py-3 text-left text-body font-semibold text-zinc-500" disabled type="button">VAG <span className="mt-1 block text-meta font-normal">Deshabilitado</span></button>
           </div>
           <p className="text-body text-zinc-600" id="vag-disabled-description">El reader VAG está disponible, pero las solicitudes siguen deshabilitadas en este formulario. Incluye Volkswagen, Audi, Škoda y SEAT.</p>
         </fieldset>
-        {group ? <fieldset className="space-y-3"><legend className="field-label">Fabricante</legend><div className="flex flex-wrap gap-2">{BRAND_OPTIONS[group].map((option) => <button aria-pressed={brand === option} className={`min-h-11 rounded-lg border px-4 py-2 text-body font-semibold transition-colors ${brand === option ? "border-sky-700 bg-sky-700 text-white" : "border-zinc-300 bg-white text-zinc-800 hover:bg-zinc-50"}`} key={option} onClick={() => void selectBrand(option)} type="button">{option}</button>)}</div></fieldset> : <p className="text-body text-zinc-600">Selecciona un grupo para ver sus fabricantes.</p>}
+        {group ? <fieldset className="space-y-3"><legend className="field-label">Fabricante</legend><div className="flex flex-wrap gap-2">{BRAND_OPTIONS[group].map((option) => <button aria-pressed={brand === option} className={buttonStyles(brand === option ? "primary" : "secondary")} key={option} onClick={() => void selectBrand(option)} type="button">{brand === option ? <CheckIcon /> : null}{option}</button>)}</div></fieldset> : <p className="text-body text-zinc-600">Selecciona un grupo para ver sus fabricantes.</p>}
         {stepError ? <p className="text-body text-red-700" role="alert">{stepError}</p> : null}
       </section> : null}
 
@@ -558,9 +563,9 @@ export function ExtractionStepperForm({
         <div className="overflow-hidden rounded-xl border border-zinc-200 bg-white">
           <div className="flex flex-wrap items-center justify-between gap-3 border-b border-zinc-200 bg-zinc-50 px-5 py-4">
             <div><p className="text-meta font-medium text-zinc-500">Código AX</p><p className="mt-0.5 font-mono text-headline font-semibold text-zinc-950">{values.axCode}</p></div>
-            <span className="rounded-full border border-sky-200 bg-sky-50 px-3 py-1 text-body font-semibold text-sky-900">{brand}</span>
+            <Badge icon={false} tone="info">{brand}</Badge>
           </div>
-          <dl className="grid divide-y divide-zinc-200 text-body sm:grid-cols-3 sm:divide-x sm:divide-y-0">
+          <dl className="grid grid-cols-3 divide-x divide-zinc-200 text-body">
             <div className="px-5 py-4"><dt className="text-meta font-medium text-zinc-500">Edición IMC</dt><dd className="mt-1 font-medium text-zinc-900">{values.imcEdition}</dd></div>
             <div className="px-5 py-4"><dt className="text-meta font-medium text-zinc-500">Inicio del desarrollo</dt><dd className="mt-1 font-medium text-zinc-900">{formatSpanishDate(values.laboursDevelopmentStart)}</dd></div>
             <div className="px-5 py-4"><dt className="text-meta font-medium text-zinc-500">Completion</dt><dd className="mt-1 font-medium text-zinc-900">{formatSpanishDate(values.completion)}</dd></div>
@@ -593,9 +598,9 @@ export function ExtractionStepperForm({
       <input name="comments" type="hidden" value={values.comments} />
       <input name="confirmReplace" type="hidden" value={replacesTable && replaceConfirmed ? "true" : "false"} />
       <input name="vehicles" type="hidden" value={JSON.stringify(vehicles)} />
-      <div className="flex flex-col-reverse gap-3 sm:flex-row sm:items-center sm:justify-between">
+      <div className="flex items-center justify-between gap-3">
         <div className="flex items-center gap-2"><Button hidden={step === 0} onClick={() => { setStep((current) => Math.max(0, current - 1)); clearValidation(); }} variant="ghost">Atrás</Button><span aria-live="polite" className="text-meta text-ink-muted" role="status">{draftReady ? draftSaved ? "Borrador guardado" : "Guardando borrador…" : "Cargando borrador…"}</span></div>
-        {step < 3 ? <Button aria-busy={checking !== null} disabled={checking !== null} onClick={nextStep} variant="primary">{checking ? `Comprobando disponibilidad (${checking.done}/${checking.total})…` : "Continuar"}</Button> : <SubmitButton className="sm:min-w-52" disabled={unavailableTypekeys.length > 0 || (replacesTable && !replaceConfirmed)} pendingLabel="Iniciando…">Iniciar extracción</SubmitButton>}
+        {step < 3 ? <Button aria-busy={checking !== null} disabled={checking !== null} onClick={nextStep} variant="primary">{checking ? `Comprobando disponibilidad (${checking.done}/${checking.total})…` : "Continuar"}</Button> : <SubmitButton className="min-w-52" disabled={unavailableTypekeys.length > 0 || (replacesTable && !replaceConfirmed)} pendingLabel="Iniciando…">Iniciar extracción</SubmitButton>}
       </div>
     </div>
   </form>;

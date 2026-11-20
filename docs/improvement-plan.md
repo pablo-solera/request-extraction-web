@@ -170,6 +170,7 @@ Contexto ya creado: `PRODUCT.md`, `DESIGN.md` y `.impeccable/design.json` (coman
   - Commit (si corrige): `fix(a11y): address impeccable audit findings`
 - [ ] **4.12 `layout`, `typeset` y `clarify`** (M) — solo donde la crítica lo pida
   - `typeset` hecho: `text-sm/xs` pasan a `text-body/meta`; títulos de sección y tarjeta a `text-title`/`text-headline`/`text-body`; `text-wrap: balance` en `h1-h3` y `pretty` en párrafos desde `@layer base`; eliminados los eyebrows (`PageHeader.Eyebrow`, «Portal interno», «404» sobre el título).
+  - `layout` hecho: en el formulario por pasos el azul deja de ser relleno (paso activo/completado, grupo y fabricante elegidos pasan a tinta, con icono de check además del color; el fabricante reutiliza `buttonStyles`; la marca del resumen es un `Badge`); rejilla de escritorio fija en grupos, resumen y barra de acciones; en aprobaciones los modelos son una lista desplazable y enfocable en vez de una cadena con comas.
   - `layout` en historial y formulario, `typeset` para la jerarquía de títulos, `clarify` para textos y errores.
   - Commit por comando: `style(ui): refine layout ...`, `style(ui): refine type hierarchy`, `fix(ui): clarify copy and error messages`
 - [ ] **4.13 `harden`** (S) — estados vacíos, de error y de carga del historial, aprobaciones y administración
