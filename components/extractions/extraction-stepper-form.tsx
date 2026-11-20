@@ -4,6 +4,7 @@ import { useActionState, useEffect, useId, useState } from "react";
 import { z } from "zod";
 import { createExtractionAction, type ExtractionFormState } from "@/app/(dashboard)/extractions/actions";
 import { SubmitButton } from "@/components/common/submit-button";
+import { Button } from "@/components/ui/button";
 import { BmwAvailabilityNotice } from "@/components/extractions/bmw-availability-notice";
 import { BmwSwapReview } from "@/components/extractions/bmw-swap-review";
 import { MercedesModelSelector } from "@/components/extractions/mercedes-model-selector";
@@ -154,7 +155,7 @@ function BmwOptionField({
     <FieldError>{error}</FieldError>
     {onAddMultiple ? <div className="mt-3 rounded-lg border border-zinc-200 bg-white p-3">
       <label><span className="field-label">Pegar varios typekeys</span><textarea className="field-control min-h-20 resize-y font-mono" disabled={!url || loading || Boolean(message) || options.length === 0} onChange={(event) => setPasteValue(event.target.value)} placeholder="Ej.: 11EH, 41HZ, 51HY" value={pasteValue} /></label>
-      <div className="mt-2 flex flex-wrap items-center gap-3"><button className="min-h-10 rounded-lg border border-zinc-300 px-3 py-2 text-sm font-semibold text-zinc-800 hover:bg-zinc-50 disabled:opacity-50" disabled={!pasteValue.trim() || loading || options.length === 0} onClick={addPastedTypekeys} type="button">Añadir typekeys</button><span className="text-xs text-zinc-500">Separados por espacios, comas o punto y coma</span></div>
+      <div className="mt-2 flex flex-wrap items-center gap-3"><Button disabled={!pasteValue.trim() || loading || options.length === 0} onClick={addPastedTypekeys}>Añadir typekeys</Button><span className="text-xs text-zinc-500">Separados por espacios, comas o punto y coma</span></div>
       {pasteMessage ? <p className="mt-2 text-xs text-zinc-600" role="status">{pasteMessage}</p> : null}
     </div> : null}
     {message ? <div className="mt-2 flex items-center gap-2 text-xs text-red-700" role="status"><span>{message}</span><button className="font-semibold underline underline-offset-2" onClick={() => setRetry((current) => current + 1)} type="button">Reintentar</button></div> : null}
@@ -522,9 +523,9 @@ export function ExtractionStepperForm({
             <BmwOptionField emptyText="No hay series disponibles" error={fieldError(state, localErrors, `vehicle.${index}.series`)} initialText="Carga series" label="Serie" loadingText="Cargando series…" onChange={(value) => updateBmwVehicle(vehicle.id, { series: value, developmentCode: "", typekey: "" })} url={`/api/readers/bmw/series?brand=${encodeURIComponent(brand)}`} value={vehicle.series} />
             <BmwOptionField emptyText="No hay códigos para esta serie" error={vehicleError(index, "developmentCode")} initialText="Selecciona primero una serie" label="Código de desarrollo" loadingText="Cargando códigos…" onChange={(value) => updateBmwVehicle(vehicle.id, { developmentCode: value, typekey: "" })} url={vehicle.series ? `/api/readers/bmw/development-codes?${new URLSearchParams({ brand, series: vehicle.series })}` : null} value={vehicle.developmentCode} />
             <BmwOptionField className="md:col-span-2" emptyText="No hay typekeys para esta selección" error={vehicleError(index, "typekey")} initialText="Selecciona primero un código" label="Typekey" loadingText="Cargando typekeys…" onAddMultiple={(codes) => addBmwTypekeys(vehicle.id, codes)} onChange={(value) => updateBmwVehicle(vehicle.id, { typekey: value })} searchable url={vehicle.series && vehicle.developmentCode ? `/api/readers/bmw/typekeys?${new URLSearchParams({ brand, series: vehicle.series, developmentCode: vehicle.developmentCode })}` : null} value={vehicle.typekey} />
-            <div className="flex items-end gap-2 md:flex-col md:items-stretch"><button aria-label={`Duplicar typekey ${index + 1}`} className="min-h-11 rounded-lg border border-zinc-300 px-3 py-2 text-sm font-medium text-zinc-700 hover:bg-white disabled:opacity-40" disabled={vehicles.length >= 50} onClick={() => duplicateBmwVehicle(vehicle.id)} type="button">Duplicar</button><button aria-label={`Quitar typekey ${index + 1}`} className="min-h-11 rounded-lg border border-red-200 px-3 py-2 text-sm text-red-700 hover:bg-red-50 disabled:opacity-40" disabled={vehicles.length === 1} onClick={() => removeBmwVehicle(vehicle.id)} type="button">Quitar</button></div>
+            <div className="flex items-end gap-2 md:flex-col md:items-stretch"><Button aria-label={`Duplicar typekey ${index + 1}`} disabled={vehicles.length >= 50} onClick={() => duplicateBmwVehicle(vehicle.id)}>Duplicar</Button><Button aria-label={`Quitar typekey ${index + 1}`} disabled={vehicles.length === 1} onClick={() => removeBmwVehicle(vehicle.id)} variant="danger">Quitar</Button></div>
           </fieldset> : null)}</div>}
-          <button className="min-h-11 rounded-lg border border-zinc-300 px-4 py-2 text-sm font-semibold text-zinc-800 hover:bg-zinc-50 disabled:opacity-50" disabled={vehicles.length >= 50} onClick={addBlankBmwVehicle} type="button">Añadir otro typekey</button>
+          <Button disabled={vehicles.length >= 50} onClick={addBlankBmwVehicle}>Añadir otro typekey</Button>
         </> : null}
         <BmwSwapReview items={reviewItems} onRemove={removeUnavailableVehicle} onSwap={replaceWithBaseType} />
         {stepError ? <p className="text-sm text-red-700" role="alert">{stepError}</p> : null}
@@ -571,8 +572,8 @@ export function ExtractionStepperForm({
       <input name="confirmReplace" type="hidden" value={replacesTable && replaceConfirmed ? "true" : "false"} />
       <input name="vehicles" type="hidden" value={JSON.stringify(vehicles)} />
       <div className="flex flex-col-reverse gap-3 sm:flex-row sm:items-center sm:justify-between">
-        <div className="flex items-center gap-2"><button className="min-h-11 rounded-lg px-3 py-2 text-sm font-semibold text-zinc-700 hover:bg-zinc-100 disabled:invisible" disabled={step === 0} onClick={() => { setStep((current) => Math.max(0, current - 1)); clearValidation(); }} type="button">Atrás</button><span className="text-xs text-zinc-500">{draftReady ? draftSaved ? "Borrador guardado" : "Guardando borrador…" : "Cargando borrador…"}</span></div>
-        {step < 3 ? <button className="inline-flex min-h-11 items-center justify-center rounded-lg bg-zinc-950 px-5 py-2 text-sm font-semibold text-white hover:bg-zinc-800 disabled:cursor-wait disabled:bg-zinc-700" disabled={checking !== null} onClick={nextStep} type="button">{checking ? `Comprobando disponibilidad (${checking.done}/${checking.total})…` : "Continuar"}</button> : <SubmitButton className="sm:min-w-52" disabled={unavailableTypekeys.length > 0 || (replacesTable && !replaceConfirmed)} pendingLabel="Iniciando…">Iniciar extracción</SubmitButton>}
+        <div className="flex items-center gap-2"><Button className="disabled:invisible" disabled={step === 0} onClick={() => { setStep((current) => Math.max(0, current - 1)); clearValidation(); }} variant="ghost">Atrás</Button><span className="text-xs text-zinc-500">{draftReady ? draftSaved ? "Borrador guardado" : "Guardando borrador…" : "Cargando borrador…"}</span></div>
+        {step < 3 ? <Button aria-busy={checking !== null} disabled={checking !== null} onClick={nextStep} variant="primary">{checking ? `Comprobando disponibilidad (${checking.done}/${checking.total})…` : "Continuar"}</Button> : <SubmitButton className="sm:min-w-52" disabled={unavailableTypekeys.length > 0 || (replacesTable && !replaceConfirmed)} pendingLabel="Iniciando…">Iniciar extracción</SubmitButton>}
       </div>
     </div>
   </form>;

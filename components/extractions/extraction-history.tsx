@@ -8,24 +8,20 @@ import type { TransformerRequestInfo } from "@/lib/transformer/info";
 import type { ExtractionListItem, ExtractionReaderDetail } from "@/lib/extractions/types";
 import { formatSpanishDate, formatSpanishDateTime } from "@/lib/date-format";
 import { retryableItems, summarizeRequest, type RequestAggregateStatus } from "@/lib/extractions/request-summary";
+import { Badge, type BadgeTone } from "@/components/ui/badge";
+import { buttonStyles } from "@/components/ui/button";
 import { extractionAction, extractionDetail } from "@/app/(dashboard)/history/actions";
 
-const statusStyles = {
-  pending: "border-amber-200 bg-amber-50 text-amber-800",
-  running: "border-sky-200 bg-sky-50 text-sky-800",
-  completed: "border-emerald-200 bg-emerald-50 text-emerald-800",
-  failed: "border-red-200 bg-red-50 text-red-800",
-  cancelled: "border-zinc-300 bg-zinc-100 text-zinc-700",
-};
+const statusTones: Record<ExtractionListItem["status"], BadgeTone> = { pending: "pending", running: "running", completed: "success", failed: "danger", cancelled: "neutral" };
 const statusLabels = { pending: "Pendiente", running: "En proceso", completed: "Completada", failed: "Fallida", cancelled: "Cancelada" };
-const aggregateStyles: Record<RequestAggregateStatus, string> = {
-  pending_approval: statusStyles.pending,
-  rejected: statusStyles.failed,
-  running: statusStyles.running,
-  completed: statusStyles.completed,
-  completed_with_issues: statusStyles.pending,
-  failed: statusStyles.failed,
-  cancelled: statusStyles.cancelled,
+const aggregateTones: Record<RequestAggregateStatus, BadgeTone> = {
+  pending_approval: "pending",
+  rejected: "danger",
+  running: "running",
+  completed: "success",
+  completed_with_issues: "issue",
+  failed: "danger",
+  cancelled: "neutral",
 };
 const requestStatusLabels = { pending: "Pendiente de aprobación", approved: "Aprobada", rejected: "Rechazada" };
 
@@ -144,21 +140,20 @@ function RequestActions({ items, onUpdated }: { items: ExtractionListItem[]; onU
     setFeedback(succeeded === targets.length ? `${succeeded} extracciones ${verb}.` : `${succeeded} de ${targets.length} extracciones ${verb}; revisa las demás.`);
   }
 
-  const buttonClass = "inline-flex min-h-11 items-center rounded-lg border px-3 text-sm font-medium disabled:opacity-50";
   return <div className="flex flex-wrap items-center gap-2">
-    {cancellable.length ? <button className={`${buttonClass} border-red-200 bg-white text-red-700 hover:bg-red-50`} disabled={busy} onClick={() => void runAll("cancel", cancellable)} type="button">Cancelar solicitud</button> : null}
-    {resumable.length ? <button className={`${buttonClass} border-zinc-300 bg-white text-zinc-800 hover:bg-zinc-50`} disabled={busy} onClick={() => void runAll("resume", resumable)} type="button">Reanudar fallidos</button> : null}
-    {canRepeat ? <Link className={`${buttonClass} border-zinc-300 bg-white text-zinc-800 hover:bg-zinc-50`} href={`/extractions?request=${encodeURIComponent(items[0]!.requestGroupId)}`}>Volver a solicitar</Link> : null}
+    {cancellable.length ? <button className={buttonStyles("danger")} disabled={busy} onClick={() => void runAll("cancel", cancellable)} type="button">Cancelar solicitud</button> : null}
+    {resumable.length ? <button className={buttonStyles("secondary")} disabled={busy} onClick={() => void runAll("resume", resumable)} type="button">Reanudar fallidos</button> : null}
+    {canRepeat ? <Link className={buttonStyles("secondary")} href={`/extractions?request=${encodeURIComponent(items[0]!.requestGroupId)}`}>Volver a solicitar</Link> : null}
     {busy ? <span className="text-xs text-zinc-600" role="status">Procesando…</span> : null}
     {feedback ? <span className="text-xs text-zinc-600" role="status">{feedback}</span> : null}
   </div>;
 }
 
-function visibleStatus(item: ExtractionListItem) {
-  if (item.status === "cancelled") return { label: statusLabels.cancelled, style: statusStyles.cancelled };
-  if (item.requestStatus === "rejected") return { label: "Rechazada", style: statusStyles.failed };
-  if (item.requestStatus === "pending") return { label: requestStatusLabels.pending, style: statusStyles.pending };
-  return { label: statusLabels[item.status], style: statusStyles[item.status] };
+function visibleStatus(item: ExtractionListItem): { label: string; tone: BadgeTone } {
+  if (item.status === "cancelled") return { label: statusLabels.cancelled, tone: "neutral" };
+  if (item.requestStatus === "rejected") return { label: "Rechazada", tone: "danger" };
+  if (item.requestStatus === "pending") return { label: requestStatusLabels.pending, tone: "pending" };
+  return { label: statusLabels[item.status], tone: statusTones[item.status] };
 }
 
 export function ExtractionHistory({ createdId, openId, draftKey = "extraction-draft-v1", initialItems, initialTransformer = {} }: { createdId?: string; openId?: string; draftKey?: string; initialItems: ExtractionListItem[]; initialTransformer?: Record<string, TransformerRequestInfo> }) {
@@ -254,7 +249,7 @@ export function ExtractionHistory({ createdId, openId, draftKey = "extraction-dr
   }
 
   if (items.length === 0) {
-    return <div className="rounded-2xl border border-dashed border-zinc-300 bg-white px-6 py-16 text-center"><p className="text-sm font-medium text-zinc-900">Todavía no hay extracciones</p><p className="mt-2 text-sm text-zinc-500">Crea una solicitud para verla aquí.</p><Link className="mt-4 inline-flex min-h-11 items-center rounded-lg bg-zinc-950 px-4 py-2 text-sm font-semibold text-white hover:bg-zinc-800" href="/extractions">Nueva extracción</Link></div>;
+    return <div className="rounded-2xl border border-dashed border-zinc-300 bg-white px-6 py-16 text-center"><p className="text-sm font-medium text-zinc-900">Todavía no hay extracciones</p><p className="mt-2 text-sm text-zinc-500">Crea una solicitud para verla aquí.</p><Link className={buttonStyles("primary", "mt-4")} href="/extractions">Nueva extracción</Link></div>;
   }
 
   const groups: Array<{ id: string; items: ExtractionListItem[] }> = [];
@@ -286,7 +281,7 @@ export function ExtractionHistory({ createdId, openId, draftKey = "extraction-dr
                 <span className="min-w-0 flex-1">
                   <span className="flex flex-wrap items-center gap-2">
                     <span className="break-words font-mono text-base font-semibold text-zinc-950" translate="no">{first.axCode}</span>
-                    <span className="rounded-full border border-sky-200 bg-sky-50 px-2.5 py-0.5 text-xs font-semibold text-sky-900" translate="no">{first.manufacturerGroup === first.brand ? first.brand : `${first.manufacturerGroup} / ${first.brand}`}</span>
+                    <Badge icon={false} tone="info"><span translate="no">{first.manufacturerGroup === first.brand ? first.brand : `${first.manufacturerGroup} / ${first.brand}`}</span></Badge>
                   </span>
                   <span className="mt-3 grid grid-cols-2 gap-x-6 gap-y-3 md:grid-cols-4">
                     <span className="block"><span className="block text-xs font-normal text-zinc-500">Edición IMC</span><span className="mt-0.5 block text-sm font-medium text-zinc-900" translate="no">{first.imcEdition}</span></span>
@@ -297,7 +292,7 @@ export function ExtractionHistory({ createdId, openId, draftKey = "extraction-dr
                   <span className="mt-3 block text-xs font-normal text-zinc-500">Solicitada el <time dateTime={first.createdAt}>{formatSpanishDateTime(first.createdAt)}</time>{first.requesterName ? ` · ${first.requesterName}` : ""}</span>
                 </span>
                 <span className="flex shrink-0 items-center gap-3">
-                  <span className={`inline-flex rounded-full border px-2.5 py-1 text-xs font-semibold ${aggregateStyles[summary.status]}`}>{summary.label}{running ? ` · ${summary.progress} %` : ""}</span>
+                  <Badge tone={aggregateTones[summary.status]}>{summary.label}{running ? ` · ${summary.progress} %` : ""}</Badge>
                   <svg aria-hidden="true" className={`size-5 text-zinc-500 transition-transform ${expanded ? "rotate-180" : ""}`} fill="none" stroke="currentColor" strokeWidth="2" viewBox="0 0 20 20"><path d="m5 8 5 5 5-5" strokeLinecap="round" strokeLinejoin="round" /></svg>
                 </span>
               </button>
@@ -318,7 +313,7 @@ export function ExtractionHistory({ createdId, openId, draftKey = "extraction-dr
             return <article className={`min-w-0 px-5 py-4 md:px-6`} key={item.id}>
               <div className="grid min-w-0 gap-5 md:grid-cols-[1.6fr_1fr_auto] md:items-center">
               <div className="min-w-0"><p className="break-words text-sm font-medium text-zinc-900">{item.modelDescription}</p><p className="mt-1 break-words text-xs text-zinc-600"><span translate="no">{item.manufacturerGroup} / {item.brand} · {item.modelCode}</span> · {item.domain}</p></div>
-              <div className="min-w-0"><span className={`inline-flex rounded-full border px-2.5 py-1 text-xs font-semibold ${status.style}`}>{status.label}</span>{readerStatusNotice(item) ? <p className="mt-2 text-xs font-medium text-amber-800">{readerStatusNotice(item)}</p> : null}{item.progress !== null && item.progress !== undefined && (item.status === "pending" || item.status === "running") ? <div className="mt-3 max-w-56"><div className="mb-1 flex justify-between text-xs text-zinc-600"><span>Progreso</span><span>{item.progress}%</span></div><div aria-label={`Progreso de ${item.axCode}`} aria-valuemax={100} aria-valuemin={0} aria-valuenow={item.progress} className="h-2 overflow-hidden rounded-full bg-zinc-200" role="progressbar"><div className="h-full rounded-full bg-sky-600 transition-[width] duration-500 motion-safe:animate-pulse" style={{ width: `${item.progress}%` }} /></div></div> : null}{item.errorMessage ? <p className="mt-2 break-words text-xs text-red-700">{item.errorMessage}</p> : null}</div>
+              <div className="min-w-0"><Badge tone={status.tone}>{status.label}</Badge>{readerStatusNotice(item) ? <p className="mt-2 text-xs font-medium text-amber-800">{readerStatusNotice(item)}</p> : null}{item.progress !== null && item.progress !== undefined && (item.status === "pending" || item.status === "running") ? <div className="mt-3 max-w-56"><div className="mb-1 flex justify-between text-xs text-zinc-600"><span>Progreso</span><span>{item.progress}%</span></div><div aria-label={`Progreso de ${item.axCode}`} aria-valuemax={100} aria-valuemin={0} aria-valuenow={item.progress} className="h-2 overflow-hidden rounded-full bg-zinc-200" role="progressbar"><div className="h-full rounded-full bg-sky-600 transition-[width] duration-500 motion-safe:animate-pulse" style={{ width: `${item.progress}%` }} /></div></div> : null}{item.errorMessage ? <p className="mt-2 break-words text-xs text-red-700">{item.errorMessage}</p> : null}</div>
                 <ExtractionActions item={item} detailsExpanded={openDetailId === item.id} onToggleDetails={(id) => void toggleReaderDetails(id)} onUpdated={updateItem} />
               </div>
               {openDetailId === item.id ? <section aria-label={`Detalle de la extracción ${item.axCode}`} className="mt-5 rounded-lg border border-zinc-200 bg-zinc-50 p-4">

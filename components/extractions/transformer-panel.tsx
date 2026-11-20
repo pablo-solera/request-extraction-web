@@ -2,17 +2,13 @@
 
 import { useCallback, useEffect, useRef, useState } from "react";
 import { formatSpanishDateTime } from "@/lib/date-format";
+import { Badge } from "@/components/ui/badge";
+import { Button } from "@/components/ui/button";
 import type { TransformerComparisonInfo, TransformerRequestInfo } from "@/lib/transformer/info";
 
 const POLL_MS = 5_000;
 const comparisonLabels = { queued: "En cola", running: "Comparando", completed: "Lista", failed: "Fallida" } as const;
-const comparisonStyles = {
-  queued: "border-amber-200 bg-amber-50 text-amber-800",
-  running: "border-sky-200 bg-sky-50 text-sky-800",
-  completed: "border-emerald-200 bg-emerald-50 text-emerald-800",
-  failed: "border-red-200 bg-red-50 text-red-800",
-} as const;
-const buttonClass = "inline-flex min-h-11 items-center rounded-lg border px-3 text-sm font-medium disabled:opacity-50";
+const comparisonTones = { queued: "pending", running: "running", completed: "success", failed: "danger" } as const;
 
 function isActive(info: TransformerRequestInfo | undefined, allCompleted: boolean) {
   if (!info?.applicable) return false;
@@ -35,7 +31,7 @@ function ReportSection({ allCompleted, busy, info, onRetry, requestGroupId }: { 
     {status === "failed" ? <div className="space-y-2" role="alert">
       <p className="text-sm text-red-700">El informe ha fallado{report?.error ? `: ${report.error}` : "."}</p>
       {download ? <p className="text-sm text-zinc-700">El Excel se llegó a generar y se puede descargar. {download}</p> : null}
-      {report?.canRetry ? <button className={`${buttonClass} border-zinc-300 bg-white text-zinc-800 hover:bg-zinc-50`} disabled={busy} onClick={onRetry} type="button">Reintentar informe</button> : null}
+      {report?.canRetry ? <Button disabled={busy} onClick={onRetry}>Reintentar informe</Button> : null}
     </div> : null}
   </section>;
 }
@@ -44,7 +40,7 @@ function ComparisonRow({ comparison }: { comparison: TransformerComparisonInfo }
   return <li className="flex flex-wrap items-center gap-x-3 gap-y-1 py-2 text-sm">
     <span className="min-w-0 break-all font-mono text-xs text-zinc-800">{comparison.filename}</span>
     <time className="text-xs text-zinc-500" dateTime={comparison.createdAt}>{formatSpanishDateTime(comparison.createdAt)}</time>
-    <span className={`inline-flex rounded-full border px-2 py-0.5 text-xs font-semibold ${comparisonStyles[comparison.status]}`}>{comparisonLabels[comparison.status]}</span>
+    <Badge tone={comparisonTones[comparison.status]}>{comparisonLabels[comparison.status]}</Badge>
     {comparison.downloadReady ? <a className="text-sm font-medium text-sky-800 underline underline-offset-2" href={`/api/comparisons/${comparison.id}/download`}>Descargar Excel</a> : null}
     {comparison.error ? <span className="w-full break-words text-xs text-red-700">{comparison.error}</span> : null}
   </li>;
@@ -136,7 +132,7 @@ export function TransformerPanel({ allCompleted, initialInfo, requestGroupId }: 
     {loading ? <p className="text-sm text-sky-800" role="status">{info.loadStatus === null ? info.loadAttempts > 0 ? "Reintentando la carga en BMW_Labour…" : "Preparando la carga en BMW_Labour…" : "Cargando los datos en BMW_Labour…"}</p> : null}
     {info.loadStatus === "failed" ? <div className="space-y-2" role="alert">
       <p className="text-sm text-red-700">La carga en BMW_Labour ha fallado{info.loadError ? `: ${info.loadError}` : "."}</p>
-      {info.canRetryLoad ? <button className={`${buttonClass} border-zinc-300 bg-white text-zinc-800 hover:bg-zinc-50`} disabled={busy} onClick={() => void retryLoad()} type="button">Reintentar carga</button> : null}
+      {info.canRetryLoad ? <Button disabled={busy} onClick={() => void retryLoad()}>Reintentar carga</Button> : null}
     </div> : null}
     {info.loadStatus === "completed" ? <>
       <p className="text-sm text-emerald-800">Datos cargados en BMW_Labour{info.loadedAt ? ` el ${formatSpanishDateTime(info.loadedAt)}` : ""}.</p>
@@ -144,7 +140,7 @@ export function TransformerPanel({ allCompleted, initialInfo, requestGroupId }: 
         <label className="min-w-0 flex-1 text-sm text-zinc-800"><span className="mb-1 block text-xs font-medium text-zinc-600">Listado maestro (.LST o .ZIP)</span>
           <input accept=".lst,.zip" className="block w-full text-sm file:mr-3 file:min-h-11 file:rounded-lg file:border file:border-zinc-300 file:bg-white file:px-3 file:text-sm file:font-medium" ref={fileInput} type="file" />
         </label>
-        <button className={`${buttonClass} border-zinc-950 bg-zinc-950 text-white hover:bg-zinc-800`} disabled={busy} type="submit">{busy ? "Subiendo…" : "Comparar con .LST"}</button>
+        <Button disabled={busy} type="submit" variant="primary">{busy ? "Subiendo…" : "Comparar con .LST"}</Button>
       </form> : null}
     </> : null}
     {message ? <p className="text-sm text-emerald-800" role="status">{message}</p> : null}

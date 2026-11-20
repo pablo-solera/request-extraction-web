@@ -129,7 +129,7 @@ Rama: `feature/ui-refresh`. Orden: tokens (4.1) antes de componentes (4.5) y de 
 - [ ] **4.4 Menú de acciones con `popover` y anclaje** (M) — `extraction-history.tsx:41-120`
   - Sustituir los listeners y el cálculo manual de posición. Descargar y reanudar como botones visibles. Aplicar el mismo patrón a `components/layout/user-menu.tsx`.
   - Commit: `feat(history): use native popover for row actions and user menu`
-- [ ] **4.5 Componentes `Badge` y `Button` compartidos** (M)
+- [x] **4.5 Componentes `Badge` y `Button` compartidos** (M)
   - Eliminar las clases repetidas y los estilos de estado duplicados (`extraction-history.tsx:14-17`, `transformer-panel.tsx:10-13`, `infrastructure/page.tsx:19-22`, `users-table.tsx:16`). Icono además del color. Estilo propio para "completada con incidencias".
   - Commit: `refactor(ui): extract shared Badge and Button components`
 - [ ] **4.6 Retoques visuales de minimalist-ui** (S)
