@@ -184,12 +184,12 @@ Rama: `feature/housekeeping`
 
 - [ ] **5.1 Dark mode** (L) — `color-scheme: light dark` y `light-dark()` con tokens. Depende de 4.1.
   - Commit: `feat(ui): add dark color scheme`
-- [ ] **5.2 Allowlist de origen en la descarga del transformer** (S) — `lib/transformer/client.ts:166-172`
+- [x] **5.2 Allowlist de origen en la descarga del transformer** (S) — `lib/transformer/client.ts:166-172`
   - Igual que Renault, y rechazar IPs privadas y de metadatos.
   - Commit: `fix(transformer): restrict report download to trusted origins`
-- [ ] **5.3 Dependabot y auditoría en CI** (S) — `.github/workflows`
+- [x] **5.3 Dependabot y auditoría en CI** (S) — `.github/workflows`
   - Commit: `ci: add dependency audit and Dependabot`
-- [ ] **5.4 Docker** (S)
+- [x] **5.4 Docker** (S)
   - Puerto 3000 en `127.0.0.1`, imágenes fijadas por digest y `HEALTHCHECK` en el `Dockerfile`.
   - Commit: `build(docker): pin images, bind loopback and add healthcheck`
 - [ ] **5.5 Serif editorial en los títulos de página** (S) — solo en los `h1`, vía `next/font`.

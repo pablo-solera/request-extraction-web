@@ -24,6 +24,7 @@ function routed(responses: Array<Response | Error>, capabilities: () => Response
 const callsTo = (fetcher: ReturnType<typeof vi.fn>) => fetcher.mock.calls.filter(([url]) => !String(url).endsWith("/v1/info"));
 
 afterEach(() => {
+  delete process.env.TRANSFORMER_DOWNLOAD_ORIGINS;
   if (originalBmw === undefined) delete process.env.BMW_TRANSFORMER_BASE_URL;
   else process.env.BMW_TRANSFORMER_BASE_URL = originalBmw;
   if (originalMercedes === undefined) delete process.env.MERCEDES_TRANSFORMER_BASE_URL;
@@ -119,6 +120,7 @@ describe("BMW transformer client", () => {
 
   it("follows the signed download redirect of /v1/reports/{id}/download server-side and refuses other schemes", async () => {
     process.env.BMW_TRANSFORMER_BASE_URL = "http://localhost:3005";
+    process.env.TRANSFORMER_DOWNLOAD_ORIGINS = "http://localhost:9000";
     const fetcher = routed([
       new Response(null, { status: 307, headers: { location: "http://localhost:9000/bucket/report.xlsx?sig=1" } }),
       new Response("xlsx-bytes"),
@@ -133,6 +135,25 @@ describe("BMW transformer client", () => {
     expect(String(callsTo(fetcher)[1]![0])).toBe("http://localhost:9000/bucket/report.xlsx?sig=1");
     await expect(client.downloadReport(id)).rejects.toMatchObject({ code: "TRANSFORMER_REQUEST_FAILED" });
     await expect(client.downloadReport(id)).rejects.toMatchObject({ status: 409 });
+  });
+
+  it("only downloads from the transformer origin or an allowlisted origin, and never from private or metadata addresses", async () => {
+    process.env.BMW_TRANSFORMER_BASE_URL = "http://localhost:3005";
+    process.env.TRANSFORMER_DOWNLOAD_ORIGINS = "https://s3.example.com,http://169.254.169.254,http://10.0.0.5:9000";
+    const redirect = (location: string) => new Response(null, { status: 307, headers: { location } });
+    const fetcher = routed([
+      redirect("https://evil.example.com/f.xlsx"),
+      redirect("http://169.254.169.254/latest/meta-data"),
+      redirect("http://10.0.0.5:9000/f.xlsx"),
+      redirect("http://metadata.google.internal/x"),
+      redirect("https://user:pw@s3.example.com/f.xlsx"),
+      redirect("https://s3.example.com/f.xlsx"),
+      new Response("ok"),
+    ]);
+    const client = createTransformerClient({ fetcher });
+    for (let i = 0; i < 5; i++) await expect(client.downloadReport(id)).rejects.toMatchObject({ code: "TRANSFORMER_REQUEST_FAILED" });
+    expect(await (await client.downloadReport(id)).text()).toBe("ok");
+    expect(callsTo(fetcher)).toHaveLength(7);
   });
 
   it("requires a configured URL that is HTTPS or loopback HTTP", async () => {
@@ -191,6 +212,7 @@ describe("Mercedes transformer client", () => {
 
   it("does not support loads, polls reports and downloads from /v1/reports", async () => {
     process.env.MERCEDES_TRANSFORMER_BASE_URL = "http://localhost:3010";
+    process.env.TRANSFORMER_DOWNLOAD_ORIGINS = "https://s3.example.com";
     const fetcher = routed([
       Response.json({ requestId: id, status: "failed", error: { code: "INTERNAL_ERROR", message: "x" } }),
       new Response(null, { status: 307, headers: { location: "https://s3.example.com/f.xlsx" } }),
