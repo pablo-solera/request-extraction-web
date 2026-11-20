@@ -15,7 +15,7 @@ export default async function LoginPage() {
             EX
           </div>
           <p className="text-sm font-medium text-zinc-500">Portal interno</p>
-          <h1 className="mt-1 text-3xl font-semibold tracking-tight text-zinc-950">Extracciones</h1>
+          <h1 className="mt-1 font-serif text-display font-medium text-zinc-950">Extracciones</h1>
           <p className="mt-3 text-sm leading-6 text-zinc-600">
             Accede con las credenciales de tu cuenta corporativa.
           </p>

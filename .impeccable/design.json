@@ -11,7 +11,8 @@
       "success-ink": { "role": "tertiary", "displayName": "Éxito", "canonical": "#065f46", "tonalRamp": ["#022c22", "#064e3b", "#065f46", "#047857", "#059669", "#34d399", "#a7f3d0", "#ecfdf5"] }
     },
     "typographyMeta": {
-      "headline": { "displayName": "Headline", "purpose": "Título de cada página." },
+      "display": { "displayName": "Display", "purpose": "h1 de cada página, en serif editorial (Newsreader).", "family": "Newsreader, Georgia, serif" },
+      "headline": { "displayName": "Headline", "purpose": "Encabezados de sección destacados." },
       "body": { "displayName": "Body", "purpose": "Contenido de tablas, listas y formularios." },
       "code": { "displayName": "Code", "purpose": "AX Code, typekeys y datos técnicos." }
     },

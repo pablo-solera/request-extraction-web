@@ -50,6 +50,12 @@ typography:
     fontSize: "1.25rem"
     fontWeight: 600
     lineHeight: 1.3
+  display:
+    fontFamily: "Newsreader, Georgia, serif"
+    fontSize: "1.875rem"
+    fontWeight: 500
+    lineHeight: 1.15
+    letterSpacing: "-0.02em"
   headline:
     fontFamily: "Geist, Arial, Helvetica, sans-serif"
     fontSize: "1.5rem"
@@ -110,7 +116,7 @@ Un puesto de trabajo donde cada cosa tiene su sitio. La interfaz es neutra, plan
 El sistema parte de un lienzo gris muy claro con superficies blancas, tinta casi negra y un único acento azul reservado al foco y a las acciones secundarias. Los colores de estado (rojo, verde, azul) aparecen solo para comunicar significado. Las esquinas son amables, con radios de 8 a 12 px, y la separación se hace con bordes de 1 px en lugar de sombras.
 
 **Key Characteristics:**
-- Una sola familia tipográfica (Geist) con Geist Mono para códigos y metadatos técnicos.
+- Geist para la interfaz y Geist Mono para códigos y metadatos técnicos; una serif editorial (Newsreader) solo en los `h1` de página.
 - Superficies planas con borde fino; la profundidad solo aparece en lo que flota.
 - Botón primario oscuro y sólido; el acento azul solo en foco y acciones secundarias.
 - Objetivos de 44 px de alto como mínimo en todo control.
@@ -154,14 +160,15 @@ Cada par tiene además un borde (`*-line`) de un tono más claro. Todos están d
 
 ## Typography
 
-**Display Font:** Geist (con Arial, Helvetica como respaldo)
-**Body Font:** Geist
+**Display Font:** Newsreader (con Georgia como respaldo), solo en los `h1` de página
+**Body Font:** Geist (con Arial, Helvetica como respaldo)
 **Label/Mono Font:** Geist Mono, para AX Code, typekeys y datos técnicos
 
-**Character:** Una sola familia sans geométrica y neutra; la jerarquía se construye con el peso (400, 500, 600) y el tamaño, no con cambios de fuente.
+**Character:** Sans geométrica y neutra para todo el trabajo; la jerarquía se construye con el peso (400, 500, 600) y el tamaño. La serif aparece una sola vez por pantalla, en el título de página, y le da voz editorial sin competir con los datos.
 
 ### Hierarchy
-- **Headline** (600, 1.5rem, 1.25, `text-headline`): título de cada página.
+- **Display** (Newsreader 500, 1.875rem, 1.15, tracking -0.02em, `font-serif text-display`): `h1` de cada página y del inicio de sesión. Nunca en tarjetas, tablas ni botones.
+- **Headline** (600, 1.5rem, 1.25, `text-headline`): encabezados de sección destacados.
 - **Title** (600, 1.25rem, 1.3, `text-title`): títulos de tarjeta y de sección.
 - **Label** (600, 0.875rem): etiquetas de campo y texto de botón.
 - **Body** (400, 0.875rem, 1.5, `text-body`): contenido de tablas, listas y párrafos. Longitud de línea máxima de 65 a 75 caracteres en texto corrido.

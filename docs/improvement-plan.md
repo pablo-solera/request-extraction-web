@@ -197,7 +197,8 @@ Rama: `feature/housekeeping`
 - [x] **5.4 Docker** (S)
   - Puerto 3000 en `127.0.0.1`, imágenes fijadas por digest y `HEALTHCHECK` en el `Dockerfile`.
   - Commit: `build(docker): pin images, bind loopback and add healthcheck`
-- [ ] **5.5 Serif editorial en los títulos de página** (S) — solo en los `h1`, vía `next/font`.
+- [x] **5.5 Serif editorial en los títulos de página** (S) — solo en los `h1`, vía `next/font`.
+  - Hecho: Newsreader (variable `--font-newsreader`, token `--font-serif` y `--text-display` en `@theme`) en `PageHeader.Title`, el `h1` del login, `not-found` y el error del dashboard. `global-error` queda en sans: no carga las fuentes del layout.
   - Commit: `style(ui): use a serif face for page titles`
 - [ ] **5.6 Refinamientos menores** (S)
   - Debounce con `useDeferredValue` en los buscadores (`users-table.tsx:37`, `mercedes-model-selector.tsx:100`). Animar el progreso con `transform: scaleX`. Caché de `fetch` entre pasos del formulario. Unificar alertas con los tokens de color.
