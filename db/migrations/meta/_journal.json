@@ -134,6 +134,13 @@
       "when": 1785177618000,
       "tag": "0018_mercedes_reports",
       "breakpoints": true
+    },
+    {
+      "idx": 19,
+      "version": "7",
+      "when": 1785177630000,
+      "tag": "0030_loaded_table_lookup_idx",
+      "breakpoints": true
     }
   ]
 }

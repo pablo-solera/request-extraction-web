@@ -55,7 +55,7 @@ Rama: `feature/security-hardening`
 
 Rama: `feature/database-hardening`. Probar cada migración en un clon antes de producción.
 
-- [ ] **2.1 Índice para `findLoadedTable`** (S) — `lib/transformer/repository.ts:26-35`
+- [x] **2.1 Índice para `findLoadedTable`** (S) — `lib/transformer/repository.ts:26-35`
   - `CREATE INDEX` sobre `(brand, imc_edition, upper(ax_code))` parcial (`manufacturer_group='BMW'` y `load_status IN ('queued','running','completed')`). `CONCURRENTLY` no puede ir en la transacción de `drizzle-kit migrate`: usar índice normal (tabla pequeña) o un archivo fuera de transacción.
   - Commit: `perf(db): add index for loaded table lookup`
 - [ ] **2.2 Índices parciales de "listas para cargar/informe"** (S) — `repository.ts:16-17,183-184`
@@ -82,7 +82,7 @@ Rama: `feature/database-hardening`. Probar cada migración en un clon antes de p
 - [ ] **2.9 Rol de aplicación sin permisos DDL** (M)
   - Rol de migración y rol de aplicación con `SELECT/INSERT/UPDATE`. Actualizar `docker-compose.yml`, `.env.example` y `README.md`.
   - Commit: `feat(db): separate migration and application database roles`
-- [ ] **2.10 Ajustes menores de base de datos** (S)
+- [x] **2.10 Ajustes menores de base de datos** (S)
   - `drizzle.config.ts` no debe fallar al importarse sin `DATABASE_URL` en `generate`. Codificar la contraseña en `DATABASE_URL` de `docker-compose.yml`. Normalizar `fallback_email` a minúsculas en `findUserByFallbackEmail`. Valorar `now()` de la BD en `updated_at`.
   - Commit: `fix(db): tolerate missing DATABASE_URL on generate and normalize fallback emails`
 

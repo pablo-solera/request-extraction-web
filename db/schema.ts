@@ -81,6 +81,7 @@ export const extractionRequests = pgTable("extraction_requests", {
   index("extraction_requests_requester_idx").on(table.requesterId),
   index("extraction_requests_load_active_idx").on(table.loadRequestedAt).where(sql`${table.loadStatus} IN ('queued', 'running')`),
   index("extraction_requests_report_active_idx").on(table.reportRequestedAt).where(sql`${table.reportStatus} IN ('queued', 'running')`),
+  index("extraction_requests_loaded_table_idx").on(table.brand, table.imcEdition, sql`upper(${table.axCode})`).where(sql`${table.manufacturerGroup} = 'BMW' AND ${table.loadStatus} IN ('queued', 'running', 'completed')`),
   check("extraction_requests_report_status_check", sql`${table.reportStatus} IS NULL OR ${table.reportStatus} IN ('queued', 'running', 'completed', 'failed')`),
   check("extraction_requests_load_status_check", sql`${table.loadStatus} IS NULL OR ${table.loadStatus} IN ('queued', 'running', 'completed', 'failed')`),
   index("extraction_requests_decided_by_idx").on(table.decidedById),
