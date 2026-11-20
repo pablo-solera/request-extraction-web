@@ -77,7 +77,7 @@ Rama: `feature/database-hardening`. Probar cada migración en un clon antes de p
 - [x] **2.7 `RESTRICT` en el FK de los logs de auditoría** (S) — `db/schema.ts:96,137,157,173`
   - `extraction_action_logs.extraction_id` pasa a `RESTRICT`. Migración con `NOT VALID` y luego `VALIDATE`.
   - Commit: `fix(db): protect audit logs from cascade deletion`
-- [ ] **2.8 Índices redundantes** (S) — `db/schema.ts`
+- [x] **2.8 Índices redundantes** (S) — `db/schema.ts`
   - `extractions_group_idx` pasa a `(request_group_id, created_at)`. Crear el nuevo antes de eliminar el antiguo.
   - Commit: `perf(db): replace redundant extraction indexes`
 - [ ] **2.9 Rol de aplicación sin permisos DDL** (M)

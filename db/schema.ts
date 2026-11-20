@@ -121,7 +121,7 @@ export const extractions = pgTable(
   },
   (table) => [
     index("extractions_user_created_idx").on(table.userId, table.createdAt),
-    index("extractions_group_idx").on(table.requestGroupId),
+    index("extractions_group_created_idx").on(table.requestGroupId, table.createdAt),
     index("extractions_active_idx").on(table.updatedAt).where(sql`${table.status} IN ('pending', 'running')`),
     index("extractions_user_active_idx").on(table.userId, table.status).where(sql`${table.status} IN ('pending', 'running')`),
     uniqueIndex("extractions_reader_remote_unique").on(table.readerKey, table.remoteRequestId).where(sql`${table.remoteRequestId} IS NOT NULL`),
