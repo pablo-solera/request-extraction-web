@@ -1,6 +1,6 @@
 import { findAllActiveEmployees } from "@/lib/employees/employee-repository";
 import { getTestAccounts } from "@/lib/employees/test-accounts";
-import { createSyncedUsers, findExistingFallbackEmails, findUsersWithOracleEmpId } from "@/lib/auth/user-repository";
+import { createSyncedUsers, findExistingFallbackEmails, findUsersWithOracleEmpId, syncUserActivation } from "@/lib/auth/user-repository";
 
 export type SyncPlan = { toCreate: { oracleEmpId: number; email: string | null; name: string }[] };
 /** `employees` replaces the query to Oracle when the caller already knows the employees to consider. */
@@ -24,7 +24,14 @@ export async function buildSyncPlan(options: { employees?: Awaited<ReturnType<ty
   });
   return { toCreate };
 }
-export async function runUserSync() { const plan = await buildSyncPlan(); const created = await createSyncedUsers(plan.toCreate); return { created: created.length }; }
+export async function runUserSync() {
+  const employees = await findAllActiveEmployees();
+  const plan = await buildSyncPlan({ employees });
+  const created = await createSyncedUsers(plan.toCreate);
+  const activeEmpIds = [...employees.map((employee) => employee.empId), ...(getTestAccounts() ?? []).map((account) => account.empId)];
+  const activation = await syncUserActivation(activeEmpIds);
+  return { created: created.length, ...activation };
+}
 /**
  * Creates only the users of the test accounts (TEST_ACCOUNTS_ENABLED), without asking Oracle for the employees. A test
  * account can only sign in if its row exists in `users`, and a new database has none. Idempotent.

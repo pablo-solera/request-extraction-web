@@ -30,7 +30,7 @@ Esfuerzo: **S** pequeño · **M** medio · **L** grande.
 
 Rama: `feature/security-hardening`
 
-- [ ] **1.1 Sesiones revocables** (M) — `lib/auth/session.ts:7,38-50`, `lib/auth/guards.ts:41`
+- [x] **1.1 Sesiones revocables** (M) — `lib/auth/session.ts:7,38-50`, `lib/auth/guards.ts:41`
   - Comprobar que el usuario sigue activo en cada petición (flag `active` o `disabledAt` en `users`). Añadir `tokenVersion` o `jti`. Reducir la duración a 1–2 h con renovación.
   - Commit: `feat(auth): make sessions revocable and check the user is active`
 - [ ] **1.2 Comprobación de `Origin` en los `POST` de Route Handlers** (S)
