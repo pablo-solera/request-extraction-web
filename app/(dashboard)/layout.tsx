@@ -1,13 +1,13 @@
+import { Suspense } from "react";
 import { AppFooter } from "@/components/layout/app-footer";
-import { AppHeader } from "@/components/layout/app-header";
-import { requireUser } from "@/lib/auth/guards";
+import { DashboardHeader, DashboardHeaderFallback } from "@/components/layout/dashboard-header";
 
-export default async function DashboardLayout({ children }: { children: React.ReactNode }) {
-  const user = await requireUser();
-
+export default function DashboardLayout({ children }: { children: React.ReactNode }) {
   return (
-      <div className="flex min-h-full flex-col bg-zinc-100">
-        <AppHeader user={{ email: user.email, name: user.name, role: user.role }} />
+    <div className="flex min-h-full flex-col bg-zinc-100">
+      <Suspense fallback={<DashboardHeaderFallback />}>
+        <DashboardHeader />
+      </Suspense>
       <main className="mx-auto w-full max-w-6xl flex-1 px-4 py-8 sm:px-6" id="main-content" tabIndex={-1}>
         {children}
       </main>

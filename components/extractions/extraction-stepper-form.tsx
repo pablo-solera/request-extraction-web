@@ -1,15 +1,17 @@
 "use client";
 
+import dynamic from "next/dynamic";
 import { useActionState, useEffect, useId, useState } from "react";
 import { z } from "zod";
 import { createExtractionAction, type ExtractionFormState } from "@/app/(dashboard)/extractions/actions";
 import { SubmitButton } from "@/components/common/submit-button";
 import { BmwAvailabilityNotice } from "@/components/extractions/bmw-availability-notice";
-import { BmwSwapReview } from "@/components/extractions/bmw-swap-review";
-import { MercedesModelSelector } from "@/components/extractions/mercedes-model-selector";
 import { formatSpanishDate, formatSpanishDateTime } from "@/lib/date-format";
 import { extractionFormSchema, type ExtractionVehicle } from "@/lib/extractions/validation";
 import { useBmwAvailability, type AvailabilityTarget } from "@/lib/hooks/use-bmw-availability";
+
+const BmwSwapReview = dynamic(() => import("@/components/extractions/bmw-swap-review").then((module) => module.BmwSwapReview));
+const MercedesModelSelector = dynamic(() => import("@/components/extractions/mercedes-model-selector").then((module) => module.MercedesModelSelector));
 
 type Vehicle = ExtractionVehicle & { id: string };
 type ManufacturerGroup = ExtractionVehicle["manufacturerGroup"];

@@ -19,12 +19,13 @@ const findSessionUser = cache(async () => {
 export const getVerifiedUser = cache(async () => {
   const user = await findSessionUser();
   if (!user) return null;
-  const identity = (await resolveUserIdentities([user])).get(user.id);
+  const [identities, role] = await Promise.all([resolveUserIdentities([user]), resolveUserRole(user)]);
+  const identity = identities.get(user.id);
   return {
     ...user,
     email: identity?.email ?? user.fallbackEmail,
     name: identity?.name ?? user.fallbackName,
-    role: await resolveUserRole(user),
+    role,
   };
 });
 
@@ -53,4 +54,3 @@ export async function requireAdmin() {
   if (user.role !== "admin") redirect("/extractions");
   return user;
 }
-
