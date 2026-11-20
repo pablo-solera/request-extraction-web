@@ -1,11 +1,15 @@
 import { z } from "zod";
 import { requireApiIdentity } from "@/lib/auth/guards";
+import { rejectCrossOrigin } from "@/lib/security/origin";
 import { ReaderError } from "@/lib/readers/errors";
 import { retryRequestReport } from "@/lib/transformer/service";
 
 const privateHeaders = { "Cache-Control": "private, no-store, max-age=0" };
 
-export async function POST(_request: Request, context: RouteContext<"/api/requests/[id]/report/retry">) {
+export async function POST(request: Request, context: RouteContext<"/api/requests/[id]/report/retry">) {
+  const crossOrigin = rejectCrossOrigin(request);
+  if (crossOrigin) return crossOrigin;
+
   const user = await requireApiIdentity();
   if (!user) return Response.json({ error: { code: "UNAUTHORIZED", message: "Inicia sesión." } }, { status: 401, headers: privateHeaders });
 

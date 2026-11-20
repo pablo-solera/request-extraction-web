@@ -33,8 +33,9 @@ Rama: `feature/security-hardening`
 - [x] **1.1 Sesiones revocables** (M) — `lib/auth/session.ts:7,38-50`, `lib/auth/guards.ts:41`
   - Comprobar que el usuario sigue activo en cada petición (flag `active` o `disabledAt` en `users`). Añadir `tokenVersion` o `jti`. Reducir la duración a 1–2 h con renovación.
   - Commit: `feat(auth): make sessions revocable and check the user is active`
-- [ ] **1.2 Comprobación de `Origin` en los `POST` de Route Handlers** (S)
+- [x] **1.2 Comprobación de `Origin` en los `POST` de Route Handlers** (S)
   - Helper común que valide `Origin` contra `APP_BASE_URL` en `requests/[id]/comparisons`, `report/retry`, `load/retry` e `internal/reconcile`. Revisar `allowedOrigins` si hay proxy inverso.
+  - Hecho: el helper `lib/security/origin.ts` acepta `Origin` igual a `Host`, `X-Forwarded-Host` o `APP_BASE_URL`. `internal/reconcile` queda fuera a propósito: se autentica con `Bearer` (sin cookie, no hay CSRF) y sus llamadores no envían `Origin`. Pendiente: si hay proxy inverso, `serverActions.allowedOrigins` en `next.config.ts` solo hace falta si el proxy reescribe `Host` sin `X-Forwarded-Host`.
   - Commit: `fix(api): validate request origin on state-changing route handlers`
 - [ ] **1.3 Subida de ficheros más segura** (M) — `app/api/requests/[id]/comparisons/route.ts:16-28`, `next.config.ts:8`
   - Contar los bytes leídos del stream, comprobar la firma `PK\x03\x04` del ZIP y que el LST sea texto. Verificar contra la documentación de `node_modules/next/dist/docs/` que `proxyClientMaxBodySize` en `experimental` es válido en esta versión.
