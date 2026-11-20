@@ -137,7 +137,7 @@ Rama: `feature/ui-refresh`. Orden: tokens (4.1) antes de componentes (4.5) y de 
 - [x] **4.6 Retoques visuales de minimalist-ui** (S)
   - Quitar `shadow-sm/lg/xl`, bajar `rounded-2xl` a `rounded-xl`/`rounded-lg`, simplificar la franja oscura y la tarjeta del login. Quitar `animate-pulse` de las barras de progreso. Fondo cálido y bordes finos vía tokens.
   - Commit: `style(ui): flatten shadows and reduce corner radii`
-- [ ] **4.7 Accesibilidad del formulario por pasos** (S–M) — `extraction-stepper-form.tsx:494-497,149-150`
+- [x] **4.7 Accesibilidad del formulario por pasos** (S–M) — `extraction-stepper-form.tsx:494-497,149-150`
   - `aria-describedby` hacia `FieldError`, foco en el primer error, `<label>` visible en lugar de `aria-label` (también en `mercedes-model-selector.tsx:84,91`), `:user-invalid`, `pattern`/`minlength` en `axCode` e `imcEdition`, región `aria-live` con el número de resultados del buscador.
   - Commit: `fix(a11y): associate field errors and move focus to the first invalid field`
 - [ ] **4.8 Copy y flujo** (S)

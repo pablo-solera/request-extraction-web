@@ -44,6 +44,20 @@ describe("extraction request stepper", () => {
     expect(screen.getAllByLabelText("Código AX")[0]).toHaveValue("AB1X");
   });
 
+  it("links each field error to its field and moves focus to the first invalid one", async () => {
+    const user = userEvent.setup();
+    render(<ExtractionForm />);
+    await user.type(screen.getAllByLabelText("Edición IMC")[0]!, "5");
+    await user.click(screen.getByRole("button", { name: "Continuar" }));
+
+    const axCode = screen.getAllByLabelText("Código AX")[0]!;
+    expect(axCode).toHaveAttribute("aria-invalid", "true");
+    expect(axCode).toHaveFocus();
+    expect(axCode).toHaveAccessibleDescription("El código AX debe tener entre 3 y 4 caracteres alfanuméricos.");
+    expect(screen.getAllByLabelText("Edición IMC")[0]).toHaveAccessibleDescription("La edición debe tener el formato XX/X, por ejemplo 05/0.");
+    expect(axCode).toHaveAttribute("pattern", "[A-Za-z0-9]{3,4}");
+  });
+
   it("keeps common data while navigating and shows the selected group manufacturers", async () => {
     const user = userEvent.setup();
     render(<ExtractionForm />);

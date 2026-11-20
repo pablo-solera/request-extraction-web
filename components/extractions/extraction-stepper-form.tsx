@@ -1,6 +1,6 @@
 "use client";
 
-import { useActionState, useEffect, useId, useState } from "react";
+import { useActionState, useEffect, useId, useRef, useState } from "react";
 import { z } from "zod";
 import { createExtractionAction, type ExtractionFormState } from "@/app/(dashboard)/extractions/actions";
 import { SubmitButton } from "@/components/common/submit-button";
@@ -79,8 +79,12 @@ function selectedModelsLabel(count: number) {
   return count === 1 ? "el modelo seleccionado" : `los ${count} modelos seleccionados`;
 }
 
-function FieldError({ children }: { children?: string }) {
-  return children ? <span className="mt-1 block text-sm text-red-700">{children}</span> : null;
+function FieldError({ children, id }: { children?: string; id: string }) {
+  return children ? <span className="mt-1 block text-body text-danger-ink" id={id}>{children}</span> : null;
+}
+
+function resultsLabel(count: number) {
+  return count === 1 ? "1 resultado" : `${count} resultados`;
 }
 
 function StepHeading({ title, description }: { title: string; description: string }) {
@@ -151,13 +155,13 @@ function BmwOptionField({
   }
 
   return <div className={className}>
+    {searchable ? <div className="mb-3"><label className="field-label" htmlFor={`${id}-search`}>{`Buscar ${label.toLocaleLowerCase("es-ES")}`}</label><input autoComplete="off" className="field-control" disabled={!url || loading || Boolean(message)} id={`${id}-search`} onChange={(event) => setSearch(event.target.value)} placeholder="Por código o descripción" type="search" value={search} /><p aria-live="polite" className="sr-only" role="status">{search.trim() && options.length > 0 ? resultsLabel(filtered.length) : ""}</p></div> : null}
     <label className="field-label" htmlFor={`${id}-select`}>{label}</label>
-    {searchable ? <input aria-label={`Buscar ${label.toLocaleLowerCase("es-ES")}`} autoComplete="off" className="field-control mb-2" disabled={!url || loading || Boolean(message)} onChange={(event) => setSearch(event.target.value)} placeholder="Buscar por código o descripción" type="search" value={search} /> : null}
-    <select aria-invalid={Boolean(error)} aria-label={label} className="field-control" disabled={!url || loading || Boolean(message) || options.length === 0} id={`${id}-select`} onChange={(event) => onChange(event.target.value)} required value={value}>
+    <select aria-describedby={error ? `${id}-error` : undefined} aria-invalid={Boolean(error)} className="field-control" disabled={!url || loading || Boolean(message) || options.length === 0} id={`${id}-select`} onChange={(event) => onChange(event.target.value)} required value={value}>
       <option value="">{!url ? initialText : loading ? loadingText : message ? "Opciones no disponibles" : options.length === 0 ? emptyText : searchable && search && filtered.length === 0 ? "No se encontraron typekeys" : `Selecciona ${label.toLocaleLowerCase("es-ES")}`}</option>
       {filtered.map((option) => <option key={option.value} value={option.value}>{option.label}</option>)}
     </select>
-    <FieldError>{error}</FieldError>
+    <FieldError id={`${id}-error`}>{error}</FieldError>
     {onAddMultiple ? <div className="mt-3 rounded-lg border border-zinc-200 bg-white p-3">
       <label><span className="field-label">Pegar varios typekeys</span><textarea className="field-control min-h-20 resize-y font-mono" disabled={!url || loading || Boolean(message) || options.length === 0} onChange={(event) => setPasteValue(event.target.value)} placeholder="Ej.: 11EH, 41HZ, 51HY" value={pasteValue} /></label>
       <div className="mt-2 flex flex-wrap items-center gap-3"><Button disabled={!pasteValue.trim() || loading || options.length === 0} onClick={addPastedTypekeys}>Añadir typekeys</Button><span className="text-xs text-zinc-500">Separados por espacios, comas o punto y coma</span></div>
@@ -194,6 +198,7 @@ function RenaultFamilySelector({ brand, selected, onToggle }: { brand: "Renault"
   const filtered = search.trim() ? options.filter((option) => `${option.value} ${option.label}`.toLocaleLowerCase("es-ES").includes(search.trim().toLocaleLowerCase("es-ES"))) : options;
   return <div className="space-y-3">
     <label className="block"><span className="field-label">Buscar familias</span><input className="field-control" disabled={!current || Boolean(current.error)} onChange={(event) => setSearch(event.target.value)} placeholder="Escribe nombre o código" type="search" value={search} /></label>
+    <p aria-live="polite" className="sr-only" role="status">{search.trim() && options.length > 0 ? resultsLabel(filtered.length) : ""}</p>
     {!current ? <p className="text-sm text-zinc-600" role="status">Cargando familias de {brand}…</p> : current.error ? <div className="flex flex-wrap items-center gap-3 text-sm text-red-700" role="alert"><span>{current.error}</span><button className="font-semibold underline" onClick={() => setRetry((value) => value + 1)} type="button">Reintentar</button></div> : options.length === 0 ? <p className="rounded-lg border border-dashed border-zinc-300 p-5 text-sm text-zinc-600">El reader no ha devuelto familias para {brand}.</p> : filtered.length === 0 ? <p className="text-sm text-zinc-600">No hay coincidencias.</p> : <ul className="max-h-96 divide-y divide-zinc-200 overflow-y-auto rounded-xl border border-zinc-200 bg-white">{filtered.map((option) => {
       const checked = selected.some((vehicle) => vehicle.manufacturerGroup === "Renault" && vehicle.modelCode === option.value);
       return <li key={option.value}><label className="flex min-h-12 cursor-pointer items-center gap-3 px-4 py-3 hover:bg-zinc-50"><input aria-label={`Seleccionar familia ${option.label}`} checked={checked} className="size-4 accent-sky-700" onChange={(event) => onToggle(option, event.target.checked)} type="checkbox" /><span className="min-w-0 text-sm text-zinc-900">{option.label}<span className="ml-2 font-mono text-xs text-zinc-500">{option.value}</span></span></label></li>;
@@ -231,6 +236,8 @@ export function ExtractionStepperForm({
   const [draftSaved, setDraftSaved] = useState(false);
   const [localErrors, setLocalErrors] = useState<Record<string, string>>({});
   const [stepError, setStepError] = useState("");
+  const [focusRequest, setFocusRequest] = useState(0);
+  const formRef = useRef<HTMLFormElement>(null);
   const availabilityTargets = new Map<string, AvailabilityTarget>();
   for (const vehicle of vehicles) {
     if (vehicle.manufacturerGroup === "BMW" && vehicle.series && vehicle.developmentCode && /^[A-Z0-9]{4}$/.test(vehicle.typekey)) {
@@ -291,6 +298,10 @@ export function ExtractionStepperForm({
     }, 0);
     return () => window.clearTimeout(timeout);
   }, [draftKey, initialValues]);
+
+  useEffect(() => {
+    if (focusRequest > 0) formRef.current?.querySelector<HTMLElement>('[aria-invalid="true"]')?.focus();
+  }, [focusRequest]);
 
   useEffect(() => {
     if (!draftReady) return;
@@ -444,6 +455,7 @@ export function ExtractionStepperForm({
         for (const issue of parsed.error.issues) errors[String(issue.path[0])] ??= issue.message;
         setLocalErrors(errors);
         setStepError("Completa correctamente los datos comunes para continuar.");
+        setFocusRequest((current) => current + 1);
         return;
       }
     }
@@ -461,6 +473,7 @@ export function ExtractionStepperForm({
         }
         setLocalErrors(errors);
         setStepError(parsed.error.issues[0]?.message ?? "Selecciona al menos un modelo válido.");
+        setFocusRequest((current) => current + 1);
         return;
       }
       if (group === "BMW" && availabilityTargets.size > 0) {
@@ -477,7 +490,7 @@ export function ExtractionStepperForm({
 
   const summaryTitle = group === "BMW" ? `Tiempos ${brand}` : `Tiempos ${brand}`;
 
-  return <form action={action} className="overflow-hidden rounded-xl border border-zinc-200 bg-white">
+  return <form action={action} className="overflow-hidden rounded-xl border border-zinc-200 bg-white" ref={formRef}>
     {confirmDialog}
 
     <div className="border-b border-zinc-200 px-5 py-4 sm:px-7">
@@ -499,10 +512,10 @@ export function ExtractionStepperForm({
       {step === 0 ? <section aria-labelledby="step-common" className="space-y-5">
         <StepHeading title="Datos comunes" description="Estos datos se aplicarán a todas las extracciones de esta solicitud." />
         <div className="grid gap-5 md:grid-cols-2">
-          <label><span className="field-label">Código AX</span><input aria-invalid={Boolean(localErrors.axCode || state.fieldErrors?.axCode)} autoComplete="off" className="field-control font-mono uppercase" maxLength={4} onChange={(event) => setValues((current) => ({ ...current, axCode: normalizeAxCode(event.target.value) }))} placeholder="Ej.: 1XF" required spellCheck={false} value={values.axCode} /><FieldError>{localErrors.axCode ?? state.fieldErrors?.axCode}</FieldError></label>
-          <label><span className="field-label">Edición IMC</span><input aria-invalid={Boolean(localErrors.imcEdition || state.fieldErrors?.imcEdition)} autoComplete="off" className="field-control font-mono" inputMode="numeric" maxLength={4} onChange={(event) => setValues((current) => ({ ...current, imcEdition: event.target.value }))} placeholder="Ej.: 05/0" required spellCheck={false} value={values.imcEdition} /><FieldError>{localErrors.imcEdition ?? state.fieldErrors?.imcEdition}</FieldError></label>
-          <label><span className="field-label">Inicio del desarrollo</span><input aria-invalid={Boolean(localErrors.laboursDevelopmentStart || state.fieldErrors?.laboursDevelopmentStart)} autoComplete="off" className="field-control" lang="es-ES" onChange={(event) => setValues((current) => ({ ...current, laboursDevelopmentStart: event.target.value }))} required type="date" value={values.laboursDevelopmentStart} /><FieldError>{localErrors.laboursDevelopmentStart ?? state.fieldErrors?.laboursDevelopmentStart}</FieldError></label>
-          <label><span className="field-label">Completion</span><input aria-invalid={Boolean(localErrors.completion || state.fieldErrors?.completion)} autoComplete="off" className="field-control" lang="es-ES" onChange={(event) => setValues((current) => ({ ...current, completion: event.target.value }))} required type="date" value={values.completion} /><FieldError>{localErrors.completion ?? state.fieldErrors?.completion}</FieldError></label>
+          <div><label><span className="field-label">Código AX</span><input aria-describedby={localErrors.axCode || state.fieldErrors?.axCode ? `${formId}-axCode-error` : undefined} aria-invalid={Boolean(localErrors.axCode || state.fieldErrors?.axCode)} autoComplete="off" className="field-control font-mono uppercase" maxLength={4} minLength={3} onChange={(event) => setValues((current) => ({ ...current, axCode: normalizeAxCode(event.target.value) }))} pattern="[A-Za-z0-9]{3,4}" placeholder="Ej.: 1XF" required spellCheck={false} value={values.axCode} /></label><FieldError id={`${formId}-axCode-error`}>{localErrors.axCode ?? state.fieldErrors?.axCode}</FieldError></div>
+          <div><label><span className="field-label">Edición IMC</span><input aria-describedby={localErrors.imcEdition || state.fieldErrors?.imcEdition ? `${formId}-imcEdition-error` : undefined} aria-invalid={Boolean(localErrors.imcEdition || state.fieldErrors?.imcEdition)} autoComplete="off" className="field-control font-mono" inputMode="numeric" maxLength={4} onChange={(event) => setValues((current) => ({ ...current, imcEdition: event.target.value }))} pattern="\d{2}/\d" placeholder="Ej.: 05/0" required spellCheck={false} value={values.imcEdition} /></label><FieldError id={`${formId}-imcEdition-error`}>{localErrors.imcEdition ?? state.fieldErrors?.imcEdition}</FieldError></div>
+          <div><label><span className="field-label">Inicio del desarrollo</span><input aria-describedby={localErrors.laboursDevelopmentStart || state.fieldErrors?.laboursDevelopmentStart ? `${formId}-laboursDevelopmentStart-error` : undefined} aria-invalid={Boolean(localErrors.laboursDevelopmentStart || state.fieldErrors?.laboursDevelopmentStart)} autoComplete="off" className="field-control" lang="es-ES" onChange={(event) => setValues((current) => ({ ...current, laboursDevelopmentStart: event.target.value }))} required type="date" value={values.laboursDevelopmentStart} /></label><FieldError id={`${formId}-laboursDevelopmentStart-error`}>{localErrors.laboursDevelopmentStart ?? state.fieldErrors?.laboursDevelopmentStart}</FieldError></div>
+          <div><label><span className="field-label">Completion</span><input aria-describedby={localErrors.completion || state.fieldErrors?.completion ? `${formId}-completion-error` : undefined} aria-invalid={Boolean(localErrors.completion || state.fieldErrors?.completion)} autoComplete="off" className="field-control" lang="es-ES" onChange={(event) => setValues((current) => ({ ...current, completion: event.target.value }))} required type="date" value={values.completion} /></label><FieldError id={`${formId}-completion-error`}>{localErrors.completion ?? state.fieldErrors?.completion}</FieldError></div>
         </div>
       </section> : null}
 
