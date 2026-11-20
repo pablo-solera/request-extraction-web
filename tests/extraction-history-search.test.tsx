@@ -110,4 +110,29 @@ describe("compact history rows", () => {
     expect(await screen.findByRole("alert")).toHaveTextContent("No se ha podido cargar el historial");
     expect(screen.getByRole("button", { name: /^AX-1/ })).toBeInTheDocument();
   });
+
+  it("retries the failed page load from the error alert", async () => {
+    const user = userEvent.setup();
+    const cursor = { createdAt: "2026-10-20 12:00:00+00", requestGroupId: crypto.randomUUID() };
+    loadHistory
+      .mockResolvedValueOnce({ ok: false, message: "No se ha podido cargar el historial. Inténtalo de nuevo." })
+      .mockResolvedValueOnce({ ok: true, items: [item({ axCode: "AX-2" })], transformer: {}, nextCursor: null });
+    render(<ExtractionHistory initialItems={[item({ axCode: "AX-1" })]} initialNextCursor={cursor} />);
+
+    await user.click(screen.getByRole("button", { name: "Cargar más solicitudes" }));
+    await user.click(await screen.findByRole("button", { name: "Reintentar" }));
+
+    expect(await screen.findByRole("button", { name: /^AX-2/ })).toBeInTheDocument();
+    expect(loadHistory).toHaveBeenCalledTimes(2);
+    expect(screen.queryByRole("alert")).not.toBeInTheDocument();
+  });
+
+  it("tells the user when a filter hides requests but more are still unloaded", async () => {
+    const user = userEvent.setup();
+    render(<ExtractionHistory initialItems={[item({ axCode: "AX-OK" })]} initialNextCursor={{ createdAt: "2026-10-20 12:00:00+00", requestGroupId: crypto.randomUUID() }} />);
+
+    await user.selectOptions(screen.getByRole("combobox", { name: "Estado" }), "failed");
+
+    expect(screen.getByText(/Hay más solicitudes sin cargar/)).toBeInTheDocument();
+  });
 });

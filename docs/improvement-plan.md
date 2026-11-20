@@ -177,8 +177,9 @@ Contexto ya creado: `PRODUCT.md`, `DESIGN.md` y `.impeccable/design.json` (coman
   - `clarify` hecho: «Completion» pasa a «Fecha de finalización» (formulario, resumen e historial, igual que los mensajes de validación) y el error de LDAP no disponible indica qué hacer.
   - `layout` en historial y formulario, `typeset` para la jerarquía de títulos, `clarify` para textos y errores.
   - Commit por comando: `style(ui): refine layout ...`, `style(ui): refine type hierarchy`, `fix(ui): clarify copy and error messages`
-- [ ] **4.13 `harden`** (S) — estados vacíos, de error y de carga del historial, aprobaciones y administración
+- [x] **4.13 `harden`** (S) — estados vacíos, de error y de carga del historial, aprobaciones y administración
   - Commit: `fix(ui): harden empty, error and loading states`
+  - Hecho: `history/actions.ts` estaba guardado en Latin-1 (los acentos de los mensajes salían como `�`) y registraba el objeto de error completo; ahora es UTF-8 y usa `describeError`. El historial ofrece «Reintentar» tras un fallo de búsqueda o de «Cargar más» y avisa de que el filtro solo cubre lo cargado cuando quedan solicitudes sin cargar. Aprobaciones gana «Volver a la primera página» al paginar y un vacío específico en páginas posteriores. Ya existían y se revisan sin cambios: esqueletos de `loading.tsx` en historial, aprobaciones, usuarios e infraestructura, vacío del historial y de usuarios, error de sincronización y límite de errores del dashboard.
 - [ ] **4.14 `polish`** (S) — pasada final de toda la interfaz
   - Commit: `style(ui): final polish pass`
 - [ ] **4.15 Detector** (S)

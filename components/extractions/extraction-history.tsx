@@ -183,6 +183,9 @@ export function ExtractionHistory({ createdId, openId, draftKey = "extraction-dr
   const [refreshError, setRefreshError] = useState(false);
   const [loadError, setLoadError] = useState("");
   const [loading, setLoading] = useState(false);
+  const [reloadKey, setReloadKey] = useState(0);
+  const failedAction = useRef<"search" | "more">("search");
+  const handledReload = useRef(0);
   const [search, setSearch] = useState("");
   const [appliedSearch, setAppliedSearch] = useState("");
   const [statusFilter, setStatusFilter] = useState<"all" | RequestAggregateStatus>("all");
@@ -215,7 +218,8 @@ export function ExtractionHistory({ createdId, openId, draftKey = "extraction-dr
   }, [createdId, draftKey, router]);
 
   useEffect(() => {
-    if (debouncedSearch === appliedSearch) return;
+    if (debouncedSearch === appliedSearch && reloadKey === handledReload.current) return;
+    handledReload.current = reloadKey;
     const requestId = ++latestLoad.current;
     void (async () => {
       setLoading(true);
@@ -224,6 +228,7 @@ export function ExtractionHistory({ createdId, openId, draftKey = "extraction-dr
       if (requestId !== latestLoad.current) return;
       setLoading(false);
       if (!result.ok) {
+        failedAction.current = "search";
         setLoadError(result.message);
         return;
       }
@@ -233,7 +238,7 @@ export function ExtractionHistory({ createdId, openId, draftKey = "extraction-dr
       setNextCursor(result.nextCursor);
       setTransformer(result.transformer);
     })();
-  }, [appliedSearch, debouncedSearch]);
+  }, [appliedSearch, debouncedSearch, reloadKey]);
 
   useEffect(() => {
     const ids = activeKey ? activeKey.split(",") : [];
@@ -318,6 +323,7 @@ export function ExtractionHistory({ createdId, openId, draftKey = "extraction-dr
     if (requestId !== latestLoad.current) return;
     setLoading(false);
     if (!result.ok) {
+      failedAction.current = "more";
       setLoadError(result.message);
       return;
     }
@@ -357,8 +363,8 @@ export function ExtractionHistory({ createdId, openId, draftKey = "extraction-dr
         <p aria-live="polite" className="pb-3 text-body text-ink-muted" role="status">{summaryText}</p>
         {filtered || search ? <Button onClick={clearFilters} variant="ghost">Limpiar filtros</Button> : null}
       </div>
-      {loadError ? <p className="rounded-xl border border-danger-line bg-danger-wash px-4 py-3 text-body text-danger-ink" role="alert">{loadError}</p> : null}
-      {visibleGroups.length === 0 ? <p className="rounded-xl border border-dashed border-line bg-surface px-6 py-12 text-center text-body text-ink-muted">{loading ? "Buscando solicitudes…" : "Ninguna solicitud coincide con la búsqueda o el estado elegido."}</p> : null}
+      {loadError ? <div className="flex flex-wrap items-center justify-between gap-3 rounded-xl border border-danger-line bg-danger-wash px-4 py-3 text-body text-danger-ink" role="alert"><p>{loadError}</p><Button disabled={loading} onClick={() => failedAction.current === "more" ? void loadMore() : setReloadKey((current) => current + 1)}>Reintentar</Button></div> : null}
+      {visibleGroups.length === 0 ? <p className="rounded-xl border border-dashed border-line bg-surface px-6 py-12 text-center text-body text-ink-muted">{loading ? "Buscando solicitudes…" : `Ninguna solicitud cargada coincide con la búsqueda o el estado elegido.${nextCursor ? " Hay más solicitudes sin cargar: pulsa «Cargar más solicitudes» para ampliar la búsqueda." : ""}`}</p> : null}
       <div aria-busy={loading} className="space-y-3">
         {visibleGroups.map(([groupId, groupRows]) => {
           const first = groupRows[0]!;
