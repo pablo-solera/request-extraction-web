@@ -117,7 +117,7 @@ Rama: `feature/performance`. Consultar `node_modules/next/dist/docs/` antes de t
 
 Rama: `feature/ui-refresh`. Orden: tokens (4.1) antes de componentes (4.5) y de los retoques visuales (4.6).
 
-- [ ] **4.1 Tokens de diseño** (M) — `app/globals.css`
+- [x] **4.1 Tokens de diseño** (M) — `app/globals.css`
   - En `@theme`: colores de estado (pares pastel), bordes, fondo, texto secundario con contraste AA y escala tipográfica con nombre. Un solo estilo de foco (hoy hay dos y una regla duplicada en `globals.css:23-26` y `:59-64`).
   - Commit: `feat(ui): define design tokens for color, type and focus`
 - [ ] **4.2 `ConfirmDialog` con `<dialog>`** (M)

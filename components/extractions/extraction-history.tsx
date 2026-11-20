@@ -102,16 +102,16 @@ function ExtractionActions({ item, detailsExpanded, onToggleDetails, onUpdated }
 
   const hasAction = item.canCancel || item.canResume || item.canForceResume || item.downloadReady || item.canViewDetails;
   return <div className="relative flex flex-col items-end gap-2" ref={containerRef}>
-    <button aria-expanded={open} aria-label={`Opciones para ${item.axCode}, ${item.modelDescription}, ${item.modelCode}`} className="inline-flex min-h-11 min-w-11 items-center justify-center rounded-lg border border-zinc-300 bg-white text-zinc-800 hover:bg-zinc-50 focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-sky-700 disabled:opacity-50" disabled={busy} onClick={toggleMenu} ref={triggerRef} type="button">
+    <button aria-expanded={open} aria-label={`Opciones para ${item.axCode}, ${item.modelDescription}, ${item.modelCode}`} className="inline-flex min-h-11 min-w-11 items-center justify-center rounded-lg border border-zinc-300 bg-white text-zinc-800 hover:bg-zinc-50 disabled:opacity-50" disabled={busy} onClick={toggleMenu} ref={triggerRef} type="button">
       <svg aria-hidden="true" fill="currentColor" height="20" viewBox="0 0 20 20" width="20"><circle cx="4" cy="10" r="1.5"/><circle cx="10" cy="10" r="1.5"/><circle cx="16" cy="10" r="1.5"/></svg>
     </button>
     {busy ? <span className="text-xs text-zinc-600" role="status">Procesando…</span> : null}
     {open ? <div className="fixed z-50 max-h-[70vh] min-w-52 overflow-y-auto rounded-lg border border-zinc-200 bg-white p-1 shadow-lg" aria-label={`Acciones para ${item.axCode}`} style={menuPosition}>
-      {item.downloadReady ? <a className="flex min-h-10 items-center rounded-md px-3 text-left text-sm text-zinc-800 hover:bg-zinc-100 focus-visible:outline-2 focus-visible:outline-sky-700" href={`/api/extractions/${item.id}/download`}>Descargar ZIP de {item.modelCode}</a> : null}
-      {item.canViewDetails ? <button className="flex min-h-10 w-full items-center rounded-md px-3 text-left text-sm text-zinc-800 hover:bg-zinc-100 focus-visible:outline-2 focus-visible:outline-sky-700" onClick={() => { onToggleDetails(item.id); setOpen(false); }} type="button">{detailsExpanded ? "Ocultar detalles" : "Ver detalles"}</button> : null}
-      {item.canCancel ? <button className="flex min-h-10 w-full items-center rounded-md px-3 text-left text-sm text-red-700 hover:bg-red-50 focus-visible:outline-2 focus-visible:outline-red-700" onClick={() => void run("cancel")} type="button">Cancelar extracción</button> : null}
-      {item.canResume ? <button className="flex min-h-10 w-full items-center rounded-md px-3 text-left text-sm text-zinc-800 hover:bg-zinc-100 focus-visible:outline-2 focus-visible:outline-sky-700" onClick={() => void run("resume")} type="button">Reanudar extracción</button> : null}
-      {item.canForceResume ? <button className="flex min-h-10 w-full items-center rounded-md px-3 text-left text-sm text-amber-900 hover:bg-amber-50 focus-visible:outline-2 focus-visible:outline-amber-700" onClick={() => void run("resume", true)} type="button">Reanudar a la fuerza</button> : null}
+      {item.downloadReady ? <a className="flex min-h-10 items-center rounded-md px-3 text-left text-sm text-zinc-800 hover:bg-zinc-100" href={`/api/extractions/${item.id}/download`}>Descargar ZIP de {item.modelCode}</a> : null}
+      {item.canViewDetails ? <button className="flex min-h-10 w-full items-center rounded-md px-3 text-left text-sm text-zinc-800 hover:bg-zinc-100" onClick={() => { onToggleDetails(item.id); setOpen(false); }} type="button">{detailsExpanded ? "Ocultar detalles" : "Ver detalles"}</button> : null}
+      {item.canCancel ? <button className="flex min-h-10 w-full items-center rounded-md px-3 text-left text-sm text-red-700 hover:bg-red-50" onClick={() => void run("cancel")} type="button">Cancelar extracción</button> : null}
+      {item.canResume ? <button className="flex min-h-10 w-full items-center rounded-md px-3 text-left text-sm text-zinc-800 hover:bg-zinc-100" onClick={() => void run("resume")} type="button">Reanudar extracción</button> : null}
+      {item.canForceResume ? <button className="flex min-h-10 w-full items-center rounded-md px-3 text-left text-sm text-amber-900 hover:bg-amber-50" onClick={() => void run("resume", true)} type="button">Reanudar a la fuerza</button> : null}
       {item.canForceResume ? <p className="px-3 pb-2 text-xs leading-5 text-zinc-500">Recupera una extracción que el reader detecta atascada; conserva los typekeys ya completados.</p> : null}
       {!hasAction ? <p className="px-3 py-2 text-sm text-zinc-500">No hay acciones disponibles</p> : null}
     </div> : null}
@@ -144,7 +144,7 @@ function RequestActions({ items, onUpdated }: { items: ExtractionListItem[]; onU
     setFeedback(succeeded === targets.length ? `${succeeded} extracciones ${verb}.` : `${succeeded} de ${targets.length} extracciones ${verb}; revisa las demás.`);
   }
 
-  const buttonClass = "inline-flex min-h-11 items-center rounded-lg border px-3 text-sm font-medium focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-sky-700 disabled:opacity-50";
+  const buttonClass = "inline-flex min-h-11 items-center rounded-lg border px-3 text-sm font-medium disabled:opacity-50";
   return <div className="flex flex-wrap items-center gap-2">
     {cancellable.length ? <button className={`${buttonClass} border-red-200 bg-white text-red-700 hover:bg-red-50`} disabled={busy} onClick={() => void runAll("cancel", cancellable)} type="button">Cancelar solicitud</button> : null}
     {resumable.length ? <button className={`${buttonClass} border-zinc-300 bg-white text-zinc-800 hover:bg-zinc-50`} disabled={busy} onClick={() => void runAll("resume", resumable)} type="button">Reanudar fallidos</button> : null}
@@ -282,7 +282,7 @@ export function ExtractionHistory({ createdId, openId, draftKey = "extraction-dr
           const running = summary.status === "running";
           return <section aria-label={`Solicitud ${first.axCode}`} id={`request-${group.id}`} className={`overflow-hidden rounded-2xl border bg-white shadow-sm ${group.id === createdId ? "border-emerald-300" : "border-zinc-200"}`} key={group.id}>
             <h2 className="m-0">
-              <button aria-controls={panelId} aria-expanded={expanded} className="flex w-full min-w-0 items-center gap-4 px-5 py-5 text-left hover:bg-zinc-50 focus-visible:outline-2 focus-visible:-outline-offset-2 focus-visible:outline-sky-700 md:px-6" onClick={() => setToggledGroups((current) => ({ ...current, [group.id]: !expanded }))} type="button">
+              <button aria-controls={panelId} aria-expanded={expanded} className="flex w-full min-w-0 items-center gap-4 px-5 py-5 text-left hover:bg-zinc-50 focus-visible:-outline-offset-2 md:px-6" onClick={() => setToggledGroups((current) => ({ ...current, [group.id]: !expanded }))} type="button">
                 <span className="min-w-0 flex-1">
                   <span className="flex flex-wrap items-center gap-2">
                     <span className="break-words font-mono text-base font-semibold text-zinc-950" translate="no">{first.axCode}</span>

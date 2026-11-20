@@ -12,7 +12,7 @@ const comparisonStyles = {
   completed: "border-emerald-200 bg-emerald-50 text-emerald-800",
   failed: "border-red-200 bg-red-50 text-red-800",
 } as const;
-const buttonClass = "inline-flex min-h-11 items-center rounded-lg border px-3 text-sm font-medium focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-sky-700 disabled:opacity-50";
+const buttonClass = "inline-flex min-h-11 items-center rounded-lg border px-3 text-sm font-medium disabled:opacity-50";
 
 function isActive(info: TransformerRequestInfo | undefined, allCompleted: boolean) {
   if (!info?.applicable) return false;

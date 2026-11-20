@@ -55,7 +55,7 @@ export function UserMenu({ user }: { user: User }) {
         aria-controls="account-disclosure"
         aria-expanded={open}
         aria-label={`Cuenta de ${displayName}`}
-        className="flex min-h-11 cursor-pointer items-center gap-3 rounded-xl px-2 py-1 text-left hover:bg-zinc-100 focus-visible:outline-2 focus-visible:outline-offset-2"
+        className="flex min-h-11 cursor-pointer items-center gap-3 rounded-xl px-2 py-1 text-left hover:bg-zinc-100"
         onClick={() => setOpen((current) => !current)}
         type="button"
       >
@@ -73,7 +73,7 @@ export function UserMenu({ user }: { user: User }) {
             <p className="text-xs text-zinc-500">{roleLabels[user.role]}</p>
           </div>
           <form action={logoutAction}>
-            <button className="flex min-h-11 w-full cursor-pointer items-center gap-2 px-4 py-2 text-left text-sm text-zinc-700 hover:bg-zinc-100 hover:text-zinc-950 focus-visible:outline-2 focus-visible:outline-offset-[-2px]" type="submit">
+            <button className="flex min-h-11 w-full cursor-pointer items-center gap-2 px-4 py-2 text-left text-sm text-zinc-700 hover:bg-zinc-100 hover:text-zinc-950" type="submit">
               <PowerOffIcon className="size-4 shrink-0" />
               Cerrar sesión
             </button>

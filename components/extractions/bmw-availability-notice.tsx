@@ -28,6 +28,6 @@ export function BmwAvailabilityNotice({
   return <div className="mt-2 space-y-1 rounded-lg border border-red-200 bg-red-50 px-3 py-2 text-xs text-red-800" role="alert">
     <p className="font-semibold">{typekey}: {notice.message}</p>
     {notice.baseTypeMessage ? <p className={notice.suggestedTypekey ? "text-zinc-800" : "text-red-800"}>{notice.baseTypeMessage}</p> : null}
-    {notice.suggestedTypekey ? <button className="min-h-9 rounded-lg border border-sky-700 bg-white px-3 py-1 text-xs font-semibold text-sky-900 hover:bg-sky-50 focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-sky-700" onClick={() => onUseBaseType(notice.suggestedTypekey!)} type="button">Usar tipo base {notice.suggestedTypekey}</button> : null}
+    {notice.suggestedTypekey ? <button className="min-h-9 rounded-lg border border-sky-700 bg-white px-3 py-1 text-xs font-semibold text-sky-900 hover:bg-sky-50" onClick={() => onUseBaseType(notice.suggestedTypekey!)} type="button">Usar tipo base {notice.suggestedTypekey}</button> : null}
   </div>;
 }
