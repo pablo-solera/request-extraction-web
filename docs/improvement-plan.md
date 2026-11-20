@@ -146,7 +146,7 @@ Rama: `feature/ui-refresh`. Orden: tokens (4.1) antes de componentes (4.5) y de 
 
 Contexto ya creado: `PRODUCT.md`, `DESIGN.md` y `.impeccable/design.json` (comandos `init` y `document`). Cada comando se ejecuta con el launcher `.agents/skills/impeccable/scripts/impeccable.cmd` y la variable `DISABLE_TELEMETRY=1`. Las pasadas que editan código se commitean aparte, una por comando.
 
-- [ ] **4.9 `extract`** (M) — hacerlo junto con 4.1 y 4.5
+- [x] **4.9 `extract`** (M) — hacerlo junto con 4.1 y 4.5
   - Sacar a tokens y componentes compartidos lo repetido. Actualizar `DESIGN.md` y `.impeccable/design.json` con los valores finales.
   - Commit: `docs(design): refresh DESIGN.md after extracting tokens and components`
 - [ ] **4.10 `critique`** (S) — sobre historial, formulario por pasos, aprobaciones y login
