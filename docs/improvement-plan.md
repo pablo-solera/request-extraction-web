@@ -183,11 +183,13 @@ Contexto ya creado: `PRODUCT.md`, `DESIGN.md` y `.impeccable/design.json` (coman
 - [x] **4.14 `polish`** (S) — pasada final de toda la interfaz
   - Commit: `style(ui): final polish pass`
   - Hecho: ritmo vertical único entre secciones (`space-y-6`, antes 6, 7 y 8 según la página, también en los esqueletos); eliminados los restos de móvil y tablet (`sm:`, `md:`, `lg:`, el ancho calculado del menú con desplazamiento) y las rejillas quedan fijas para escritorio.
-- [ ] **4.15 Detector** (S)
+- [x] **4.15 Detector** (S)
   - `impeccable.cmd detect --json --changed` sobre la interfaz terminada, una sola vez. Arreglar los hallazgos reales y anotar los falsos positivos en `.impeccable/critique/ignore.md`.
+  - Hecho: sin hallazgos. `detect --json --changed` devolvió `[]` (árbol limpio tras los commits); se repitió con los 33 `.tsx` cambiados respecto a `main` y con `app/` y `components/` completos: `[]` en ambos. Sin falsos positivos, así que no se crea `.impeccable/critique/ignore.md`. No hay commit de código.
   - Commit: `style(ui): resolve design detector findings`
 - [ ] **4.16 Capturas con `impeccable shot`** (S) — solo `/login` sin sesión (el resto requiere LDAP)
   - Comprobar a 1280 y 1536 px de ancho que el login queda bien tras 4.6. Es solo de escritorio.
+  - **Bloqueada:** `npx next dev -p 3106` se niega a arrancar porque ya hay un `next dev` en este directorio (puerto 3000, PID ajeno): Next permite un solo servidor de desarrollo por proyecto. Alternativas descartadas por tocar el servidor del usuario (`next build` escribe en `.next`). Reintentar cuando el servidor del 3000 esté parado: `impeccable shot http://localhost:PUERTO/login --viewport 1280x800,1536x864`.
 
 ---
 
