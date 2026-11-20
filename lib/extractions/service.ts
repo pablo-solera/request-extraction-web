@@ -22,6 +22,7 @@ import {
   markExtractionResumed,
   recordExtractionAction,
 } from "@/lib/extractions/repository";
+import type { RequestPageOptions } from "@/lib/extractions/repository";
 import type { ExtractionFormInput } from "@/lib/extractions/validation";
 import type { ExtractionListItem, ExtractionReaderDetail } from "@/lib/extractions/types";
 import { ReaderError } from "@/lib/readers/errors";
@@ -172,9 +173,9 @@ function localizedReaderActionError(error: unknown): unknown {
   return new ReaderError(message, error.code, error.retryable, error.status);
 }
 
-export async function listExtractionsVisibleToUser(actor: ExtractionActor) {
+export async function listExtractionsVisibleToUser(actor: ExtractionActor, options?: RequestPageOptions) {
   const teamIds = actor.role === "admin" ? null : actor.role === "coordinator" ? await findCoordinatorTeamUserIds(actor) : [];
-  return listVisibleExtractionsRepository(actor.id, teamIds);
+  return listVisibleExtractionsRepository(actor.id, teamIds, options);
 }
 
 export async function listExtractionsVisibleToUserByIds(actor: ExtractionActor, ids: string[]) {

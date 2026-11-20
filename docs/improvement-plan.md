@@ -61,9 +61,10 @@ Rama: `feature/database-hardening`. Probar cada migración en un clon antes de p
 - [ ] **2.2 Índices parciales de "listas para cargar/informe"** (S) — `repository.ts:16-17,183-184`
   - `(created_at) WHERE status='approved' AND manufacturer_group='BMW' AND load_status IS NULL` y el equivalente de Mercedes con `report_status IS NULL`.
   - Commit: `perf(db): add partial indexes for reconciliation queries`
-- [ ] **2.3 Paginación de los listados** (M) — `lib/extractions/repository.ts:257-278,316-324`
+- [x] **2.3 Paginación de los listados** (M) — `lib/extractions/repository.ts:257-278,316-324`
   - Paginación por keyset sobre `(created_at DESC, id DESC)`. `listPendingRequests` debe paginar por solicitud y no por fila del join. Índice `extractions_created_idx`. Cambia la API y la interfaz del historial: hacerlo en un solo cambio con la tarea 4.3.
   - Commit: `feat(extractions): paginate extraction and pending-request listings`
+  - Hecho junto con 4.3 en `feat(history): compact rows with search and status filter`. La paginación es por solicitud (keyset `(created_at DESC, request_group_id DESC)` sobre `extraction_requests`) y no por fila, para no partir un grupo entre páginas; por eso los índices (`extraction_requests_created_idx` y `extraction_requests_requester_created_idx`) están en `extraction_requests` y no en `extractions`. Migración `0040_request_pagination_indexes` (sin ejecutar): **renumerar al fusionar si otra rama ya usa ese número, y mantener el `when` del journal mayor que el de la última migración aplicada**. El historial pagina de 20 en 20 con «Cargar más»; aprobaciones, con «Ver más solicitudes». La búsqueda por AX es en servidor; el filtro por estado actúa sobre las solicitudes ya cargadas.
 - [ ] **2.4 Unificar el camino de migraciones** (M) — `scripts/apply-migrations.ts`, `scripts/migrations.ts`, `package.json`, `db/migrations/meta`
   - Un único camino con `drizzle-kit migrate`. Resolver la ausencia de snapshots en `meta/` (verificarla antes de actuar). `psql` con `--single-transaction` si se mantiene `docker:setup-db`. No generar nunca una migración con `when` menor que la última aplicada.
   - Commit: `build(db): unify migrations on drizzle-kit migrate`
@@ -104,11 +105,12 @@ Rama: `feature/performance`. Consultar `node_modules/next/dist/docs/` antes de t
 - [ ] **3.4 Carga diferida en el formulario por pasos** (M) — `components/extractions/extraction-stepper-form.tsx`
   - `next/dynamic` para los selectores por fabricante y `BmwSwapReview`. Medir el bundle antes y después; decidir si `zod` debe quedarse en el cliente.
   - Commit: `perf(extractions): lazy-load manufacturer selectors in the stepper form`
-- [ ] **3.5 Agrupar con `Map` en el historial** (S) — `extraction-history.tsx:260-265`
+- [x] **3.5 Agrupar con `Map` en el historial** (S) — `extraction-history.tsx:260-265`
   - Sustituir el `groups.find` dentro del bucle (O(n·g)) por un `Map`.
   - Commit: `perf(history): group extractions with a map`
-- [ ] **3.6 Listeners pasivos** (S) — `extraction-history.tsx:49-70`
+- [x] **3.6 Listeners pasivos** (S) — `extraction-history.tsx:49-70`
   - `{ passive: true }` en `scroll` y `resize`. Se absorbe si 4.2 sustituye el menú.
+  - Absorbida por 4.4: el menú con `popover` ya no registra listeners de `scroll` ni `resize`. Agrupación con `Map` (3.5) hecha en 4.3.
   - Commit: `perf(history): register scroll listeners as passive`
 
 ---
@@ -123,7 +125,7 @@ Rama: `feature/ui-refresh`. Orden: tokens (4.1) antes de componentes (4.5) y de 
 - [x] **4.2 `ConfirmDialog` con `<dialog>`** (M)
   - Sustituir los 4 `window.confirm` (`extraction-history.tsx:73,131`, `extraction-stepper-form.tsx:311,323`) con consecuencias explícitas en el texto.
   - Commit: `feat(ui): replace window.confirm with a native dialog component`
-- [ ] **4.3 Historial con filas compactas, búsqueda y filtro por estado** (M) — `extraction-history.tsx:283-310`
+- [x] **4.3 Historial con filas compactas, búsqueda y filtro por estado** (M) — `extraction-history.tsx:283-310`
   - Fila compacta (AX, marca, estado, progreso, fecha) con detalle al expandir, búsqueda por AX y filtro por estado. Hacerlo junto con 2.3. `content-visibility: auto` en cada grupo.
   - Commit: `feat(history): compact rows with search and status filter`
 - [x] **4.4 Menú de acciones con `popover` y anclaje** (M) — `extraction-history.tsx:41-120`

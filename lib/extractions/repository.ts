@@ -1,6 +1,6 @@
 import "server-only";
 
-import { and, count, desc, eq, getTableColumns, inArray, isNotNull, isNull, lte, or, sql } from "drizzle-orm";
+import { and, count, desc, eq, getTableColumns, ilike, inArray, isNotNull, isNull, lte, or, sql, type SQL } from "drizzle-orm";
 import { getDb } from "@/db";
 import { extractionActionLogs, extractions, extractionRequests, type Extraction, type ExtractionStatus } from "@/db/schema";
 import type { ExtractionFormInput } from "@/lib/extractions/validation";
@@ -254,32 +254,70 @@ export async function listOwnedExtractions(userId: string, ids: string[]) {
     .where(and(eq(extractions.userId, userId), inArray(extractions.id, uniqueIds)));
 }
 
-async function listAllExtractions() {
-  return getDb().select({
+export type RequestCursor = { createdAt: string; requestGroupId: string };
+export type RequestPageOptions = { cursor?: RequestCursor | null; limit?: number; axCode?: string; requestGroupId?: string };
+export type RequestPage<T> = { rows: T[]; nextCursor: RequestCursor | null };
+export const REQUEST_PAGE_SIZE = 20;
+
+const requesterColumns = { id: users.id, oracleEmpId: users.oracleEmpId, fallbackName: users.fallbackName, fallbackEmail: users.fallbackEmail };
+
+function escapeLike(value: string) {
+  return value.replace(/[\\%_]/g, (character) => `\\${character}`);
+}
+
+async function pageRequestGroups(where: SQL | undefined, limit: number) {
+  const createdAt = sql<string>`${extractionRequests.createdAt}::text`;
+  const groups = await getDb().select({ requestGroupId: extractionRequests.requestGroupId, createdAt })
+    .from(extractionRequests)
+    .where(where)
+    .orderBy(desc(extractionRequests.createdAt), desc(extractionRequests.requestGroupId))
+    .limit(limit + 1);
+  const page = groups.slice(0, limit);
+  const last = page.at(-1);
+  return { groupIds: page.map((group) => group.requestGroupId), nextCursor: groups.length > limit && last ? { createdAt: last.createdAt, requestGroupId: last.requestGroupId } : null };
+}
+
+function afterCursor(cursor: RequestCursor | null | undefined) {
+  return cursor ? sql`(${extractionRequests.createdAt}, ${extractionRequests.requestGroupId}) < (${cursor.createdAt}::timestamptz, ${cursor.requestGroupId}::uuid)` : undefined;
+}
+
+async function listExtractionsOfGroups(groupIds: string[]) {
+  if (groupIds.length === 0) return [];
+  const rows = await getDb().select({
     extraction: extractionColumns,
     requestStatus: extractionRequests.status,
-    requester: { id: users.id, oracleEmpId: users.oracleEmpId, fallbackName: users.fallbackName, fallbackEmail: users.fallbackEmail },
+    requester: requesterColumns,
   }).from(extractions)
     .innerJoin(extractionRequests, eq(extractions.requestGroupId, extractionRequests.requestGroupId))
     .innerJoin(users, eq(extractions.userId, users.id))
-    .orderBy(desc(extractions.createdAt));
+    .where(inArray(extractions.requestGroupId, groupIds)).orderBy(desc(extractions.createdAt), desc(extractions.id));
+  const position = new Map(groupIds.map((groupId, index) => [groupId, index]));
+  return rows.toSorted((left, right) => position.get(left.extraction.requestGroupId)! - position.get(right.extraction.requestGroupId)!);
 }
 
-async function listExtractionsForUsers(userIds: string[]) {
-  if (userIds.length === 0) return [];
-  return getDb().select({
-    extraction: extractionColumns,
-    requestStatus: extractionRequests.status,
-    requester: { id: users.id, oracleEmpId: users.oracleEmpId, fallbackName: users.fallbackName, fallbackEmail: users.fallbackEmail },
-  }).from(extractions)
-    .innerJoin(extractionRequests, eq(extractions.requestGroupId, extractionRequests.requestGroupId))
-    .innerJoin(users, eq(extractions.userId, users.id))
-    .where(inArray(extractions.userId, userIds)).orderBy(desc(extractions.createdAt));
+async function listRequestPage(visibility: SQL | undefined, { cursor, limit = REQUEST_PAGE_SIZE, axCode, requestGroupId }: RequestPageOptions) {
+  const search = axCode?.trim();
+  const { groupIds, nextCursor } = await pageRequestGroups(and(
+    visibility,
+    search ? ilike(extractionRequests.axCode, `%${escapeLike(search)}%`) : undefined,
+    requestGroupId ? eq(extractionRequests.requestGroupId, requestGroupId) : undefined,
+    afterCursor(cursor),
+  ), limit);
+  return { rows: await listExtractionsOfGroups(groupIds), nextCursor };
 }
 
-export async function listVisibleExtractions(userId: string, managedUserIds: string[] | null) {
-  if (managedUserIds === null) return listAllExtractions();
-  return listExtractionsForUsers([...new Set([userId, ...managedUserIds])]);
+async function listAllExtractions(options: RequestPageOptions) {
+  return listRequestPage(undefined, options);
+}
+
+async function listExtractionsForUsers(userIds: string[], options: RequestPageOptions) {
+  if (userIds.length === 0) return { rows: [], nextCursor: null };
+  return listRequestPage(inArray(extractionRequests.requesterId, userIds), options);
+}
+
+export async function listVisibleExtractions(userId: string, managedUserIds: string[] | null, options: RequestPageOptions = {}) {
+  if (managedUserIds === null) return listAllExtractions(options);
+  return listExtractionsForUsers([...new Set([userId, ...managedUserIds])], options);
 }
 
 export async function listVisibleExtractionsByIds(userId: string, ids: string[], managedUserIds: string[] | null) {
@@ -313,14 +351,20 @@ export async function listRequestExtractions(requestGroupId: string) {
     .where(eq(extractions.requestGroupId, requestGroupId)).orderBy(extractions.createdAt);
 }
 
-export async function listPendingRequests(userId?: string, isAdmin = false) {
-  return getDb().select({
+export async function listPendingRequests(userId?: string, isAdmin = false, { cursor, limit = REQUEST_PAGE_SIZE }: RequestPageOptions = {}) {
+  const { groupIds, nextCursor } = await pageRequestGroups(and(
+    eq(extractionRequests.status, "pending"),
+    isAdmin ? undefined : eq(extractionRequests.coordinatorId, userId ?? ""),
+    afterCursor(cursor),
+  ), limit);
+  const rows = groupIds.length === 0 ? [] : await getDb().select({
     request: { requestGroupId: extractionRequests.requestGroupId, requesterId: extractionRequests.requesterId, coordinatorId: extractionRequests.coordinatorId, status: extractionRequests.status, createdAt: extractionRequests.createdAt, axCode: extractionRequests.axCode, imcEdition: extractionRequests.imcEdition, completion: extractionRequests.completion, developmentStart: extractionRequests.developmentStart, manufacturerGroup: extractionRequests.manufacturerGroup, brand: extractionRequests.brand },
     extraction: { id: extractions.id, modelDescription: extractions.modelDescription },
-    requester: { id: users.id, oracleEmpId: users.oracleEmpId, fallbackName: users.fallbackName, fallbackEmail: users.fallbackEmail },
+    requester: requesterColumns,
   }).from(extractionRequests)
     .innerJoin(extractions, eq(extractions.requestGroupId, extractionRequests.requestGroupId)).innerJoin(users, eq(users.id, extractionRequests.requesterId))
-    .where(and(eq(extractionRequests.status, "pending"), isAdmin ? undefined : eq(extractionRequests.coordinatorId, userId ?? ""))).orderBy(desc(extractionRequests.createdAt)).limit(500);
+    .where(inArray(extractionRequests.requestGroupId, groupIds)).orderBy(desc(extractionRequests.createdAt), desc(extractionRequests.requestGroupId), extractions.createdAt);
+  return { rows, nextCursor };
 }
 
 export async function getPendingRequest(requestGroupId: string) {

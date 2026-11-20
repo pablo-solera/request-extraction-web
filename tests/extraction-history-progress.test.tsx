@@ -91,7 +91,7 @@ describe("BMW extraction progress in history", () => {
 
     expect(extractionAction).toHaveBeenCalledWith({ id: expect.any(String), action: "cancel", force: false });
     expect(await screen.findByText("Extracción cancelada.")).toBeInTheDocument();
-    expect(screen.getAllByText("Cancelada")).toHaveLength(2);
+    expect(screen.getAllByText("Cancelada", { selector: "span" })).toHaveLength(2);
   });
 
   it("does not cancel when the user keeps the extraction in the dialog", async () => {
@@ -140,7 +140,7 @@ describe("grouped request history", () => {
     openAll();
 
     expect(screen.getAllByRole("heading", { level: 2 })).toHaveLength(1);
-    expect(screen.getByText("Completada con incidencias")).toBeInTheDocument();
+    expect(screen.getByText("Completada con incidencias", { selector: "span" })).toBeInTheDocument();
     expect(screen.getByText("2 de 3 typekeys completados · 1 fallido")).toBeInTheDocument();
     expect(screen.getByText("Edición IMC").parentElement).toHaveTextContent("05/0");
     expect(screen.getByText("Inicio del desarrollo")).toBeInTheDocument();
@@ -185,8 +185,8 @@ describe("grouped request history", () => {
     expect(extractionAction).toHaveBeenCalledWith({ id: "b", action: "resume" });
     expect(await screen.findByText("1 extracciones reanudadas.")).toBeInTheDocument();
     expect(screen.getByText(/^En proceso · \d+ %$/)).toBeInTheDocument();
-    expect(screen.getAllByText("En proceso")).toHaveLength(1);
-    expect(screen.queryByText("Completada con incidencias")).not.toBeInTheDocument();
+    expect(screen.getAllByText("En proceso", { selector: "span" })).toHaveLength(1);
+    expect(screen.queryByText("Completada con incidencias", { selector: "span" })).not.toBeInTheDocument();
   });
 
   it("cancels only the active items of the request after confirmation", async () => {
