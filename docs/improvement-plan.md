@@ -71,7 +71,7 @@ Rama: `feature/database-hardening`. Probar cada migración en un clon antes de p
 - [x] **2.5 Timeouts del pool** (S) — `db/index.ts:34-47`
   - `statement_timeout` e `idle_in_transaction_session_timeout` en `connection`.
   - Commit: `fix(db): set statement and idle-in-transaction timeouts`
-- [ ] **2.6 Advisory lock de 64 bits** (S) — `lib/extractions/repository.ts:37`
+- [x] **2.6 Advisory lock de 64 bits** (S) — `lib/extractions/repository.ts:37`
   - Sustituir `hashtext(userId)` por `hashtextextended(userId, 0)`.
   - Commit: `fix(extractions): use 64-bit advisory lock key`
 - [ ] **2.7 `RESTRICT` en el FK de los logs de auditoría** (S) — `db/schema.ts:96,137,157,173`
