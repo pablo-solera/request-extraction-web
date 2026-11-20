@@ -81,6 +81,14 @@
     outline-offset: 2px;
   }
 
+  :where(h1, h2, h3) {
+    text-wrap: balance;
+  }
+
+  :where(p, dd, li) {
+    text-wrap: pretty;
+  }
+
   dialog:modal {
     overscroll-behavior: contain;
   }

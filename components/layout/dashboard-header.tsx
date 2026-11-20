@@ -11,7 +11,7 @@ export function DashboardHeaderFallback() {
   return (
     <header className="border-b border-zinc-200 bg-white">
       <div className="mx-auto flex w-full max-w-6xl items-center px-4 py-4 sm:px-6">
-        <span className="text-base font-semibold text-zinc-950">Extracciones</span>
+        <span className="text-title font-semibold text-zinc-950">Extracciones</span>
       </div>
     </header>
   );

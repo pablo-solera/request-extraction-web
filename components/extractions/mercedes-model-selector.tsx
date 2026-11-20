@@ -94,18 +94,18 @@ export function MercedesModelSelector({ initialSeries, selected, onSeriesChange,
         </select>
       </div> : null}
     </div>
-    {failure ? <div className="flex flex-wrap items-center gap-3 text-sm text-red-700" role="alert"><span>{failure}</span><button className="font-semibold underline" onClick={() => setRetry((value) => value + 1)} type="button">Reintentar</button></div> : null}
-    {series && !currentModels ? <p className="text-sm text-zinc-600" role="status">Cargando modelos…</p> : null}
+    {failure ? <div className="flex flex-wrap items-center gap-3 text-body text-red-700" role="alert"><span>{failure}</span><button className="font-semibold underline" onClick={() => setRetry((value) => value + 1)} type="button">Reintentar</button></div> : null}
+    {series && !currentModels ? <p className="text-body text-zinc-600" role="status">Cargando modelos…</p> : null}
     {currentModels && !currentModels.error ? <>
       <label className="block"><span className="field-label">Buscar modelos</span><input className="field-control" onChange={(event) => setSearch(event.target.value)} placeholder="Escribe designación o descripción" type="search" value={search} /></label>
       <p aria-live="polite" className="sr-only" role="status">{term && models.length > 0 ? (filtered.length === 1 ? "1 resultado" : `${filtered.length} resultados`) : ""}</p>
-      {models.length === 0 ? <p className="rounded-lg border border-dashed border-zinc-300 p-5 text-sm text-zinc-600">El reader no ha devuelto modelos para esta serie.</p>
-        : filtered.length === 0 ? <p className="text-sm text-zinc-600">No hay coincidencias.</p>
+      {models.length === 0 ? <p className="rounded-lg border border-dashed border-zinc-300 p-5 text-body text-zinc-600">El reader no ha devuelto modelos para esta serie.</p>
+        : filtered.length === 0 ? <p className="text-body text-zinc-600">No hay coincidencias.</p>
         : <ul className="max-h-96 divide-y divide-zinc-200 overflow-y-auto rounded-xl border border-zinc-200 bg-white">{filtered.map((option) => {
           const checked = selected.some((model) => model.series === series && model.modelCode === option.value);
-          return <li key={option.value}><label className="flex min-h-12 cursor-pointer items-center gap-3 px-4 py-3 hover:bg-zinc-50"><input aria-label={`Seleccionar modelo ${option.label}`} checked={checked} className="size-4 accent-sky-700" onChange={(event) => onToggle(option, event.target.checked, series)} type="checkbox" /><span className="min-w-0 text-sm text-zinc-900">{option.label}{option.productGroup ? <span className="ml-2 text-xs text-zinc-500">{option.productGroup}</span> : null}</span></label></li>;
+          return <li key={option.value}><label className="flex min-h-12 cursor-pointer items-center gap-3 px-4 py-3 hover:bg-zinc-50"><input aria-label={`Seleccionar modelo ${option.label}`} checked={checked} className="size-4 accent-sky-700" onChange={(event) => onToggle(option, event.target.checked, series)} type="checkbox" /><span className="min-w-0 text-body text-zinc-900">{option.label}{option.productGroup ? <span className="ml-2 text-meta text-zinc-500">{option.productGroup}</span> : null}</span></label></li>;
         })}</ul>}
-      <p className="text-xs text-zinc-500">Cada modelo seleccionado se enviará como una extracción independiente.</p>
+      <p className="text-meta text-zinc-500">Cada modelo seleccionado se enviará como una extracción independiente.</p>
     </> : null}
   </div>;
 }

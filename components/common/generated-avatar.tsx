@@ -14,7 +14,7 @@ function getUserInitials(name: string) {
   return initials || "?";
 }
 
-export function GeneratedAvatar({ name, className = "size-10 text-sm" }: GeneratedAvatarProps) {
+export function GeneratedAvatar({ name, className = "size-10 text-body" }: GeneratedAvatarProps) {
   return (
     <span aria-hidden="true" className={`flex shrink-0 items-center justify-center rounded-full bg-zinc-950 font-semibold text-white ${className}`}>
       {getUserInitials(name)}

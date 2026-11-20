@@ -62,7 +62,7 @@ export default async function ExtractionsPage({ searchParams }: { searchParams: 
         <PageHeader.Title>Nueva extracción</PageHeader.Title>
         <PageHeader.Description>Prepara y realiza una exportación técnica desde un único formulario.</PageHeader.Description>
       </PageHeader>
-      {initialValues ? <p className="rounded-xl border border-sky-200 bg-sky-50 px-4 py-3 text-sm text-sky-900" role="status">Se cargaron los datos comunes y todos los typekeys de la solicitud anterior para extraerlos de nuevo con los datos de hoy. Revísalos y actualiza lo que necesites antes de solicitarla.</p> : null}
+      {initialValues ? <p className="rounded-xl border border-sky-200 bg-sky-50 px-4 py-3 text-body text-sky-900" role="status">Se cargaron los datos comunes y todos los typekeys de la solicitud anterior para extraerlos de nuevo con los datos de hoy. Revísalos y actualiza lo que necesites antes de solicitarla.</p> : null}
       <ExtractionForm draftKey={`extraction-draft-v1-${user.id}`} initialValues={initialValues} requiresApproval={user.role === "employee"} />
     </div>
   );
