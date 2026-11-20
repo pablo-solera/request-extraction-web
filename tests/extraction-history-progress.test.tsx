@@ -76,18 +76,36 @@ describe("BMW extraction progress in history", () => {
 
   it("offers per-extraction actions in the accessible options menu and reports the result", async () => {
     const user = (await import("@testing-library/user-event")).default.setup();
-    vi.stubGlobal("confirm", vi.fn(() => true));
     extractionAction.mockResolvedValueOnce({ ok: true, status: "cancelled", readerStatus: "cancelled" });
     render(<ExtractionHistory initialItems={[item({ canCancel: true, canResume: true, progress: null })]} />);
     openAll();
 
     await user.click(screen.getAllByRole("button", { name: "Opciones para AX-100, X5 · G05, 41HZ" })[0]!);
-    expect(screen.getByRole("button", { name: "Reanudar extracción" })).toBeInTheDocument();
+    expect(screen.getByRole("button", { name: "Reanudar extracción de 41HZ" })).toBeVisible();
+    expect(screen.getByRole("button", { name: "Opciones para AX-100, X5 · G05, 41HZ" })).toHaveAttribute("aria-expanded", "true");
     await user.click(screen.getByRole("button", { name: "Cancelar extracción" }));
+    const dialog = screen.getByRole("dialog", { name: "¿Cancelar la extracción?" });
+    expect(dialog).toHaveTextContent("tendrás que volver a solicitarla");
+    expect(extractionAction).not.toHaveBeenCalled();
+    await user.click(within(dialog).getByRole("button", { name: "Cancelar extracción" }));
 
     expect(extractionAction).toHaveBeenCalledWith({ id: expect.any(String), action: "cancel", force: false });
     expect(await screen.findByText("Extracción cancelada.")).toBeInTheDocument();
-    expect(screen.getAllByText("Cancelada")).toHaveLength(2);
+    expect(screen.getAllByText("Cancelada", { selector: "span" })).toHaveLength(2);
+  });
+
+  it("does not cancel when the user keeps the extraction in the dialog", async () => {
+    const user = (await import("@testing-library/user-event")).default.setup();
+    extractionAction.mockClear();
+    render(<ExtractionHistory initialItems={[item({ canCancel: true, progress: null })]} />);
+    openAll();
+
+    await user.click(screen.getAllByRole("button", { name: "Opciones para AX-100, X5 · G05, 41HZ" })[0]!);
+    await user.click(screen.getByRole("button", { name: "Cancelar extracción" }));
+    await user.click(within(screen.getByRole("dialog")).getByRole("button", { name: "Mantener" }));
+
+    expect(screen.queryByRole("dialog")).not.toBeInTheDocument();
+    expect(extractionAction).not.toHaveBeenCalled();
   });
 
   it("loads authorized per-typekey reader details", async () => {
@@ -122,7 +140,7 @@ describe("grouped request history", () => {
     openAll();
 
     expect(screen.getAllByRole("heading", { level: 2 })).toHaveLength(1);
-    expect(screen.getByText("Completada con incidencias")).toBeInTheDocument();
+    expect(screen.getByText("Completada con incidencias", { selector: "span" })).toBeInTheDocument();
     expect(screen.getByText("2 de 3 typekeys completados · 1 fallido")).toBeInTheDocument();
     expect(screen.getByText("Edición IMC").parentElement).toHaveTextContent("05/0");
     expect(screen.getByText("Inicio del desarrollo")).toBeInTheDocument();
@@ -167,14 +185,13 @@ describe("grouped request history", () => {
     expect(extractionAction).toHaveBeenCalledWith({ id: "b", action: "resume" });
     expect(await screen.findByText("1 extracciones reanudadas.")).toBeInTheDocument();
     expect(screen.getByText(/^En proceso · \d+ %$/)).toBeInTheDocument();
-    expect(screen.getAllByText("En proceso")).toHaveLength(1);
-    expect(screen.queryByText("Completada con incidencias")).not.toBeInTheDocument();
+    expect(screen.getAllByText("En proceso", { selector: "span" })).toHaveLength(1);
+    expect(screen.queryByText("Completada con incidencias", { selector: "span" })).not.toBeInTheDocument();
   });
 
   it("cancels only the active items of the request after confirmation", async () => {
     const user = (await import("@testing-library/user-event")).default.setup();
     vi.stubGlobal("fetch", vi.fn().mockResolvedValue(Response.json([])));
-    vi.stubGlobal("confirm", vi.fn(() => true));
     extractionAction.mockResolvedValue({ ok: true, status: "cancelled", readerStatus: "cancelled" });
     render(<ExtractionHistory initialItems={[
       item({ id: "x", requestGroupId: group, status: "running", canCancel: true }),
@@ -184,6 +201,7 @@ describe("grouped request history", () => {
     openAll();
 
     await user.click(screen.getByRole("button", { name: "Cancelar solicitud" }));
+    await user.click(within(screen.getByRole("dialog", { name: "¿Cancelar la solicitud?" })).getByRole("button", { name: "Cancelar solicitud" }));
 
     expect(extractionAction.mock.calls.map(([call]) => call.id)).toEqual(["x", "z"]);
     expect(await screen.findByText("2 extracciones canceladas.")).toBeInTheDocument();
@@ -222,11 +240,11 @@ describe("request accordion", () => {
     expect(screen.getByRole("button", { name: /^AX-100/ })).toHaveAttribute("aria-expanded", "true");
   });
 
-  it("pulses the progress bars only while work is in progress", () => {
+  it("does not animate the progress bars with a pulse", () => {
     vi.stubGlobal("fetch", vi.fn().mockResolvedValue(Response.json([])));
     const { unmount } = render(<ExtractionHistory initialItems={[item({ requestGroupId: group, status: "running", progress: 40 })]} />);
     openAll();
-    for (const bar of screen.getAllByRole("progressbar")) expect(bar.firstElementChild).toHaveClass("motion-safe:animate-pulse");
+    for (const bar of screen.getAllByRole("progressbar")) expect(bar.firstElementChild).not.toHaveClass("motion-safe:animate-pulse");
     unmount();
 
     render(<ExtractionHistory initialItems={[item({ requestGroupId: group, status: "completed", progress: 100, readerStatus: "completed" })]} />);

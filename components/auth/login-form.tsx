@@ -3,17 +3,19 @@
 import { useActionState, useState } from "react";
 import { loginAction, type LoginFormState } from "@/app/(auth)/login/actions";
 import { SubmitButton } from "@/components/common/submit-button";
+import { Button } from "@/components/ui/button";
 
 const initialState: LoginFormState = {};
 
 export function LoginForm() {
   const [state, action] = useActionState(loginAction, initialState);
   const [email, setEmail] = useState<string | null>(null);
+  const [passwordVisible, setPasswordVisible] = useState(false);
 
   return (
     <form action={action} className="space-y-5">
-      <label className="block space-y-2" htmlFor="email">
-        <span className="text-sm font-medium text-zinc-700">Email corporativo</span>
+      <div>
+        <label className="field-label" htmlFor="email">Email corporativo</label>
         <input
           autoComplete="username"
           className="field-control"
@@ -26,20 +28,23 @@ export function LoginForm() {
           type="email"
           value={email ?? state.email ?? ""}
         />
-      </label>
-      <label className="block space-y-2" htmlFor="password">
-        <span className="text-sm font-medium text-zinc-700">Contraseña</span>
+      </div>
+      <div>
+        <label className="field-label" htmlFor="password">Contraseña</label>
         <input
           autoComplete="current-password"
           className="field-control"
           id="password"
           name="password"
           required
-          type="password"
+          type={passwordVisible ? "text" : "password"}
         />
-      </label>
+        <Button aria-pressed={passwordVisible} className="mt-2 min-h-11" onClick={() => setPasswordVisible((current) => !current)} variant="ghost">
+          {passwordVisible ? "Ocultar contraseña" : "Mostrar contraseña"}
+        </Button>
+      </div>
       {state.error ? (
-        <p role="alert" className="rounded-lg bg-red-50 px-3 py-2 text-sm text-red-700">
+        <p role="alert" className="rounded-lg border border-danger-line bg-danger-wash px-3 py-2 text-body text-danger-ink">
           {state.error}
         </p>
       ) : null}

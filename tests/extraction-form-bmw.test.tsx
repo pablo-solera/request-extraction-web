@@ -1,4 +1,4 @@
-import { cleanup, render, screen, waitFor } from "@testing-library/react";
+import { cleanup, render, screen, waitFor, within } from "@testing-library/react";
 import userEvent from "@testing-library/user-event";
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 
@@ -10,7 +10,6 @@ import { ExtractionForm } from "@/components/extractions/extraction-form";
 beforeEach(() => {
   cleanup();
   localStorage.clear();
-  vi.stubGlobal("confirm", vi.fn(() => true));
 });
 
 afterEach(() => {
@@ -43,6 +42,20 @@ describe("extraction request stepper", () => {
     render(<ExtractionForm />);
     await user.type(screen.getAllByLabelText("Código AX")[0]!, " a b-1_x ");
     expect(screen.getAllByLabelText("Código AX")[0]).toHaveValue("AB1X");
+  });
+
+  it("links each field error to its field and moves focus to the first invalid one", async () => {
+    const user = userEvent.setup();
+    render(<ExtractionForm />);
+    await user.type(screen.getAllByLabelText("Edición IMC")[0]!, "5");
+    await user.click(screen.getByRole("button", { name: "Continuar" }));
+
+    const axCode = screen.getAllByLabelText("Código AX")[0]!;
+    expect(axCode).toHaveAttribute("aria-invalid", "true");
+    expect(axCode).toHaveFocus();
+    expect(axCode).toHaveAccessibleDescription("El código AX debe tener entre 3 y 4 caracteres alfanuméricos.");
+    expect(screen.getAllByLabelText("Edición IMC")[0]).toHaveAccessibleDescription("La edición debe tener el formato XX/X, por ejemplo 05/0.");
+    expect(axCode).toHaveAttribute("pattern", "[A-Za-z0-9]{3,4}");
   });
 
   it("keeps common data while navigating and shows the selected group manufacturers", async () => {
@@ -81,6 +94,33 @@ describe("extraction request stepper", () => {
     expect(screen.getByText("7 · G70 · 41HZ")).toBeInTheDocument();
     expect(screen.getAllByText("1 extracción")).toHaveLength(1);
     expect(screen.getByText("01/03/2026")).toBeInTheDocument();
+  });
+
+  it("explains what is lost in a dialog before switching group and keeps the group when declined", async () => {
+    const fetchMock = vi.fn(async (input: RequestInfo | URL) => {
+      const url = new URL(String(input), "http://localhost");
+      if (url.pathname.endsWith("/series")) return Response.json({ options: [{ value: "7", label: "7 Series" }] });
+      return Response.json({ options: [] });
+    });
+    vi.stubGlobal("fetch", fetchMock);
+    const user = userEvent.setup();
+    render(<ExtractionForm />);
+    await completeCommonStep(user);
+    await user.click(screen.getByRole("button", { name: "BMW Group" }));
+    await user.click(screen.getByRole("button", { name: /^BMW$/ }));
+    await user.click(screen.getByRole("button", { name: "Continuar" }));
+    await user.selectOptions(await screen.findByRole("combobox", { name: "Serie" }), "7");
+    await user.click(screen.getByRole("button", { name: "Atrás" }));
+
+    await user.click(screen.getByRole("button", { name: "Renault Group" }));
+    const dialog = screen.getByRole("dialog", { name: "¿Cambiar de grupo?" });
+    expect(dialog).toHaveTextContent("Se borrará el modelo seleccionado");
+    await user.click(within(dialog).getByRole("button", { name: "Mantener grupo" }));
+    expect(screen.getByRole("button", { name: "BMW Group" })).toHaveAttribute("aria-pressed", "true");
+
+    await user.click(screen.getByRole("button", { name: "Renault Group" }));
+    await user.click(within(screen.getByRole("dialog")).getByRole("button", { name: "Cambiar de grupo" }));
+    expect(screen.getByRole("button", { name: "Renault Group" })).toHaveAttribute("aria-pressed", "true");
   });
 
   function availabilityFetch(answers: Record<string, unknown>, typekeys: string[]) {

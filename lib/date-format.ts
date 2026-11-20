@@ -15,6 +15,14 @@ const spanishDateTimeFormatter = new Intl.DateTimeFormat("es-ES", {
   timeZone: "Europe/Madrid",
 });
 
+const spanishTimeFormatter = new Intl.DateTimeFormat("es-ES", {
+  hour: "2-digit",
+  minute: "2-digit",
+  second: "2-digit",
+  hourCycle: "h23",
+  timeZone: "Europe/Madrid",
+});
+
 function asDate(value: Date | string) {
   if (typeof value === "string" && /^\d{4}-\d{2}-\d{2}$/.test(value)) return new Date(`${value}T12:00:00.000Z`);
   return value instanceof Date ? value : new Date(value);
@@ -22,6 +30,10 @@ function asDate(value: Date | string) {
 
 export function formatSpanishDate(value: Date | string) {
   return spanishDateFormatter.format(asDate(value));
+}
+
+export function formatSpanishTime(value: Date | string) {
+  return spanishTimeFormatter.format(asDate(value));
 }
 
 export function formatSpanishDateTime(value: Date | string) {

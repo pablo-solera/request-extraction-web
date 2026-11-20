@@ -1,10 +1,12 @@
 "use client";
 
 import dynamic from "next/dynamic";
-import { useActionState, useEffect, useId, useState } from "react";
+import { useActionState, useEffect, useId, useRef, useState } from "react";
 import { z } from "zod";
 import { createExtractionAction, type ExtractionFormState } from "@/app/(dashboard)/extractions/actions";
 import { SubmitButton } from "@/components/common/submit-button";
+import { Button } from "@/components/ui/button";
+import { useConfirm } from "@/components/ui/confirm-dialog";
 import { BmwAvailabilityNotice } from "@/components/extractions/bmw-availability-notice";
 import { formatSpanishDate, formatSpanishDateTime } from "@/lib/date-format";
 import { extractionFormSchema, type ExtractionVehicle } from "@/lib/extractions/validation";
@@ -75,8 +77,16 @@ function emptyVehicle(group: ManufacturerGroup, brand: ManufacturerBrand, id = c
     : { id, manufacturerGroup: "Renault", brand: brand as "Renault" | "Dacia", modelDescription: "", modelCode: "" };
 }
 
-function FieldError({ children }: { children?: string }) {
-  return children ? <span className="mt-1 block text-sm text-red-700">{children}</span> : null;
+function selectedModelsLabel(count: number) {
+  return count === 1 ? "el modelo seleccionado" : `los ${count} modelos seleccionados`;
+}
+
+function FieldError({ children, id }: { children?: string; id: string }) {
+  return children ? <span className="mt-1 block text-body text-danger-ink" id={id}>{children}</span> : null;
+}
+
+function resultsLabel(count: number) {
+  return count === 1 ? "1 resultado" : `${count} resultados`;
 }
 
 function StepHeading({ title, description }: { title: string; description: string }) {
@@ -147,19 +157,19 @@ function BmwOptionField({
   }
 
   return <div className={className}>
+    {searchable ? <div className="mb-3"><label className="field-label" htmlFor={`${id}-search`}>{`Buscar ${label.toLocaleLowerCase("es-ES")}`}</label><input autoComplete="off" className="field-control" disabled={!url || loading || Boolean(message)} id={`${id}-search`} onChange={(event) => setSearch(event.target.value)} placeholder="Por código o descripción" type="search" value={search} /><p aria-live="polite" className="sr-only" role="status">{search.trim() && options.length > 0 ? resultsLabel(filtered.length) : ""}</p></div> : null}
     <label className="field-label" htmlFor={`${id}-select`}>{label}</label>
-    {searchable ? <input aria-label={`Buscar ${label.toLocaleLowerCase("es-ES")}`} autoComplete="off" className="field-control mb-2" disabled={!url || loading || Boolean(message)} onChange={(event) => setSearch(event.target.value)} placeholder="Buscar por código o descripción" type="search" value={search} /> : null}
-    <select aria-invalid={Boolean(error)} aria-label={label} className="field-control" disabled={!url || loading || Boolean(message) || options.length === 0} id={`${id}-select`} onChange={(event) => onChange(event.target.value)} required value={value}>
+    <select aria-describedby={error ? `${id}-error` : undefined} aria-invalid={Boolean(error)} className="field-control" disabled={!url || loading || Boolean(message) || options.length === 0} id={`${id}-select`} onChange={(event) => onChange(event.target.value)} required value={value}>
       <option value="">{!url ? initialText : loading ? loadingText : message ? "Opciones no disponibles" : options.length === 0 ? emptyText : searchable && search && filtered.length === 0 ? "No se encontraron typekeys" : `Selecciona ${label.toLocaleLowerCase("es-ES")}`}</option>
       {filtered.map((option) => <option key={option.value} value={option.value}>{option.label}</option>)}
     </select>
-    <FieldError>{error}</FieldError>
+    <FieldError id={`${id}-error`}>{error}</FieldError>
     {onAddMultiple ? <div className="mt-3 rounded-lg border border-zinc-200 bg-white p-3">
       <label><span className="field-label">Pegar varios typekeys</span><textarea className="field-control min-h-20 resize-y font-mono" disabled={!url || loading || Boolean(message) || options.length === 0} onChange={(event) => setPasteValue(event.target.value)} placeholder="Ej.: 11EH, 41HZ, 51HY" value={pasteValue} /></label>
-      <div className="mt-2 flex flex-wrap items-center gap-3"><button className="min-h-10 rounded-lg border border-zinc-300 px-3 py-2 text-sm font-semibold text-zinc-800 hover:bg-zinc-50 disabled:opacity-50" disabled={!pasteValue.trim() || loading || options.length === 0} onClick={addPastedTypekeys} type="button">Añadir typekeys</button><span className="text-xs text-zinc-500">Separados por espacios, comas o punto y coma</span></div>
-      {pasteMessage ? <p className="mt-2 text-xs text-zinc-600" role="status">{pasteMessage}</p> : null}
+      <div className="mt-2 flex flex-wrap items-center gap-3"><Button disabled={!pasteValue.trim() || loading || options.length === 0} onClick={addPastedTypekeys}>Añadir typekeys</Button><span className="text-xs text-zinc-500">Separados por espacios, comas o punto y coma</span></div>
+      {pasteMessage ? <p className="mt-2 text-body text-zinc-600" role="status">{pasteMessage}</p> : null}
     </div> : null}
-    {message ? <div className="mt-2 flex items-center gap-2 text-xs text-red-700" role="status"><span>{message}</span><button className="font-semibold underline underline-offset-2" onClick={() => setRetry((current) => current + 1)} type="button">Reintentar</button></div> : null}
+    {message ? <div className="mt-2 flex items-center gap-2 text-body text-danger-ink" role="status"><span>{message}</span><button className="font-semibold underline underline-offset-2" onClick={() => setRetry((current) => current + 1)} type="button">Reintentar</button></div> : null}
   </div>;
 }
 
@@ -190,6 +200,7 @@ function RenaultFamilySelector({ brand, selected, onToggle }: { brand: "Renault"
   const filtered = search.trim() ? options.filter((option) => `${option.value} ${option.label}`.toLocaleLowerCase("es-ES").includes(search.trim().toLocaleLowerCase("es-ES"))) : options;
   return <div className="space-y-3">
     <label className="block"><span className="field-label">Buscar familias</span><input className="field-control" disabled={!current || Boolean(current.error)} onChange={(event) => setSearch(event.target.value)} placeholder="Escribe nombre o código" type="search" value={search} /></label>
+    <p aria-live="polite" className="sr-only" role="status">{search.trim() && options.length > 0 ? resultsLabel(filtered.length) : ""}</p>
     {!current ? <p className="text-sm text-zinc-600" role="status">Cargando familias de {brand}…</p> : current.error ? <div className="flex flex-wrap items-center gap-3 text-sm text-red-700" role="alert"><span>{current.error}</span><button className="font-semibold underline" onClick={() => setRetry((value) => value + 1)} type="button">Reintentar</button></div> : options.length === 0 ? <p className="rounded-lg border border-dashed border-zinc-300 p-5 text-sm text-zinc-600">El reader no ha devuelto familias para {brand}.</p> : filtered.length === 0 ? <p className="text-sm text-zinc-600">No hay coincidencias.</p> : <ul className="max-h-96 divide-y divide-zinc-200 overflow-y-auto rounded-xl border border-zinc-200 bg-white">{filtered.map((option) => {
       const checked = selected.some((vehicle) => vehicle.manufacturerGroup === "Renault" && vehicle.modelCode === option.value);
       return <li key={option.value}><label className="flex min-h-12 cursor-pointer items-center gap-3 px-4 py-3 hover:bg-zinc-50"><input aria-label={`Seleccionar familia ${option.label}`} checked={checked} className="size-4 accent-sky-700" onChange={(event) => onToggle(option, event.target.checked)} type="checkbox" /><span className="min-w-0 text-sm text-zinc-900">{option.label}<span className="ml-2 font-mono text-xs text-zinc-500">{option.value}</span></span></label></li>;
@@ -212,6 +223,7 @@ export function ExtractionStepperForm({
   requiresApproval?: boolean;
 }) {
   const [state, action] = useActionState(createExtractionAction, initialState);
+  const [confirm, confirmDialog] = useConfirm();
   const formId = useId();
   const [group, setGroup] = useState<ManufacturerGroup | "">(initialValues?.group ?? "");
   const [brand, setBrand] = useState<ManufacturerBrand | "">(initialValues?.vehicles[0]?.brand ?? "");
@@ -226,6 +238,8 @@ export function ExtractionStepperForm({
   const [draftSaved, setDraftSaved] = useState(false);
   const [localErrors, setLocalErrors] = useState<Record<string, string>>({});
   const [stepError, setStepError] = useState("");
+  const [focusRequest, setFocusRequest] = useState(0);
+  const formRef = useRef<HTMLFormElement>(null);
   const availabilityTargets = new Map<string, AvailabilityTarget>();
   for (const vehicle of vehicles) {
     if (vehicle.manufacturerGroup === "BMW" && vehicle.series && vehicle.developmentCode && /^[A-Z0-9]{4}$/.test(vehicle.typekey)) {
@@ -288,6 +302,10 @@ export function ExtractionStepperForm({
   }, [draftKey, initialValues]);
 
   useEffect(() => {
+    if (focusRequest > 0) formRef.current?.querySelector<HTMLElement>('[aria-invalid="true"]')?.focus();
+  }, [focusRequest]);
+
+  useEffect(() => {
     if (!draftReady) return;
     const timeout = window.setTimeout(() => {
       try {
@@ -305,24 +323,24 @@ export function ExtractionStepperForm({
     setStepError("");
   }
 
-  function selectGroup(nextGroup: ManufacturerGroup) {
+  async function selectGroup(nextGroup: ManufacturerGroup) {
     if (group === nextGroup) return;
     const hasModels = vehicles.some((vehicle) => vehicle.manufacturerGroup === "BMW"
       ? Boolean(vehicle.series || vehicle.developmentCode || vehicle.typekey)
       : Boolean(vehicle.modelCode));
-    if (hasModels && !window.confirm("Cambiar de grupo borrará los modelos seleccionados. ¿Quieres continuar?")) return;
+    if (hasModels && !await confirm({ title: "¿Cambiar de grupo?", description: `Se borrará ${selectedModelsLabel(vehicles.length)} y tendrás que volver a elegir modelos.`, confirmLabel: "Cambiar de grupo", cancelLabel: "Mantener grupo" })) return;
     setGroup(nextGroup);
     setBrand(nextGroup === "Mercedes" ? "Mercedes-Benz" : "");
     setVehicles([]);
     clearValidation();
   }
 
-  function selectBrand(nextBrand: ManufacturerBrand) {
+  async function selectBrand(nextBrand: ManufacturerBrand) {
     if (brand === nextBrand) return;
     const hasModels = vehicles.some((vehicle) => vehicle.manufacturerGroup === "BMW"
       ? Boolean(vehicle.series || vehicle.developmentCode || vehicle.typekey)
       : Boolean(vehicle.modelCode));
-    if (hasModels && !window.confirm("Cambiar de fabricante borrará los modelos seleccionados. ¿Quieres continuar?")) return;
+    if (hasModels && !await confirm({ title: "¿Cambiar de fabricante?", description: `Se borrará ${selectedModelsLabel(vehicles.length)} y tendrás que volver a elegir modelos.`, confirmLabel: "Cambiar de fabricante", cancelLabel: "Mantener fabricante" })) return;
     setBrand(nextBrand);
     setVehicles(group ? (group === "BMW" ? [emptyVehicle("BMW", nextBrand, `${formId}-model-0`)] : []) : []);
     clearValidation();
@@ -439,6 +457,7 @@ export function ExtractionStepperForm({
         for (const issue of parsed.error.issues) errors[String(issue.path[0])] ??= issue.message;
         setLocalErrors(errors);
         setStepError("Completa correctamente los datos comunes para continuar.");
+        setFocusRequest((current) => current + 1);
         return;
       }
     }
@@ -456,6 +475,7 @@ export function ExtractionStepperForm({
         }
         setLocalErrors(errors);
         setStepError(parsed.error.issues[0]?.message ?? "Selecciona al menos un modelo válido.");
+        setFocusRequest((current) => current + 1);
         return;
       }
       if (group === "BMW" && availabilityTargets.size > 0) {
@@ -470,15 +490,16 @@ export function ExtractionStepperForm({
     return fieldError(state, localErrors, `vehicle.${index}.${field}`);
   }
 
-  const summaryTitle = group === "BMW" ? `Tiempos ${brand}` : `Tiempos ${brand}`;
+  const summaryTitle = group === "BMW" ? "Serie y typekeys" : group === "Mercedes" ? "Serie y modelos" : "Familias";
 
-  return <form action={action} className="overflow-hidden rounded-2xl border border-zinc-200 bg-white shadow-sm">
+  return <form action={action} className="overflow-hidden rounded-xl border border-zinc-200 bg-white" ref={formRef}>
+    {confirmDialog}
 
     <div className="border-b border-zinc-200 px-5 py-4 sm:px-7">
       <nav aria-label="Progreso de la solicitud">
         <ol className="flex items-center">
           {STEP_TITLES.map((title, index) => <li className={`flex min-w-0 items-center ${index < STEP_TITLES.length - 1 ? "flex-1" : ""}`} key={title}>
-            <button aria-current={step === index ? "step" : undefined} className={`flex min-h-11 shrink-0 items-center gap-3 rounded-lg text-xs transition-colors focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-sky-700 sm:text-sm ${step === index ? "font-semibold text-zinc-950" : index < step ? "text-zinc-800 hover:text-sky-800" : "cursor-not-allowed text-zinc-500"}`} disabled={index > step} onClick={() => goToStep(index)} type="button">
+            <button aria-current={step === index ? "step" : undefined} className={`flex min-h-11 shrink-0 items-center gap-3 rounded-lg text-body transition-colors ${step === index ? "font-semibold text-zinc-950" : index < step ? "text-zinc-800 hover:text-sky-800" : "cursor-not-allowed text-zinc-500"}`} disabled={index > step} onClick={() => goToStep(index)} type="button">
               <span className={`flex size-8 shrink-0 items-center justify-center rounded-full border text-sm font-medium tabular-nums ${step === index ? "border-2 border-sky-700 bg-white text-sky-800" : index < step ? "border-sky-700 bg-sky-700 text-white" : "border-zinc-400 bg-white text-zinc-700"}`}>{index < step ? <svg aria-hidden="true" className="size-4" fill="none" stroke="currentColor" strokeLinecap="round" strokeLinejoin="round" strokeWidth="3" viewBox="0 0 24 24"><path d="M5 12.5l4.5 4.5L19 7.5" /></svg> : index + 1}</span>
               <span className={step === index ? "inline" : "hidden sm:inline"}>{title}</span>{index < step ? <span className="sr-only"> (completado)</span> : null}
             </button>
@@ -493,10 +514,10 @@ export function ExtractionStepperForm({
       {step === 0 ? <section aria-labelledby="step-common" className="space-y-5">
         <StepHeading title="Datos comunes" description="Estos datos se aplicarán a todas las extracciones de esta solicitud." />
         <div className="grid gap-5 md:grid-cols-2">
-          <label><span className="field-label">Código AX</span><input aria-invalid={Boolean(localErrors.axCode || state.fieldErrors?.axCode)} autoComplete="off" className="field-control font-mono uppercase" maxLength={4} onChange={(event) => setValues((current) => ({ ...current, axCode: normalizeAxCode(event.target.value) }))} placeholder="Ej.: 1XF" required spellCheck={false} value={values.axCode} /><FieldError>{localErrors.axCode ?? state.fieldErrors?.axCode}</FieldError></label>
-          <label><span className="field-label">Edición IMC</span><input aria-invalid={Boolean(localErrors.imcEdition || state.fieldErrors?.imcEdition)} autoComplete="off" className="field-control font-mono" inputMode="numeric" maxLength={4} onChange={(event) => setValues((current) => ({ ...current, imcEdition: event.target.value }))} placeholder="Ej.: 05/0" required spellCheck={false} value={values.imcEdition} /><FieldError>{localErrors.imcEdition ?? state.fieldErrors?.imcEdition}</FieldError></label>
-          <label><span className="field-label">Inicio del desarrollo</span><input aria-invalid={Boolean(localErrors.laboursDevelopmentStart || state.fieldErrors?.laboursDevelopmentStart)} autoComplete="off" className="field-control" lang="es-ES" onChange={(event) => setValues((current) => ({ ...current, laboursDevelopmentStart: event.target.value }))} required type="date" value={values.laboursDevelopmentStart} /><FieldError>{localErrors.laboursDevelopmentStart ?? state.fieldErrors?.laboursDevelopmentStart}</FieldError></label>
-          <label><span className="field-label">Completion</span><input aria-invalid={Boolean(localErrors.completion || state.fieldErrors?.completion)} autoComplete="off" className="field-control" lang="es-ES" onChange={(event) => setValues((current) => ({ ...current, completion: event.target.value }))} required type="date" value={values.completion} /><FieldError>{localErrors.completion ?? state.fieldErrors?.completion}</FieldError></label>
+          <div><label><span className="field-label">Código AX</span><input aria-describedby={localErrors.axCode || state.fieldErrors?.axCode ? `${formId}-axCode-error` : undefined} aria-invalid={Boolean(localErrors.axCode || state.fieldErrors?.axCode)} autoComplete="off" className="field-control font-mono uppercase" maxLength={4} minLength={3} onChange={(event) => setValues((current) => ({ ...current, axCode: normalizeAxCode(event.target.value) }))} pattern="[A-Za-z0-9]{3,4}" placeholder="Ej.: 1XF" required spellCheck={false} value={values.axCode} /></label><FieldError id={`${formId}-axCode-error`}>{localErrors.axCode ?? state.fieldErrors?.axCode}</FieldError></div>
+          <div><label><span className="field-label">Edición IMC</span><input aria-describedby={localErrors.imcEdition || state.fieldErrors?.imcEdition ? `${formId}-imcEdition-error` : undefined} aria-invalid={Boolean(localErrors.imcEdition || state.fieldErrors?.imcEdition)} autoComplete="off" className="field-control font-mono" inputMode="numeric" maxLength={4} onChange={(event) => setValues((current) => ({ ...current, imcEdition: event.target.value }))} pattern="\d{2}/\d" placeholder="Ej.: 05/0" required spellCheck={false} value={values.imcEdition} /></label><FieldError id={`${formId}-imcEdition-error`}>{localErrors.imcEdition ?? state.fieldErrors?.imcEdition}</FieldError></div>
+          <div><label><span className="field-label">Inicio del desarrollo</span><input aria-describedby={localErrors.laboursDevelopmentStart || state.fieldErrors?.laboursDevelopmentStart ? `${formId}-laboursDevelopmentStart-error` : undefined} aria-invalid={Boolean(localErrors.laboursDevelopmentStart || state.fieldErrors?.laboursDevelopmentStart)} autoComplete="off" className="field-control" lang="es-ES" onChange={(event) => setValues((current) => ({ ...current, laboursDevelopmentStart: event.target.value }))} required type="date" value={values.laboursDevelopmentStart} /></label><FieldError id={`${formId}-laboursDevelopmentStart-error`}>{localErrors.laboursDevelopmentStart ?? state.fieldErrors?.laboursDevelopmentStart}</FieldError></div>
+          <div><label><span className="field-label">Completion</span><input aria-describedby={localErrors.completion || state.fieldErrors?.completion ? `${formId}-completion-error` : undefined} aria-invalid={Boolean(localErrors.completion || state.fieldErrors?.completion)} autoComplete="off" className="field-control" lang="es-ES" onChange={(event) => setValues((current) => ({ ...current, completion: event.target.value }))} required type="date" value={values.completion} /></label><FieldError id={`${formId}-completion-error`}>{localErrors.completion ?? state.fieldErrors?.completion}</FieldError></div>
         </div>
       </section> : null}
 
@@ -504,12 +525,12 @@ export function ExtractionStepperForm({
         <StepHeading title="Grupo y fabricante" description="Una solicitud corresponde a una sola marca. Después podrás añadir varios modelos o familias de esa marca." />
         <fieldset className="space-y-3"><legend className="field-label">Grupo de fabricantes</legend>
           <div className="grid gap-3 sm:grid-cols-3">
-            {(["BMW", "Renault", "Mercedes"] as const).map((option) => <button aria-pressed={group === option} className={`min-h-16 rounded-xl border px-4 py-3 text-left text-sm font-semibold transition-colors focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-sky-700 ${group === option ? "border-sky-700 bg-sky-50 text-sky-950" : "border-zinc-300 bg-white text-zinc-800 hover:bg-zinc-50"}`} key={option} onClick={() => selectGroup(option)} type="button">{option === "BMW" ? "BMW Group" : option === "Renault" ? "Renault Group" : "Mercedes-Benz Group"}</button>)}
+            {(["BMW", "Renault", "Mercedes"] as const).map((option) => <button aria-pressed={group === option} className={`min-h-16 rounded-xl border px-4 py-3 text-left text-sm font-semibold transition-colors ${group === option ? "border-sky-700 bg-sky-50 text-sky-950" : "border-zinc-300 bg-white text-zinc-800 hover:bg-zinc-50"}`} key={option} onClick={() => void selectGroup(option)} type="button">{option === "BMW" ? "BMW Group" : option === "Renault" ? "Renault Group" : "Mercedes-Benz Group"}</button>)}
             <button aria-describedby="vag-disabled-description" aria-disabled="true" className="min-h-16 cursor-not-allowed rounded-xl border border-zinc-200 bg-zinc-100 px-4 py-3 text-left text-sm font-semibold text-zinc-500" disabled type="button">VAG <span className="mt-1 block text-xs font-normal">Deshabilitado</span></button>
           </div>
-          <p className="text-xs text-zinc-500" id="vag-disabled-description">El reader VAG está disponible, pero las solicitudes siguen deshabilitadas en este formulario. Incluye Volkswagen, Audi, Škoda y SEAT.</p>
+          <p className="text-body text-zinc-600" id="vag-disabled-description">El reader VAG está disponible, pero las solicitudes siguen deshabilitadas en este formulario. Incluye Volkswagen, Audi, Škoda y SEAT.</p>
         </fieldset>
-        {group ? <fieldset className="space-y-3"><legend className="field-label">Fabricante</legend><div className="flex flex-wrap gap-2">{BRAND_OPTIONS[group].map((option) => <button aria-pressed={brand === option} className={`min-h-11 rounded-lg border px-4 py-2 text-sm font-semibold transition-colors focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-sky-700 ${brand === option ? "border-sky-700 bg-sky-700 text-white" : "border-zinc-300 bg-white text-zinc-800 hover:bg-zinc-50"}`} key={option} onClick={() => selectBrand(option)} type="button">{option}</button>)}</div></fieldset> : <p className="text-sm text-zinc-600">Selecciona un grupo para ver sus fabricantes.</p>}
+        {group ? <fieldset className="space-y-3"><legend className="field-label">Fabricante</legend><div className="flex flex-wrap gap-2">{BRAND_OPTIONS[group].map((option) => <button aria-pressed={brand === option} className={`min-h-11 rounded-lg border px-4 py-2 text-sm font-semibold transition-colors ${brand === option ? "border-sky-700 bg-sky-700 text-white" : "border-zinc-300 bg-white text-zinc-800 hover:bg-zinc-50"}`} key={option} onClick={() => void selectBrand(option)} type="button">{option}</button>)}</div></fieldset> : <p className="text-sm text-zinc-600">Selecciona un grupo para ver sus fabricantes.</p>}
         {stepError ? <p className="text-sm text-red-700" role="alert">{stepError}</p> : null}
       </section> : null}
 
@@ -524,9 +545,9 @@ export function ExtractionStepperForm({
             <BmwOptionField emptyText="No hay series disponibles" error={fieldError(state, localErrors, `vehicle.${index}.series`)} initialText="Carga series" label="Serie" loadingText="Cargando series…" onChange={(value) => updateBmwVehicle(vehicle.id, { series: value, developmentCode: "", typekey: "" })} url={`/api/readers/bmw/series?brand=${encodeURIComponent(brand)}`} value={vehicle.series} />
             <BmwOptionField emptyText="No hay códigos para esta serie" error={vehicleError(index, "developmentCode")} initialText="Selecciona primero una serie" label="Código de desarrollo" loadingText="Cargando códigos…" onChange={(value) => updateBmwVehicle(vehicle.id, { developmentCode: value, typekey: "" })} url={vehicle.series ? `/api/readers/bmw/development-codes?${new URLSearchParams({ brand, series: vehicle.series })}` : null} value={vehicle.developmentCode} />
             <BmwOptionField className="md:col-span-2" emptyText="No hay typekeys para esta selección" error={vehicleError(index, "typekey")} initialText="Selecciona primero un código" label="Typekey" loadingText="Cargando typekeys…" onAddMultiple={(codes) => addBmwTypekeys(vehicle.id, codes)} onChange={(value) => updateBmwVehicle(vehicle.id, { typekey: value })} searchable url={vehicle.series && vehicle.developmentCode ? `/api/readers/bmw/typekeys?${new URLSearchParams({ brand, series: vehicle.series, developmentCode: vehicle.developmentCode })}` : null} value={vehicle.typekey} />
-            <div className="flex items-end gap-2 md:flex-col md:items-stretch"><button aria-label={`Duplicar typekey ${index + 1}`} className="min-h-11 rounded-lg border border-zinc-300 px-3 py-2 text-sm font-medium text-zinc-700 hover:bg-white disabled:opacity-40" disabled={vehicles.length >= 50} onClick={() => duplicateBmwVehicle(vehicle.id)} type="button">Duplicar</button><button aria-label={`Quitar typekey ${index + 1}`} className="min-h-11 rounded-lg border border-red-200 px-3 py-2 text-sm text-red-700 hover:bg-red-50 disabled:opacity-40" disabled={vehicles.length === 1} onClick={() => removeBmwVehicle(vehicle.id)} type="button">Quitar</button></div>
+            <div className="flex items-end gap-2 md:flex-col md:items-stretch"><Button aria-label={`Duplicar typekey ${index + 1}`} disabled={vehicles.length >= 50} onClick={() => duplicateBmwVehicle(vehicle.id)}>Duplicar</Button><Button aria-label={`Quitar typekey ${index + 1}`} disabled={vehicles.length === 1} onClick={() => removeBmwVehicle(vehicle.id)} variant="danger">Quitar</Button></div>
           </fieldset> : null)}</div>}
-          <button className="min-h-11 rounded-lg border border-zinc-300 px-4 py-2 text-sm font-semibold text-zinc-800 hover:bg-zinc-50 disabled:opacity-50" disabled={vehicles.length >= 50} onClick={addBlankBmwVehicle} type="button">Añadir otro typekey</button>
+          <Button disabled={vehicles.length >= 50} onClick={addBlankBmwVehicle}>Añadir otro typekey</Button>
         </> : null}
         <BmwSwapReview items={reviewItems} onRemove={removeUnavailableVehicle} onSwap={replaceWithBaseType} />
         {stepError ? <p className="text-sm text-red-700" role="alert">{stepError}</p> : null}
@@ -573,8 +594,8 @@ export function ExtractionStepperForm({
       <input name="confirmReplace" type="hidden" value={replacesTable && replaceConfirmed ? "true" : "false"} />
       <input name="vehicles" type="hidden" value={JSON.stringify(vehicles)} />
       <div className="flex flex-col-reverse gap-3 sm:flex-row sm:items-center sm:justify-between">
-        <div className="flex items-center gap-2"><button className="min-h-11 rounded-lg px-3 py-2 text-sm font-semibold text-zinc-700 hover:bg-zinc-100 disabled:invisible" disabled={step === 0} onClick={() => { setStep((current) => Math.max(0, current - 1)); clearValidation(); }} type="button">Atrás</button><span className="text-xs text-zinc-500">{draftReady ? draftSaved ? "Borrador guardado" : "Guardando borrador…" : "Cargando borrador…"}</span></div>
-        {step < 3 ? <button className="inline-flex min-h-11 items-center justify-center rounded-lg bg-zinc-950 px-5 py-2 text-sm font-semibold text-white hover:bg-zinc-800 focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-sky-700 disabled:cursor-wait disabled:bg-zinc-700" disabled={checking !== null} onClick={nextStep} type="button">{checking ? `Comprobando disponibilidad (${checking.done}/${checking.total})…` : "Continuar"}</button> : <SubmitButton className="sm:min-w-52" disabled={unavailableTypekeys.length > 0 || (replacesTable && !replaceConfirmed)} pendingLabel="Iniciando…">Iniciar extracción</SubmitButton>}
+        <div className="flex items-center gap-2"><Button hidden={step === 0} onClick={() => { setStep((current) => Math.max(0, current - 1)); clearValidation(); }} variant="ghost">Atrás</Button><span aria-live="polite" className="text-meta text-ink-muted" role="status">{draftReady ? draftSaved ? "Borrador guardado" : "Guardando borrador…" : "Cargando borrador…"}</span></div>
+        {step < 3 ? <Button aria-busy={checking !== null} disabled={checking !== null} onClick={nextStep} variant="primary">{checking ? `Comprobando disponibilidad (${checking.done}/${checking.total})…` : "Continuar"}</Button> : <SubmitButton className="sm:min-w-52" disabled={unavailableTypekeys.length > 0 || (replacesTable && !replaceConfirmed)} pendingLabel="Iniciando…">Iniciar extracción</SubmitButton>}
       </div>
     </div>
   </form>;

@@ -8,24 +8,24 @@ import type { TransformerRequestInfo } from "@/lib/transformer/info";
 import type { ExtractionListItem, ExtractionReaderDetail } from "@/lib/extractions/types";
 import { formatSpanishDate, formatSpanishDateTime } from "@/lib/date-format";
 import { retryableItems, summarizeRequest, type RequestAggregateStatus } from "@/lib/extractions/request-summary";
-import { extractionAction, extractionDetail } from "@/app/(dashboard)/history/actions";
+import { Badge, type BadgeTone } from "@/components/ui/badge";
+import { Button, buttonStyles } from "@/components/ui/button";
+import { useConfirm, type Confirm } from "@/components/ui/confirm-dialog";
+import { PopoverMenu } from "@/components/ui/popover-menu";
+import { extractionAction, extractionDetail, loadHistory } from "@/app/(dashboard)/history/actions";
+import type { RequestCursor } from "@/lib/extractions/repository";
+import { useDebouncedValue } from "@/lib/hooks/use-debounced-value";
 
-const statusStyles = {
-  pending: "border-amber-200 bg-amber-50 text-amber-800",
-  running: "border-sky-200 bg-sky-50 text-sky-800",
-  completed: "border-emerald-200 bg-emerald-50 text-emerald-800",
-  failed: "border-red-200 bg-red-50 text-red-800",
-  cancelled: "border-zinc-300 bg-zinc-100 text-zinc-700",
-};
+const statusTones: Record<ExtractionListItem["status"], BadgeTone> = { pending: "pending", running: "running", completed: "success", failed: "danger", cancelled: "neutral" };
 const statusLabels = { pending: "Pendiente", running: "En proceso", completed: "Completada", failed: "Fallida", cancelled: "Cancelada" };
-const aggregateStyles: Record<RequestAggregateStatus, string> = {
-  pending_approval: statusStyles.pending,
-  rejected: statusStyles.failed,
-  running: statusStyles.running,
-  completed: statusStyles.completed,
-  completed_with_issues: statusStyles.pending,
-  failed: statusStyles.failed,
-  cancelled: statusStyles.cancelled,
+const aggregateTones: Record<RequestAggregateStatus, BadgeTone> = {
+  pending_approval: "pending",
+  rejected: "danger",
+  running: "running",
+  completed: "success",
+  completed_with_issues: "issue",
+  failed: "danger",
+  cancelled: "neutral",
 };
 const requestStatusLabels = { pending: "Pendiente de aprobación", approved: "Aprobada", rejected: "Rechazada" };
 
@@ -38,44 +38,16 @@ function readerStatusNotice(item: ExtractionListItem) {
   return null;
 }
 
-function ExtractionActions({ item, detailsExpanded, onToggleDetails, onUpdated }: { item: ExtractionListItem; detailsExpanded: boolean; onToggleDetails(itemId: string): void; onUpdated(itemId: string, update: Partial<ExtractionListItem>): void }) {
-  const containerRef = useRef<HTMLDivElement>(null);
-  const triggerRef = useRef<HTMLButtonElement>(null);
-  const [open, setOpen] = useState(false);
+function ExtractionActions({ confirm, item, detailsExpanded, onToggleDetails, onUpdated }: { confirm: Confirm; item: ExtractionListItem; detailsExpanded: boolean; onToggleDetails(itemId: string): void; onUpdated(itemId: string, update: Partial<ExtractionListItem>): void }) {
   const [busy, setBusy] = useState(false);
   const [feedback, setFeedback] = useState("");
-  const [menuPosition, setMenuPosition] = useState({ top: 0, left: 0 });
-
-  useEffect(() => {
-    if (!open) return;
-    const onPointerDown = (event: PointerEvent) => {
-      if (event.target instanceof Node && !containerRef.current?.contains(event.target)) setOpen(false);
-    };
-    const onKeyDown = (event: KeyboardEvent) => {
-      if (event.key !== "Escape") return;
-      setOpen(false);
-      triggerRef.current?.focus();
-    };
-    const onScroll = () => setOpen(false);
-    document.addEventListener("pointerdown", onPointerDown);
-    document.addEventListener("keydown", onKeyDown);
-    document.addEventListener("scroll", onScroll, true);
-    window.addEventListener("resize", onScroll);
-    return () => {
-      document.removeEventListener("pointerdown", onPointerDown);
-      document.removeEventListener("keydown", onKeyDown);
-      document.removeEventListener("scroll", onScroll, true);
-      window.removeEventListener("resize", onScroll);
-    };
-  }, [open]);
 
   async function run(action: "cancel" | "resume", force = false) {
-    if (action === "cancel" && !window.confirm(`¿Cancelar la extracción ${item.axCode} · ${item.modelDescription}?`)) return;
+    if (action === "cancel" && !await confirm({ title: "¿Cancelar la extracción?", description: `Se detendrá la extracción de ${item.modelDescription} de la solicitud ${item.axCode}. Quedará como cancelada y, si la necesitas, tendrás que volver a solicitarla.`, confirmLabel: "Cancelar extracción", cancelLabel: "Mantener" })) return;
     setBusy(true);
     setFeedback("");
     const result = await extractionAction({ id: item.id, action, force });
     setBusy(false);
-    setOpen(false);
     if (!result.ok) {
       setFeedback(result.message);
       return;
@@ -85,41 +57,32 @@ function ExtractionActions({ item, detailsExpanded, onToggleDetails, onUpdated }
     setFeedback(action === "cancel" ? result.status === "cancelled" ? "Extracción cancelada." : "Cancelación solicitada." : "Reanudación solicitada.");
   }
 
-  function toggleMenu() {
-    if (open) {
-      setOpen(false);
-      return;
-    }
-    const rect = triggerRef.current?.getBoundingClientRect();
-    if (rect) {
-      const menuWidth = 224;
-      const left = Math.max(8, Math.min(rect.right - menuWidth, window.innerWidth - menuWidth - 8));
-      const top = window.innerHeight - rect.bottom < 260 ? Math.max(8, rect.top - 200) : rect.bottom + 4;
-      setMenuPosition({ top, left });
-    }
-    setOpen(true);
-  }
-
-  const hasAction = item.canCancel || item.canResume || item.canForceResume || item.downloadReady || item.canViewDetails;
-  return <div className="relative flex flex-col items-end gap-2" ref={containerRef}>
-    <button aria-expanded={open} aria-label={`Opciones para ${item.axCode}, ${item.modelDescription}, ${item.modelCode}`} className="inline-flex min-h-11 min-w-11 items-center justify-center rounded-lg border border-zinc-300 bg-white text-zinc-800 hover:bg-zinc-50 focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-sky-700 disabled:opacity-50" disabled={busy} onClick={toggleMenu} ref={triggerRef} type="button">
-      <svg aria-hidden="true" fill="currentColor" height="20" viewBox="0 0 20 20" width="20"><circle cx="4" cy="10" r="1.5"/><circle cx="10" cy="10" r="1.5"/><circle cx="16" cy="10" r="1.5"/></svg>
-    </button>
-    {busy ? <span className="text-xs text-zinc-600" role="status">Procesando…</span> : null}
-    {open ? <div className="fixed z-50 max-h-[70vh] min-w-52 overflow-y-auto rounded-lg border border-zinc-200 bg-white p-1 shadow-lg" aria-label={`Acciones para ${item.axCode}`} style={menuPosition}>
-      {item.downloadReady ? <a className="flex min-h-10 items-center rounded-md px-3 text-left text-sm text-zinc-800 hover:bg-zinc-100 focus-visible:outline-2 focus-visible:outline-sky-700" href={`/api/extractions/${item.id}/download`}>Descargar ZIP de {item.modelCode}</a> : null}
-      {item.canViewDetails ? <button className="flex min-h-10 w-full items-center rounded-md px-3 text-left text-sm text-zinc-800 hover:bg-zinc-100 focus-visible:outline-2 focus-visible:outline-sky-700" onClick={() => { onToggleDetails(item.id); setOpen(false); }} type="button">{detailsExpanded ? "Ocultar detalles" : "Ver detalles"}</button> : null}
-      {item.canCancel ? <button className="flex min-h-10 w-full items-center rounded-md px-3 text-left text-sm text-red-700 hover:bg-red-50 focus-visible:outline-2 focus-visible:outline-red-700" onClick={() => void run("cancel")} type="button">Cancelar extracción</button> : null}
-      {item.canResume ? <button className="flex min-h-10 w-full items-center rounded-md px-3 text-left text-sm text-zinc-800 hover:bg-zinc-100 focus-visible:outline-2 focus-visible:outline-sky-700" onClick={() => void run("resume")} type="button">Reanudar extracción</button> : null}
-      {item.canForceResume ? <button className="flex min-h-10 w-full items-center rounded-md px-3 text-left text-sm text-amber-900 hover:bg-amber-50 focus-visible:outline-2 focus-visible:outline-amber-700" onClick={() => void run("resume", true)} type="button">Reanudar a la fuerza</button> : null}
-      {item.canForceResume ? <p className="px-3 pb-2 text-xs leading-5 text-zinc-500">Recupera una extracción que el reader detecta atascada; conserva los typekeys ya completados.</p> : null}
-      {!hasAction ? <p className="px-3 py-2 text-sm text-zinc-500">No hay acciones disponibles</p> : null}
-    </div> : null}
-    {feedback ? <p className="max-w-56 text-right text-xs text-zinc-600" role="status">{feedback}</p> : null}
+  const hasMenu = item.canCancel || item.canForceResume || item.canViewDetails;
+  const itemClass = "flex min-h-11 w-full items-center rounded-md px-3 text-left text-body hover:bg-canvas";
+  return <div className="flex flex-col items-end gap-2">
+    <div className="flex items-center gap-2">
+      {item.downloadReady ? <a aria-label={`Descargar ZIP de ${item.modelCode}`} className={buttonStyles("secondary")} href={`/api/extractions/${item.id}/download`}>Descargar ZIP</a> : null}
+      {item.canResume ? <button aria-label={`Reanudar extracción de ${item.modelCode}`} className={buttonStyles("secondary")} disabled={busy} onClick={() => void run("resume")} type="button">Reanudar</button> : null}
+      {hasMenu ? <PopoverMenu
+        panelClassName="w-56"
+        panelLabel={`Acciones para ${item.axCode}`}
+        trigger={<svg aria-hidden="true" fill="currentColor" height="20" viewBox="0 0 20 20" width="20"><circle cx="4" cy="10" r="1.5"/><circle cx="10" cy="10" r="1.5"/><circle cx="16" cy="10" r="1.5"/></svg>}
+        triggerClassName={buttonStyles("secondary", "min-w-11 px-0")}
+        triggerDisabled={busy}
+        triggerLabel={`Opciones para ${item.axCode}, ${item.modelDescription}, ${item.modelCode}`}
+      >{(close) => <>
+        {item.canViewDetails ? <button {...close} className={`${itemClass} text-ink`} onClick={() => onToggleDetails(item.id)} type="button">{detailsExpanded ? "Ocultar detalles" : "Ver detalles"}</button> : null}
+        {item.canCancel ? <button {...close} className={`${itemClass} text-danger-ink`} onClick={() => void run("cancel")} type="button">Cancelar extracción</button> : null}
+        {item.canForceResume ? <button {...close} className={`${itemClass} text-pending-ink`} onClick={() => void run("resume", true)} type="button">Reanudar a la fuerza</button> : null}
+        {item.canForceResume ? <p className="px-3 pb-2 text-meta text-ink-muted">Recupera una extracción que el reader detecta atascada; conserva los typekeys ya completados.</p> : null}
+      </>}</PopoverMenu> : null}
+    </div>
+    {busy ? <span className="text-body text-ink-muted" role="status">Procesando…</span> : null}
+    {feedback ? <p className="max-w-56 text-right text-body text-ink-muted" role="status">{feedback}</p> : null}
   </div>;
 }
 
-function RequestActions({ items, onUpdated }: { items: ExtractionListItem[]; onUpdated(itemId: string, update: Partial<ExtractionListItem>): void }) {
+function RequestActions({ confirm, items, onUpdated }: { confirm: Confirm; items: ExtractionListItem[]; onUpdated(itemId: string, update: Partial<ExtractionListItem>): void }) {
   const [busy, setBusy] = useState(false);
   const [feedback, setFeedback] = useState("");
   const cancellable = items.filter((item) => item.canCancel);
@@ -128,7 +91,7 @@ function RequestActions({ items, onUpdated }: { items: ExtractionListItem[]; onU
   const canRepeat = items[0]?.requestStatus !== "pending" && items.every((item) => item.status !== "pending" && item.status !== "running");
 
   async function runAll(action: "cancel" | "resume", targets: ExtractionListItem[]) {
-    if (action === "cancel" && !window.confirm(`¿Cancelar las ${targets.length} extracciones activas de la solicitud ${axCode}?`)) return;
+    if (action === "cancel" && !await confirm({ title: "¿Cancelar la solicitud?", description: `Se detendrán las ${targets.length} extracciones activas de la solicitud ${axCode}. Las ya completadas no se verán afectadas.`, confirmLabel: "Cancelar solicitud", cancelLabel: "Mantener" })) return;
     setBusy(true);
     setFeedback("");
     let succeeded = 0;
@@ -144,34 +107,98 @@ function RequestActions({ items, onUpdated }: { items: ExtractionListItem[]; onU
     setFeedback(succeeded === targets.length ? `${succeeded} extracciones ${verb}.` : `${succeeded} de ${targets.length} extracciones ${verb}; revisa las demás.`);
   }
 
-  const buttonClass = "inline-flex min-h-11 items-center rounded-lg border px-3 text-sm font-medium focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-sky-700 disabled:opacity-50";
   return <div className="flex flex-wrap items-center gap-2">
-    {cancellable.length ? <button className={`${buttonClass} border-red-200 bg-white text-red-700 hover:bg-red-50`} disabled={busy} onClick={() => void runAll("cancel", cancellable)} type="button">Cancelar solicitud</button> : null}
-    {resumable.length ? <button className={`${buttonClass} border-zinc-300 bg-white text-zinc-800 hover:bg-zinc-50`} disabled={busy} onClick={() => void runAll("resume", resumable)} type="button">Reanudar fallidos</button> : null}
-    {canRepeat ? <Link className={`${buttonClass} border-zinc-300 bg-white text-zinc-800 hover:bg-zinc-50`} href={`/extractions?request=${encodeURIComponent(items[0]!.requestGroupId)}`}>Volver a solicitar</Link> : null}
-    {busy ? <span className="text-xs text-zinc-600" role="status">Procesando…</span> : null}
-    {feedback ? <span className="text-xs text-zinc-600" role="status">{feedback}</span> : null}
+    {cancellable.length ? <button className={buttonStyles("danger")} disabled={busy} onClick={() => void runAll("cancel", cancellable)} type="button">Cancelar solicitud</button> : null}
+    {resumable.length ? <button className={buttonStyles("secondary")} disabled={busy} onClick={() => void runAll("resume", resumable)} type="button">Reanudar fallidos</button> : null}
+    {canRepeat ? <Link className={buttonStyles("secondary")} href={`/extractions?request=${encodeURIComponent(items[0]!.requestGroupId)}`}>Volver a solicitar</Link> : null}
+    {busy ? <span className="text-body text-ink-muted" role="status">Procesando…</span> : null}
+    {feedback ? <span className="text-body text-ink-muted" role="status">{feedback}</span> : null}
   </div>;
 }
 
-function visibleStatus(item: ExtractionListItem) {
-  if (item.status === "cancelled") return { label: statusLabels.cancelled, style: statusStyles.cancelled };
-  if (item.requestStatus === "rejected") return { label: "Rechazada", style: statusStyles.failed };
-  if (item.requestStatus === "pending") return { label: requestStatusLabels.pending, style: statusStyles.pending };
-  return { label: statusLabels[item.status], style: statusStyles[item.status] };
+function visibleStatus(item: ExtractionListItem): { label: string; tone: BadgeTone } {
+  if (item.status === "cancelled") return { label: statusLabels.cancelled, tone: "neutral" };
+  if (item.requestStatus === "rejected") return { label: "Rechazada", tone: "danger" };
+  if (item.requestStatus === "pending") return { label: requestStatusLabels.pending, tone: "pending" };
+  return { label: statusLabels[item.status], tone: statusTones[item.status] };
 }
 
-export function ExtractionHistory({ createdId, openId, draftKey = "extraction-draft-v1", initialItems, initialTransformer = {} }: { createdId?: string; openId?: string; draftKey?: string; initialItems: ExtractionListItem[]; initialTransformer?: Record<string, TransformerRequestInfo> }) {
+const statusFilters: Array<{ value: RequestAggregateStatus; label: string }> = [
+  { value: "running", label: "En proceso" },
+  { value: "pending_approval", label: "Pendiente de aprobación" },
+  { value: "completed", label: "Completada" },
+  { value: "completed_with_issues", label: "Completada con incidencias" },
+  { value: "failed", label: "Fallida" },
+  { value: "rejected", label: "Rechazada" },
+  { value: "cancelled", label: "Cancelada" },
+];
+
+function nounFor(manufacturerGroup: string) {
+  return manufacturerGroup === "Renault" ? "familia" : manufacturerGroup === "Mercedes" ? "modelo" : "typekey";
+}
+
+function groupItems(items: ExtractionListItem[]) {
+  const groups = new Map<string, ExtractionListItem[]>();
+  for (const item of items) {
+    const group = groups.get(item.requestGroupId);
+    if (group) group.push(item);
+    else groups.set(item.requestGroupId, [item]);
+  }
+  return groups;
+}
+
+function mergeUpdates(current: ExtractionListItem[], incoming: ExtractionListItem[]) {
+  const byId = new Map(incoming.map((item) => [item.id, item]));
+  return current.map((item) => {
+    const updated = byId.get(item.id);
+    return updated && updated.updatedAt >= item.updatedAt ? updated : item;
+  });
+}
+
+function ProgressBar({ label, value, className = "" }: { label: string; value: number; className?: string }) {
+  return <div className={className}><div className="mb-1 flex justify-between text-meta text-ink-muted"><span>Progreso</span><span>{value}%</span></div><div aria-label={label} aria-valuemax={100} aria-valuemin={0} aria-valuenow={value} className="h-2 overflow-hidden rounded-full bg-line-soft" role="progressbar"><div className="h-full rounded-full bg-focus transition-[width] duration-500" style={{ width: `${value}%` }} /></div></div>;
+}
+
+function ReaderDetail({ item, state }: { item: ExtractionListItem; state: { loading?: boolean; detail?: ExtractionReaderDetail; error?: string } | undefined }) {
+  return <section aria-label={`Detalle de la extracción ${item.axCode}`} className="mt-3 rounded-lg border border-line-soft bg-surface p-4">
+    {state?.loading ? <p className="text-body text-ink-muted" role="status">Cargando detalles del reader…</p> : null}
+    {state?.error ? <p className="text-body text-danger-ink" role="alert">{state.error}</p> : null}
+    {state?.detail ? <>
+      <div className="flex flex-wrap gap-x-6 gap-y-2 text-body"><p><span className="font-semibold text-ink">Fase:</span> <span className="text-ink-secondary">{state.detail.stage ?? state.detail.status}</span></p><p><span className="font-semibold text-ink">Estado:</span> <span className="text-ink-secondary">{state.detail.status}</span></p>{state.detail.stalled ? <p className="font-medium text-pending-ink">El reader detecta la extracción atascada.</p> : null}</div>
+      {state.detail.typekeys.length > 0 ? <div className="mt-4 overflow-x-auto"><table className="min-w-full text-left text-meta"><thead className="text-ink-muted"><tr><th className="px-2 py-2 font-semibold">Typekey</th><th className="px-2 py-2 font-semibold">Familia</th><th className="px-2 py-2 font-semibold">Hojas completadas</th><th className="px-2 py-2 font-semibold">Pendientes</th><th className="px-2 py-2 font-semibold">Fallidas</th><th className="px-2 py-2 font-semibold">Grupos</th></tr></thead><tbody className="divide-y divide-line-soft">{state.detail.typekeys.map((typekey) => <tr key={typekey.typekey}><th className="px-2 py-2 font-mono font-medium text-ink">{typekey.typekey}</th><td className="px-2 py-2 text-ink-secondary">{typekey.family ?? "—"}</td><td className="px-2 py-2 tabular-nums text-ink-secondary">{typekey.completed ?? "—"}{typekey.total !== null ? ` / ${typekey.total}` : ""}</td><td className="px-2 py-2 tabular-nums text-ink-secondary">{typekey.remaining ?? "—"}</td><td className="px-2 py-2 tabular-nums text-ink-secondary">{typekey.failed ?? "—"}</td><td className="px-2 py-2 tabular-nums text-ink-secondary">{typekey.groups ?? "—"}</td></tr>)}</tbody></table></div> : <p className="mt-3 text-meta text-ink-muted">El reader no ha proporcionado desglose por typekey.</p>}
+    </> : null}
+  </section>;
+}
+
+type HistoryProps = { createdId?: string; openId?: string; draftKey?: string; initialItems: ExtractionListItem[]; initialTransformer?: Record<string, TransformerRequestInfo>; initialNextCursor?: RequestCursor | null };
+
+export function ExtractionHistory({ createdId, openId, draftKey = "extraction-draft-v1", initialItems, initialTransformer = {}, initialNextCursor = null }: HistoryProps) {
   const router = useRouter();
+  const [confirm, confirmDialog] = useConfirm();
   const [items, setItems] = useState(initialItems);
+  const [transformer, setTransformer] = useState(initialTransformer);
+  const [nextCursor, setNextCursor] = useState(initialNextCursor);
+  const [customized, setCustomized] = useState(false);
   const [previousInitialItems, setPreviousInitialItems] = useState(initialItems);
   const [refreshError, setRefreshError] = useState(false);
+  const [loadError, setLoadError] = useState("");
+  const [loading, setLoading] = useState(false);
+  const [search, setSearch] = useState("");
+  const [appliedSearch, setAppliedSearch] = useState("");
+  const [statusFilter, setStatusFilter] = useState<"all" | RequestAggregateStatus>("all");
   const [toggledGroups, setToggledGroups] = useState<Record<string, boolean>>({});
   const [openDetailId, setOpenDetailId] = useState<string | null>(null);
   const [readerDetails, setReaderDetails] = useState<Record<string, { loading?: boolean; detail?: ExtractionReaderDetail; error?: string }>>({});
+  const latestLoad = useRef(0);
+  const debouncedSearch = useDebouncedValue(search.trim());
   if (initialItems !== previousInitialItems) {
     setPreviousInitialItems(initialItems);
-    setItems(initialItems);
+    if (customized) setItems((current) => mergeUpdates(current, initialItems));
+    else {
+      setItems(initialItems);
+      setNextCursor(initialNextCursor);
+      setTransformer(initialTransformer);
+    }
   }
   const refreshIds = items.filter((item) => item.status === "pending" || item.status === "running").map((item) => item.id);
   const activeKey = refreshIds.toSorted().join(",");
@@ -186,6 +213,27 @@ export function ExtractionHistory({ createdId, openId, draftKey = "extraction-dr
       router.replace("/history", { scroll: false });
     }
   }, [createdId, draftKey, router]);
+
+  useEffect(() => {
+    if (debouncedSearch === appliedSearch) return;
+    const requestId = ++latestLoad.current;
+    void (async () => {
+      setLoading(true);
+      setLoadError("");
+      const result = await loadHistory({ query: debouncedSearch });
+      if (requestId !== latestLoad.current) return;
+      setLoading(false);
+      if (!result.ok) {
+        setLoadError(result.message);
+        return;
+      }
+      setAppliedSearch(debouncedSearch);
+      setCustomized(debouncedSearch !== "");
+      setItems(result.items);
+      setNextCursor(result.nextCursor);
+      setTransformer(result.transformer);
+    })();
+  }, [appliedSearch, debouncedSearch]);
 
   useEffect(() => {
     const ids = activeKey ? activeKey.split(",") : [];
@@ -238,6 +286,14 @@ export function ExtractionHistory({ createdId, openId, draftKey = "extraction-dr
     };
   }, [activeKey]);
 
+  const groups = groupItems(items);
+  const summaries = new Map([...groups].map(([id, groupRows]) => {
+    const first = groupRows[0]!;
+    return [id, summarizeRequest(first.requestStatus, groupRows, nounFor(first.manufacturerGroup))] as const;
+  }));
+  const visibleGroups = [...groups].filter(([id]) => statusFilter === "all" || summaries.get(id)!.status === statusFilter);
+  const filtered = statusFilter !== "all" || appliedSearch !== "";
+
   function updateItem(itemId: string, update: Partial<ExtractionListItem>) {
     setItems((current) => current.map((item) => item.id === itemId ? { ...item, ...update } : item));
   }
@@ -253,89 +309,111 @@ export function ExtractionHistory({ createdId, openId, draftKey = "extraction-dr
     setReaderDetails((current) => ({ ...current, [itemId]: result.ok ? { detail: result.detail } : { error: result.message } }));
   }
 
-  if (items.length === 0) {
-    return <div className="rounded-2xl border border-dashed border-zinc-300 bg-white px-6 py-16 text-center"><p className="text-sm font-medium text-zinc-900">Todavía no hay extracciones</p><p className="mt-2 text-sm text-zinc-500">Crea una solicitud para verla aquí.</p><Link className="mt-4 inline-flex min-h-11 items-center rounded-lg bg-zinc-950 px-4 py-2 text-sm font-semibold text-white hover:bg-zinc-800" href="/extractions">Nueva extracción</Link></div>;
+  async function loadMore() {
+    if (!nextCursor) return;
+    const requestId = ++latestLoad.current;
+    setLoading(true);
+    setLoadError("");
+    const result = await loadHistory({ cursor: nextCursor, query: appliedSearch });
+    if (requestId !== latestLoad.current) return;
+    setLoading(false);
+    if (!result.ok) {
+      setLoadError(result.message);
+      return;
+    }
+    setCustomized(true);
+    setItems((current) => {
+      const known = new Set(current.map((item) => item.id));
+      return [...current, ...result.items.filter((item) => !known.has(item.id))];
+    });
+    setNextCursor(result.nextCursor);
+    setTransformer((current) => ({ ...current, ...result.transformer }));
   }
 
-  const groups: Array<{ id: string; items: ExtractionListItem[] }> = [];
-  for (const item of items) {
-    const group = groups.find((entry) => entry.id === item.requestGroupId);
-    if (group) group.items.push(item);
-    else groups.push({ id: item.requestGroupId, items: [item] });
+  function clearFilters() {
+    setSearch("");
+    setStatusFilter("all");
   }
+
+  if (items.length === 0 && !filtered && !search && !loading) {
+    return <div className="rounded-xl border border-dashed border-line bg-surface px-6 py-16 text-center"><p className="text-body font-medium text-ink">Todavía no hay extracciones</p><p className="mt-2 text-body text-ink-muted">Crea una solicitud para verla aquí.</p><Link className={buttonStyles("primary", "mt-4")} href="/extractions">Nueva extracción</Link></div>;
+  }
+
   const createdItems = createdId ? items.filter((item) => item.requestGroupId === createdId) : [];
   const hasPendingApproval = createdItems.some((item) => item.requestStatus === "pending");
+  const summaryText = filtered
+    ? `${visibleGroups.length} de ${groups.size} solicitudes cargadas${nextCursor ? ", hay más sin cargar" : ""}`
+    : `${groups.size} ${groups.size === 1 ? "solicitud" : "solicitudes"}${nextCursor ? ", hay más sin cargar" : ""}`;
 
   return (
     <div className="space-y-4">
-      {createdId ? <p className="rounded-xl border border-emerald-200 bg-emerald-50 px-4 py-3 text-sm text-emerald-800" role="status">{hasPendingApproval ? "Solicitud enviada y pendiente de aprobación." : "Solicitud enviada correctamente."}</p> : null}
-      {refreshError ? <p className="rounded-xl border border-amber-200 bg-amber-50 px-4 py-3 text-sm text-amber-900" role="status">No se pudo actualizar el estado. Se volverá a intentar automáticamente.</p> : null}
+      {confirmDialog}
+      {createdId ? <p className="rounded-xl border border-success-line bg-success-wash px-4 py-3 text-body text-success-ink" role="status">{hasPendingApproval ? "Solicitud enviada y pendiente de aprobación." : "Solicitud enviada correctamente."}</p> : null}
+      {refreshError ? <p className="rounded-xl border border-pending-line bg-pending-wash px-4 py-3 text-body text-pending-ink" role="status">No se pudo actualizar el estado. Se volverá a intentar automáticamente.</p> : null}
       <p className="sr-only" aria-live="polite">{items.filter((item) => item.status === "completed" || item.status === "failed" || item.requestStatus === "approved" || item.requestStatus === "rejected").map((item) => `${item.axCode}: ${visibleStatus(item).label}`).join(". ")}</p>
-      <div className="space-y-4">
-        {groups.map((group) => {
-          const first = group.items[0]!;
-          const noun = first.manufacturerGroup === "Renault" ? "familia" : first.manufacturerGroup === "Mercedes" ? "modelo" : "typekey";
-          const summary = summarizeRequest(first.requestStatus, group.items, noun);
-          const expanded = toggledGroups[group.id] ?? (group.id === createdId || group.id === openId);
-          const panelId = `request-panel-${group.id}`;
+      <div className="flex flex-wrap items-end gap-4">
+        <label className="block min-w-64 max-w-sm flex-1"><span className="field-label">Buscar por código AX</span><input autoComplete="off" className="field-control" name="search" onChange={(event) => setSearch(event.target.value)} placeholder="Ej.: 1XF" spellCheck={false} type="search" value={search} /></label>
+        <label className="block w-64"><span className="field-label">Estado</span><select className="field-control" name="status" onChange={(event) => setStatusFilter(event.target.value as typeof statusFilter)} value={statusFilter}><option value="all">Todos los estados</option>{statusFilters.map((option) => <option key={option.value} value={option.value}>{option.label}</option>)}</select></label>
+        <p aria-live="polite" className="pb-3 text-body text-ink-muted" role="status">{summaryText}</p>
+        {filtered || search ? <Button onClick={clearFilters} variant="ghost">Limpiar filtros</Button> : null}
+      </div>
+      {loadError ? <p className="rounded-xl border border-danger-line bg-danger-wash px-4 py-3 text-body text-danger-ink" role="alert">{loadError}</p> : null}
+      {visibleGroups.length === 0 ? <p className="rounded-xl border border-dashed border-line bg-surface px-6 py-12 text-center text-body text-ink-muted">{loading ? "Buscando solicitudes…" : "Ninguna solicitud coincide con la búsqueda o el estado elegido."}</p> : null}
+      <div aria-busy={loading} className="space-y-3">
+        {visibleGroups.map(([groupId, groupRows]) => {
+          const first = groupRows[0]!;
+          const noun = nounFor(first.manufacturerGroup);
+          const summary = summaries.get(groupId)!;
+          const expanded = toggledGroups[groupId] ?? (groupId === createdId || groupId === openId);
+          const panelId = `request-panel-${groupId}`;
           const hasProgress = summary.status !== "pending_approval" && summary.status !== "rejected";
           const running = summary.status === "running";
-          return <section aria-label={`Solicitud ${first.axCode}`} id={`request-${group.id}`} className={`overflow-hidden rounded-2xl border bg-white shadow-sm ${group.id === createdId ? "border-emerald-300" : "border-zinc-200"}`} key={group.id}>
+          return <section aria-label={`Solicitud ${first.axCode}`} className={`overflow-hidden rounded-xl border bg-surface [contain-intrinsic-size:auto_4.5rem] [content-visibility:auto] ${groupId === createdId ? "border-success-line" : "border-line-soft"}`} id={`request-${groupId}`} key={groupId}>
             <h2 className="m-0">
-              <button aria-controls={panelId} aria-expanded={expanded} className="flex w-full min-w-0 items-center gap-4 px-5 py-5 text-left hover:bg-zinc-50 focus-visible:outline-2 focus-visible:-outline-offset-2 focus-visible:outline-sky-700 md:px-6" onClick={() => setToggledGroups((current) => ({ ...current, [group.id]: !expanded }))} type="button">
-                <span className="min-w-0 flex-1">
-                  <span className="flex flex-wrap items-center gap-2">
-                    <span className="break-words font-mono text-base font-semibold text-zinc-950" translate="no">{first.axCode}</span>
-                    <span className="rounded-full border border-sky-200 bg-sky-50 px-2.5 py-0.5 text-xs font-semibold text-sky-900" translate="no">{first.manufacturerGroup === first.brand ? first.brand : `${first.manufacturerGroup} / ${first.brand}`}</span>
-                  </span>
-                  <span className="mt-3 grid grid-cols-2 gap-x-6 gap-y-3 md:grid-cols-4">
-                    <span className="block"><span className="block text-xs font-normal text-zinc-500">Edición IMC</span><span className="mt-0.5 block text-sm font-medium text-zinc-900" translate="no">{first.imcEdition}</span></span>
-                    <span className="block"><span className="block text-xs font-normal text-zinc-500">Inicio del desarrollo</span><span className="mt-0.5 block text-sm font-medium text-zinc-900">{first.developmentStart ? formatSpanishDate(first.developmentStart) : "—"}</span></span>
-                    <span className="block"><span className="block text-xs font-normal text-zinc-500">Completion</span><span className="mt-0.5 block text-sm font-medium text-zinc-900">{formatSpanishDate(first.completion)}</span></span>
-                    <span className="block"><span className="block text-xs font-normal text-zinc-500">{noun === "familia" ? "Familias" : noun === "modelo" ? "Modelos" : "Typekeys"}</span><span className="mt-0.5 block text-sm font-medium text-zinc-900">{group.items.length}</span></span>
-                  </span>
-                  <span className="mt-3 block text-xs font-normal text-zinc-500">Solicitada el <time dateTime={first.createdAt}>{formatSpanishDateTime(first.createdAt)}</time>{first.requesterName ? ` · ${first.requesterName}` : ""}</span>
-                </span>
-                <span className="flex shrink-0 items-center gap-3">
-                  <span className={`inline-flex rounded-full border px-2.5 py-1 text-xs font-semibold ${aggregateStyles[summary.status]}`}>{summary.label}{running ? ` · ${summary.progress} %` : ""}</span>
-                  <svg aria-hidden="true" className={`size-5 text-zinc-500 transition-transform ${expanded ? "rotate-180" : ""}`} fill="none" stroke="currentColor" strokeWidth="2" viewBox="0 0 20 20"><path d="m5 8 5 5 5-5" strokeLinecap="round" strokeLinejoin="round" /></svg>
-                </span>
+              <button aria-controls={panelId} aria-expanded={expanded} className="grid w-full min-w-0 grid-cols-[minmax(7rem,auto)_auto_1fr_auto_auto_auto] items-center gap-x-4 px-5 py-3 text-left hover:bg-surface-sunken focus-visible:-outline-offset-2" onClick={() => setToggledGroups((current) => ({ ...current, [groupId]: !expanded }))} type="button">
+                <span className="break-words font-mono text-code font-semibold text-ink-strong" translate="no">{first.axCode}</span>
+                <Badge icon={false} tone="info"><span translate="no">{first.manufacturerGroup === first.brand ? first.brand : `${first.manufacturerGroup} / ${first.brand}`}</span></Badge>
+                <span className="text-body text-ink-muted">{summary.total} {summary.total === 1 ? noun : `${noun}s`}</span>
+                <Badge tone={aggregateTones[summary.status]}>{summary.label}{running ? ` · ${summary.progress} %` : ""}</Badge>
+                <time className="text-meta text-ink-muted" dateTime={first.createdAt}>{formatSpanishDate(first.createdAt)}</time>
+                <svg aria-hidden="true" className={`size-5 text-ink-muted transition-transform ${expanded ? "rotate-180" : ""}`} fill="none" stroke="currentColor" strokeWidth="2" viewBox="0 0 20 20"><path d="m5 8 5 5 5-5" strokeLinecap="round" strokeLinejoin="round" /></svg>
               </button>
             </h2>
-            {expanded ? <div className="border-t border-zinc-200" id={panelId}>
-              <div className="space-y-3 px-5 py-4 md:px-6">
+            {expanded ? <div className="border-t border-line-soft" id={panelId}>
+              <div className="space-y-3 px-5 py-4">
+                <dl className="grid grid-cols-2 gap-x-6 gap-y-3 md:grid-cols-5">
+                  <div><dt className="text-meta text-ink-muted">Edición IMC</dt><dd className="mt-0.5 text-body font-medium text-ink" translate="no">{first.imcEdition}</dd></div>
+                  <div><dt className="text-meta text-ink-muted">Inicio del desarrollo</dt><dd className="mt-0.5 text-body font-medium text-ink">{first.developmentStart ? formatSpanishDate(first.developmentStart) : "—"}</dd></div>
+                  <div><dt className="text-meta text-ink-muted">Completion</dt><dd className="mt-0.5 text-body font-medium text-ink">{formatSpanishDate(first.completion)}</dd></div>
+                  <div><dt className="text-meta text-ink-muted">{noun === "familia" ? "Familias" : noun === "modelo" ? "Modelos" : "Typekeys"}</dt><dd className="mt-0.5 text-body font-medium text-ink">{groupRows.length}</dd></div>
+                  <div><dt className="text-meta text-ink-muted">Solicitada</dt><dd className="mt-0.5 text-body font-medium text-ink"><time dateTime={first.createdAt}>{formatSpanishDateTime(first.createdAt)}</time>{first.requesterName ? ` · ${first.requesterName}` : ""}</dd></div>
+                </dl>
                 {hasProgress ? <>
-                  <p className="text-sm text-zinc-700">{summary.description}</p>
-                  <div className="max-w-80"><div className="mb-1 flex justify-between text-xs text-zinc-600"><span>Progreso</span><span>{summary.progress}%</span></div><div aria-label={`Progreso de la solicitud ${first.axCode}`} aria-valuemax={100} aria-valuemin={0} aria-valuenow={summary.progress} className="h-2 overflow-hidden rounded-full bg-zinc-200" role="progressbar"><div className={`h-full rounded-full bg-sky-600 transition-[width] duration-500 ${running ? "motion-safe:animate-pulse" : ""}`} style={{ width: `${summary.progress}%` }} /></div></div>
+                  <p className="text-body text-ink-secondary">{summary.description}</p>
+                  <ProgressBar className="max-w-80" label={`Progreso de la solicitud ${first.axCode}`} value={summary.progress} />
                 </> : null}
-                <RequestActions items={group.items} onUpdated={updateItem} />
-                {first.manufacturerGroup === "BMW" || first.manufacturerGroup === "Mercedes" ? <TransformerPanel allCompleted={group.items.every((item) => item.status === "completed")} initialInfo={initialTransformer[group.id]} requestGroupId={group.id} /> : null}
+                <RequestActions confirm={confirm} items={groupRows} onUpdated={updateItem} />
+                {first.manufacturerGroup === "BMW" || first.manufacturerGroup === "Mercedes" ? <TransformerPanel allCompleted={groupRows.every((item) => item.status === "completed")} initialInfo={transformer[groupId]} requestGroupId={groupId} /> : null}
               </div>
-              <div className="divide-y divide-zinc-200 border-t border-zinc-200 bg-zinc-50/50">
-              {group.items.map((item) => {
-            const status = visibleStatus(item);
-            const detailState = readerDetails[item.id];
-            return <article className={`min-w-0 px-5 py-4 md:px-6`} key={item.id}>
-              <div className="grid min-w-0 gap-5 md:grid-cols-[1.6fr_1fr_auto] md:items-center">
-              <div className="min-w-0"><p className="break-words text-sm font-medium text-zinc-900">{item.modelDescription}</p><p className="mt-1 break-words text-xs text-zinc-600"><span translate="no">{item.manufacturerGroup} / {item.brand} · {item.modelCode}</span> · {item.domain}</p></div>
-              <div className="min-w-0"><span className={`inline-flex rounded-full border px-2.5 py-1 text-xs font-semibold ${status.style}`}>{status.label}</span>{readerStatusNotice(item) ? <p className="mt-2 text-xs font-medium text-amber-800">{readerStatusNotice(item)}</p> : null}{item.progress !== null && item.progress !== undefined && (item.status === "pending" || item.status === "running") ? <div className="mt-3 max-w-56"><div className="mb-1 flex justify-between text-xs text-zinc-600"><span>Progreso</span><span>{item.progress}%</span></div><div aria-label={`Progreso de ${item.axCode}`} aria-valuemax={100} aria-valuemin={0} aria-valuenow={item.progress} className="h-2 overflow-hidden rounded-full bg-zinc-200" role="progressbar"><div className="h-full rounded-full bg-sky-600 transition-[width] duration-500 motion-safe:animate-pulse" style={{ width: `${item.progress}%` }} /></div></div> : null}{item.errorMessage ? <p className="mt-2 break-words text-xs text-red-700">{item.errorMessage}</p> : null}</div>
-                <ExtractionActions item={item} detailsExpanded={openDetailId === item.id} onToggleDetails={(id) => void toggleReaderDetails(id)} onUpdated={updateItem} />
-              </div>
-              {openDetailId === item.id ? <section aria-label={`Detalle de la extracción ${item.axCode}`} className="mt-5 rounded-lg border border-zinc-200 bg-zinc-50 p-4">
-                {detailState?.loading ? <p className="text-sm text-zinc-600" role="status">Cargando detalles del reader…</p> : null}
-                {detailState?.error ? <p className="text-sm text-red-700" role="alert">{detailState.error}</p> : null}
-                {detailState?.detail ? <>
-                  <div className="flex flex-wrap gap-x-6 gap-y-2 text-sm"><p><span className="font-semibold text-zinc-900">Fase:</span> <span className="text-zinc-700">{detailState.detail.stage ?? detailState.detail.status}</span></p><p><span className="font-semibold text-zinc-900">Estado:</span> <span className="text-zinc-700">{detailState.detail.status}</span></p>{detailState.detail.stalled ? <p className="font-medium text-amber-800">El reader detecta la extracción atascada.</p> : null}</div>
-                  {detailState.detail.typekeys.length > 0 ? <div className="mt-4 overflow-x-auto"><table className="min-w-full text-left text-xs"><thead className="text-zinc-500"><tr><th className="px-2 py-2 font-semibold">Typekey</th><th className="px-2 py-2 font-semibold">Familia</th><th className="px-2 py-2 font-semibold">Hojas completadas</th><th className="px-2 py-2 font-semibold">Pendientes</th><th className="px-2 py-2 font-semibold">Fallidas</th><th className="px-2 py-2 font-semibold">Grupos</th></tr></thead><tbody className="divide-y divide-zinc-200">{detailState.detail.typekeys.map((typekey) => <tr key={typekey.typekey}><th className="px-2 py-2 font-mono font-medium text-zinc-900">{typekey.typekey}</th><td className="px-2 py-2 text-zinc-700">{typekey.family ?? "—"}</td><td className="px-2 py-2 tabular-nums text-zinc-700">{typekey.completed ?? "—"}{typekey.total !== null ? ` / ${typekey.total}` : ""}</td><td className="px-2 py-2 tabular-nums text-zinc-700">{typekey.remaining ?? "—"}</td><td className="px-2 py-2 tabular-nums text-zinc-700">{typekey.failed ?? "—"}</td><td className="px-2 py-2 tabular-nums text-zinc-700">{typekey.groups ?? "—"}</td></tr>)}</tbody></table></div> : <p className="mt-3 text-xs text-zinc-600">El reader no ha proporcionado desglose por typekey.</p>}
-                </> : null}
-              </section> : null}
-            </article>;
-              })}
+              <div className="divide-y divide-line-soft border-t border-line-soft bg-surface-sunken">
+                {groupRows.map((item) => {
+                  const status = visibleStatus(item);
+                  const notice = readerStatusNotice(item);
+                  return <article className="min-w-0 px-5 py-3" key={item.id}>
+                    <div className="grid min-w-0 grid-cols-[minmax(0,2fr)_minmax(0,1.2fr)_auto] items-center gap-4">
+                      <div className="min-w-0"><p className="break-words text-body font-medium text-ink">{item.modelDescription}</p><p className="mt-0.5 break-words text-meta text-ink-muted"><span translate="no">{item.manufacturerGroup} / {item.brand} · {item.modelCode}</span> · {item.domain}</p></div>
+                      <div className="min-w-0"><Badge tone={status.tone}>{status.label}</Badge>{notice ? <p className="mt-1.5 text-meta font-medium text-pending-ink">{notice}</p> : null}{item.progress !== null && item.progress !== undefined && (item.status === "pending" || item.status === "running") ? <ProgressBar className="mt-2 max-w-56" label={`Progreso de ${item.axCode}`} value={item.progress} /> : null}{item.errorMessage ? <p className="mt-1.5 break-words text-meta text-danger-ink">{item.errorMessage}</p> : null}</div>
+                      <ExtractionActions confirm={confirm} detailsExpanded={openDetailId === item.id} item={item} onToggleDetails={(id) => void toggleReaderDetails(id)} onUpdated={updateItem} />
+                    </div>
+                    {openDetailId === item.id ? <ReaderDetail item={item} state={readerDetails[item.id]} /> : null}
+                  </article>;
+                })}
               </div>
             </div> : null}
           </section>;
         })}
       </div>
+      {nextCursor ? <div className="flex justify-center"><Button aria-busy={loading} disabled={loading} onClick={() => void loadMore()}>{loading ? "Cargando…" : "Cargar más solicitudes"}</Button></div> : null}
     </div>
   );
 }

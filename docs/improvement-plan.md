@@ -66,9 +66,10 @@ Rama: `feature/database-hardening`. Probar cada migración en un clon antes de p
 - [x] **2.2 Índices parciales de "listas para cargar/informe"** (S) — `repository.ts:16-17,183-184`
   - `(created_at) WHERE status='approved' AND manufacturer_group='BMW' AND load_status IS NULL` y el equivalente de Mercedes con `report_status IS NULL`.
   - Commit: `perf(db): add partial indexes for reconciliation queries`
-- [ ] **2.3 Paginación de los listados** (M) — `lib/extractions/repository.ts:257-278,316-324`
+- [x] **2.3 Paginación de los listados** (M) — `lib/extractions/repository.ts:257-278,316-324`
   - Paginación por keyset sobre `(created_at DESC, id DESC)`. `listPendingRequests` debe paginar por solicitud y no por fila del join. Índice `extractions_created_idx`. Cambia la API y la interfaz del historial: hacerlo en un solo cambio con la tarea 4.3.
   - Commit: `feat(extractions): paginate extraction and pending-request listings`
+  - Hecho junto con 4.3 en `feat(history): compact rows with search and status filter`. La paginación es por solicitud (keyset `(created_at DESC, request_group_id DESC)` sobre `extraction_requests`) y no por fila, para no partir un grupo entre páginas; por eso los índices (`extraction_requests_created_idx` y `extraction_requests_requester_created_idx`) están en `extraction_requests` y no en `extractions`. Migración `0040_request_pagination_indexes` (sin ejecutar): **renumerar al fusionar si otra rama ya usa ese número, y mantener el `when` del journal mayor que el de la última migración aplicada**. El historial pagina de 20 en 20 con «Cargar más»; aprobaciones, con «Ver más solicitudes». La búsqueda por AX es en servidor; el filtro por estado actúa sobre las solicitudes ya cargadas.
 - [x] **2.4 Unificar el camino de migraciones** (M) — `scripts/apply-migrations.ts`, `scripts/migrations.ts`, `package.json`, `db/migrations/meta`
   - Un único camino con `drizzle-kit migrate`. Resolver la ausencia de snapshots en `meta/` (verificarla antes de actuar). `psql` con `--single-transaction` si se mantiene `docker:setup-db`. No generar nunca una migración con `when` menor que la última aplicada.
   - Hecho: `meta/` solo tiene `_journal.json` (verificado), así que `db:generate` queda desactivado (`scripts/db-generate-disabled.mjs`) y las migraciones se escriben a mano; `docker:setup-db` ahora es `drizzle-kit migrate` y se elimina `scripts/apply-migrations.ts`. `scripts/migrations.ts` se mantiene para `run-integration-tests.ts` (base temporal).
@@ -112,11 +113,12 @@ Rama: `feature/performance`. Consultar `node_modules/next/dist/docs/` antes de t
   - `next/dynamic` para los selectores por fabricante y `BmwSwapReview`. Medir el bundle antes y después; decidir si `zod` debe quedarse en el cliente.
   - Resultado: `next build --webpack` (Turbopack no resuelve el `node_modules` enlazado en el worktree): JS total 1.130.081 B → 1.134.371 B (el reparto en chunks añade sobrecarga; BmwSwapReview y MercedesModelSelector salen del chunk de la página). `zod` se queda en el cliente (sin medir).
   - Commit: `perf(extractions): lazy-load manufacturer selectors in the stepper form`
-- [ ] **3.5 Agrupar con `Map` en el historial** (S) — `extraction-history.tsx:260-265`
+- [x] **3.5 Agrupar con `Map` en el historial** (S) — `extraction-history.tsx:260-265`
   - Sustituir el `groups.find` dentro del bucle (O(n·g)) por un `Map`.
   - Commit: `perf(history): group extractions with a map`
-- [ ] **3.6 Listeners pasivos** (S) — `extraction-history.tsx:49-70`
+- [x] **3.6 Listeners pasivos** (S) — `extraction-history.tsx:49-70`
   - `{ passive: true }` en `scroll` y `resize`. Se absorbe si 4.2 sustituye el menú.
+  - Absorbida por 4.4: el menú con `popover` ya no registra listeners de `scroll` ni `resize`. Agrupación con `Map` (3.5) hecha en 4.3.
   - Commit: `perf(history): register scroll listeners as passive`
 
 ---
@@ -125,28 +127,28 @@ Rama: `feature/performance`. Consultar `node_modules/next/dist/docs/` antes de t
 
 Rama: `feature/ui-refresh`. Orden: tokens (4.1) antes de componentes (4.5) y de los retoques visuales (4.6).
 
-- [ ] **4.1 Tokens de diseño** (M) — `app/globals.css`
+- [x] **4.1 Tokens de diseño** (M) — `app/globals.css`
   - En `@theme`: colores de estado (pares pastel), bordes, fondo, texto secundario con contraste AA y escala tipográfica con nombre. Un solo estilo de foco (hoy hay dos y una regla duplicada en `globals.css:23-26` y `:59-64`).
   - Commit: `feat(ui): define design tokens for color, type and focus`
-- [ ] **4.2 `ConfirmDialog` con `<dialog>`** (M)
+- [x] **4.2 `ConfirmDialog` con `<dialog>`** (M)
   - Sustituir los 4 `window.confirm` (`extraction-history.tsx:73,131`, `extraction-stepper-form.tsx:311,323`) con consecuencias explícitas en el texto.
   - Commit: `feat(ui): replace window.confirm with a native dialog component`
-- [ ] **4.3 Historial con filas compactas, búsqueda y filtro por estado** (M) — `extraction-history.tsx:283-310`
+- [x] **4.3 Historial con filas compactas, búsqueda y filtro por estado** (M) — `extraction-history.tsx:283-310`
   - Fila compacta (AX, marca, estado, progreso, fecha) con detalle al expandir, búsqueda por AX y filtro por estado. Hacerlo junto con 2.3. `content-visibility: auto` en cada grupo.
   - Commit: `feat(history): compact rows with search and status filter`
-- [ ] **4.4 Menú de acciones con `popover` y anclaje** (M) — `extraction-history.tsx:41-120`
+- [x] **4.4 Menú de acciones con `popover` y anclaje** (M) — `extraction-history.tsx:41-120`
   - Sustituir los listeners y el cálculo manual de posición. Descargar y reanudar como botones visibles. Aplicar el mismo patrón a `components/layout/user-menu.tsx`.
   - Commit: `feat(history): use native popover for row actions and user menu`
-- [ ] **4.5 Componentes `Badge` y `Button` compartidos** (M)
+- [x] **4.5 Componentes `Badge` y `Button` compartidos** (M)
   - Eliminar las clases repetidas y los estilos de estado duplicados (`extraction-history.tsx:14-17`, `transformer-panel.tsx:10-13`, `infrastructure/page.tsx:19-22`, `users-table.tsx:16`). Icono además del color. Estilo propio para "completada con incidencias".
   - Commit: `refactor(ui): extract shared Badge and Button components`
-- [ ] **4.6 Retoques visuales de minimalist-ui** (S)
+- [x] **4.6 Retoques visuales de minimalist-ui** (S)
   - Quitar `shadow-sm/lg/xl`, bajar `rounded-2xl` a `rounded-xl`/`rounded-lg`, simplificar la franja oscura y la tarjeta del login. Quitar `animate-pulse` de las barras de progreso. Fondo cálido y bordes finos vía tokens.
   - Commit: `style(ui): flatten shadows and reduce corner radii`
-- [ ] **4.7 Accesibilidad del formulario por pasos** (S–M) — `extraction-stepper-form.tsx:494-497,149-150`
+- [x] **4.7 Accesibilidad del formulario por pasos** (S–M) — `extraction-stepper-form.tsx:494-497,149-150`
   - `aria-describedby` hacia `FieldError`, foco en el primer error, `<label>` visible en lugar de `aria-label` (también en `mercedes-model-selector.tsx:84,91`), `:user-invalid`, `pattern`/`minlength` en `axCode` e `imcEdition`, región `aria-live` con el número de resultados del buscador.
   - Commit: `fix(a11y): associate field errors and move focus to the first invalid field`
-- [ ] **4.8 Copy y flujo** (S)
+- [x] **4.8 Copy y flujo** (S)
   - `<Link>` en lugar de `<a href>` (`approvals/page.tsx:28`). Enfocar y exigir el comentario al rechazar (`approval-form.tsx`). Etiqueta corta del comentario. Etiquetas del login con `.field-label` y botón "Mostrar contraseña". Página de error con salida al inicio y `digest`. Título de paso por grupo en lugar de "Tiempos X". "Atrás" con `hidden` en lugar de `invisible`. Hora local en infraestructura. `aria-live` para "Guardando borrador…". `text-xs` solo en metadatos.
   - Commit: `fix(ui): improve copy, links and flow in approvals, login and error pages`
 
@@ -154,7 +156,7 @@ Rama: `feature/ui-refresh`. Orden: tokens (4.1) antes de componentes (4.5) y de 
 
 Contexto ya creado: `PRODUCT.md`, `DESIGN.md` y `.impeccable/design.json` (comandos `init` y `document`). Cada comando se ejecuta con el launcher `.agents/skills/impeccable/scripts/impeccable.cmd` y la variable `DISABLE_TELEMETRY=1`. Las pasadas que editan código se commitean aparte, una por comando.
 
-- [ ] **4.9 `extract`** (M) — hacerlo junto con 4.1 y 4.5
+- [x] **4.9 `extract`** (M) — hacerlo junto con 4.1 y 4.5
   - Sacar a tokens y componentes compartidos lo repetido. Actualizar `DESIGN.md` y `.impeccable/design.json` con los valores finales.
   - Commit: `docs(design): refresh DESIGN.md after extracting tokens and components`
 - [ ] **4.10 `critique`** (S) — sobre historial, formulario por pasos, aprobaciones y login

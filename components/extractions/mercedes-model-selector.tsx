@@ -81,14 +81,14 @@ export function MercedesModelSelector({ initialSeries, selected, onSeriesChange,
     <div className="grid gap-4 md:grid-cols-2">
       <div>
         <label className="field-label" htmlFor={`${id}-series`}>Serie</label>
-        <select aria-label="Serie" className="field-control" disabled={!currentSeries || Boolean(currentSeries.error) || currentSeries.data.length === 0} id={`${id}-series`} onChange={(event) => changeSeries(event.target.value)} value={series}>
+        <select className="field-control" disabled={!currentSeries || Boolean(currentSeries.error) || currentSeries.data.length === 0} id={`${id}-series`} onChange={(event) => changeSeries(event.target.value)} value={series}>
           <option value="">{!currentSeries ? "Cargando series…" : currentSeries.error ? "Opciones no disponibles" : currentSeries.data.length === 0 ? "No hay series disponibles" : "Selecciona serie"}</option>
           {currentSeries?.data.map((option) => <option key={option.value} value={option.value}>{option.label}</option>)}
         </select>
       </div>
       {knownGroups.length > 1 ? <div>
         <label className="field-label" htmlFor={`${id}-group`}>Grupo de producto</label>
-        <select aria-label="Grupo de producto" className="field-control" id={`${id}-group`} onChange={(event) => setProductGroup(event.target.value)} value={productGroup}>
+        <select className="field-control" id={`${id}-group`} onChange={(event) => setProductGroup(event.target.value)} value={productGroup}>
           <option value="">Todos</option>
           {knownGroups.map((option) => <option key={option.value} value={option.value}>{option.label}</option>)}
         </select>
@@ -98,6 +98,7 @@ export function MercedesModelSelector({ initialSeries, selected, onSeriesChange,
     {series && !currentModels ? <p className="text-sm text-zinc-600" role="status">Cargando modelos…</p> : null}
     {currentModels && !currentModels.error ? <>
       <label className="block"><span className="field-label">Buscar modelos</span><input className="field-control" onChange={(event) => setSearch(event.target.value)} placeholder="Escribe designación o descripción" type="search" value={search} /></label>
+      <p aria-live="polite" className="sr-only" role="status">{term && models.length > 0 ? (filtered.length === 1 ? "1 resultado" : `${filtered.length} resultados`) : ""}</p>
       {models.length === 0 ? <p className="rounded-lg border border-dashed border-zinc-300 p-5 text-sm text-zinc-600">El reader no ha devuelto modelos para esta serie.</p>
         : filtered.length === 0 ? <p className="text-sm text-zinc-600">No hay coincidencias.</p>
         : <ul className="max-h-96 divide-y divide-zinc-200 overflow-y-auto rounded-xl border border-zinc-200 bg-white">{filtered.map((option) => {

@@ -23,6 +23,7 @@ export async function decideExtractionRequest(_previous: DecisionState, formData
   const groupId = groupResult.data;
   const decision = decisionResult.data;
   const parsedComment = commentResult.data;
+  if (decision === "rejected" && !parsedComment) return { error: "Indica el motivo del rechazo en el comentario." };
   const pending = await getPendingRequest(groupId);
   if (!pending) return { error: "La solicitud ya no está pendiente. Actualiza la lista." };
   if (user.role === "coordinator" && (!(await isCurrentCoordinator(user)) || !(await isUserInCoordinatorTeam(user, pending.requester)))) return { error: "No estás autorizado para esta solicitud." };

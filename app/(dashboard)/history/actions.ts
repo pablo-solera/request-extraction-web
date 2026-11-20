@@ -4,6 +4,7 @@ import { revalidatePath } from "next/cache";
 import { z } from "zod";
 import { requireUser } from "@/lib/auth/guards";
 import { getExtractionReaderDetail, performExtractionAction } from "@/lib/extractions/service";
+import { historyPageInputSchema, loadHistoryPage } from "@/lib/extractions/history";
 import { ReaderError } from "@/lib/readers/errors";
 import { describeError } from "@/lib/logging/describe-error";
 
@@ -35,5 +36,17 @@ export async function extractionDetail(input: unknown) {
     if (error instanceof ReaderError) return { ok: false as const, message: error.message };
     console.error("Extraction details lookup failed.", describeError(error));
     return { ok: false as const, message: "No se han podido cargar los detalles de esta extracciÃ³n." };
+  }
+}
+
+export async function loadHistory(input: unknown) {
+  const user = await requireUser();
+  const parsed = historyPageInputSchema.safeParse(input);
+  if (!parsed.success) return { ok: false as const, message: "La búsqueda no es válida." };
+  try {
+    return { ok: true as const, ...await loadHistoryPage(user, parsed.data) };
+  } catch (error) {
+    console.error("History page lookup failed.", error);
+    return { ok: false as const, message: "No se ha podido cargar el historial. Inténtalo de nuevo." };
   }
 }
