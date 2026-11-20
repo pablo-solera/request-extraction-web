@@ -197,7 +197,9 @@ Contexto ya creado: `PRODUCT.md`, `DESIGN.md` y `.impeccable/design.json` (coman
 
 Rama: `feature/housekeeping`
 
-- [ ] **5.1 Dark mode** (L) — `color-scheme: light dark` y `light-dark()` con tokens. Depende de 4.1.
+- [x] **5.1 Dark mode** (L) — `color-scheme: light dark` y `light-dark()` con tokens. Depende de 4.1.
+  - Hecho: tokens `light-dark()` en `@theme`, `color-scheme: light dark`, token `scrim` para el fondo del diálogo, `themeColor` por esquema y test de contraste AA (`tests/color-tokens.test.ts`). Sin selector manual. `global-error` ya usaba solo tokens.
+  - Pendiente: revisar visualmente el oscuro en navegador (no se arrancó `next dev`); los bordes `line` oscuros (#52525b) dan ~2,3:1 sobre surface, como en claro (~1,5:1), por debajo de 3:1 de UI no textual.
   - Commit: `feat(ui): add dark color scheme`
 - [x] **5.2 Allowlist de origen en la descarga del transformer** (S) — `lib/transformer/client.ts:166-172`
   - Igual que Renault, y rechazar IPs privadas y de metadatos.
