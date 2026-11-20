@@ -442,3 +442,14 @@ describe("transformer request actions", () => {
     expect(info.g1).toMatchObject({ applicable: true, loadStatus: "completed", canUpload: true, canRetryLoad: false, comparisons: [{ id: "cmp-1", filename: "a.lst", downloadReady: true }] });
   });
 });
+
+describe("uploaded file content", () => {
+  it("requires the ZIP signature for .zip and plain text for .lst", async () => {
+    const { hasValidLstContent } = await import("@/lib/transformer/service");
+    expect(hasValidLstContent("a.zip", new Uint8Array([0x50, 0x4b, 0x03, 0x04, 1]))).toBe(true);
+    expect(hasValidLstContent("a.zip", new TextEncoder().encode("texto"))).toBe(false);
+    expect(hasValidLstContent("a.lst", new TextEncoder().encode("linea 1\nlinea 2"))).toBe(true);
+    expect(hasValidLstContent("a.lst", new Uint8Array([0x50, 0x4b, 0x03, 0x04]))).toBe(false);
+    expect(hasValidLstContent("a.lst", new Uint8Array([65, 0, 66]))).toBe(false);
+  });
+});

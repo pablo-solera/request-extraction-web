@@ -1,4 +1,5 @@
 import { requireApiUser } from "@/lib/auth/guards";
+import { limitReaderUsage } from "@/lib/readers/usage";
 import { ReaderError } from "@/lib/readers/errors";
 import { getMercedesSeries } from "@/lib/readers/mercedes/client";
 
@@ -7,6 +8,8 @@ const privateHeaders = { "Cache-Control": "private, no-store, max-age=0" };
 export async function GET() {
   const user = await requireApiUser();
   if (!user) return Response.json({ error: { message: "Inicia sesión." } }, { status: 401, headers: privateHeaders });
+  const limited = limitReaderUsage(user.id);
+  if (limited) return limited;
 
   try {
     return Response.json({ options: await getMercedesSeries() }, { headers: privateHeaders });

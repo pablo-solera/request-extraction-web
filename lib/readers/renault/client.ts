@@ -137,7 +137,20 @@ export async function getRenaultReaderCapabilities(): Promise<RenaultReaderCapab
   return capabilities;
 }
 
+const FAMILIES_CACHE_TTL_MS = 60 * 60 * 1000;
+const familiesCache = new Map<string, { expiresAt: number; options: { value: string; label: string }[] }>();
+
 export async function getRenaultLabourFamilies(brand: "Renault" | "Dacia") {
+  const cached = familiesCache.get(brand);
+  if (cached && cached.expiresAt > Date.now()) return cached.options;
+  const options = await loadRenaultLabourFamilies(brand);
+  familiesCache.set(brand, { expiresAt: Date.now() + FAMILIES_CACHE_TTL_MS, options });
+  return options;
+}
+
+export function clearRenaultFamiliesCache() { familiesCache.clear(); }
+
+async function loadRenaultLabourFamilies(brand: "Renault" | "Dacia") {
   if (await getRenaultReaderCapabilities() && readerCoreModelOptionsAvailable) {
     const query = new URLSearchParams({ manufacturer: "Renault", brand });
     const response = await request(`/v1/models/options?${query}`);

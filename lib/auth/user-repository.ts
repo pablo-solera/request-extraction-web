@@ -1,6 +1,6 @@
 import "server-only";
 
-import { eq, inArray, isNotNull } from "drizzle-orm";
+import { and, eq, inArray, isNotNull, isNull, notInArray, sql } from "drizzle-orm";
 import { getDb } from "@/db";
 import { users } from "@/db/schema";
 
@@ -30,6 +30,8 @@ export async function findUserById(id: string) {
       oracleEmpId: users.oracleEmpId,
       fallbackEmail: users.fallbackEmail,
       fallbackName: users.fallbackName,
+      disabledAt: users.disabledAt,
+      tokenVersion: users.tokenVersion,
     })
     .from(users)
     .where(eq(users.id, id))
@@ -59,4 +61,27 @@ export async function listManagedUsers() {
 export async function findUsersByOracleEmpIds(oracleEmpIds: number[]) {
   if (oracleEmpIds.length === 0) return [];
   return getDb().select().from(users).where(inArray(users.oracleEmpId, oracleEmpIds));
+}
+
+/** Invalidates every session already issued for the user. */
+export async function revokeUserSessions(id: string) {
+  await getDb().update(users).set({ tokenVersion: sql`${users.tokenVersion} + 1` }).where(eq(users.id, id));
+}
+
+/**
+ * Disables the users mapped to an Oracle employee that is no longer active (and re-enables those that came back).
+ * `activeEmpIds` must be non-empty: an empty list is treated as a failed read and changes nothing.
+ */
+export async function syncUserActivation(activeEmpIds: number[]) {
+  if (activeEmpIds.length === 0) return { disabled: 0, enabled: 0 };
+  const db = getDb();
+  const disabled = await db.update(users)
+    .set({ disabledAt: sql`now()`, tokenVersion: sql`${users.tokenVersion} + 1` })
+    .where(and(isNotNull(users.oracleEmpId), notInArray(users.oracleEmpId, activeEmpIds), isNull(users.disabledAt)))
+    .returning({ id: users.id });
+  const enabled = await db.update(users)
+    .set({ disabledAt: null })
+    .where(and(inArray(users.oracleEmpId, activeEmpIds), isNotNull(users.disabledAt)))
+    .returning({ id: users.id });
+  return { disabled: disabled.length, enabled: enabled.length };
 }

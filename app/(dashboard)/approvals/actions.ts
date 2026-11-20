@@ -7,6 +7,7 @@ import { decideRequest, getPendingRequest } from "@/lib/extractions/repository";
 import { isCurrentCoordinator, isUserInCoordinatorTeam } from "@/lib/employees/org-service";
 import { submitApprovedRequest } from "@/lib/extractions/service";
 import { after } from "next/server";
+import { describeError } from "@/lib/logging/describe-error";
 
 const requestId = z.uuid();
 const comment = z.string().trim().max(4000).nullable();
@@ -31,7 +32,7 @@ export async function decideExtractionRequest(_previous: DecisionState, formData
     try {
       await submitApprovedRequest(groupId);
     } catch (error) {
-      console.error("Approved request submission failed after response.", error);
+      console.error("Approved request submission failed after response.", describeError(error));
     }
   });
   revalidatePath("/approvals");

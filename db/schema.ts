@@ -35,6 +35,8 @@ export const users = pgTable(
     createdAt: timestamp("created_at", { withTimezone: true }).defaultNow().notNull(),
     updatedAt: timestamp("updated_at", { withTimezone: true }).defaultNow().notNull(),
     lastLoginAt: timestamp("last_login_at", { withTimezone: true }).defaultNow().notNull(),
+    disabledAt: timestamp("disabled_at", { withTimezone: true }),
+    tokenVersion: integer("token_version").default(0).notNull(),
   },
   (table) => [
     uniqueIndex("users_oracle_emp_id_unique").on(table.oracleEmpId).where(sql`${table.oracleEmpId} IS NOT NULL`),

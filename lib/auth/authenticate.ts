@@ -10,7 +10,7 @@ export async function authenticate(email: string, password: string) {
   const testAccount = findTestAccountByEmail(normalizedEmail);
   if (testAccount && verifyTestAccountPassword(password)) {
     const user = await findUserByFallbackEmail(normalizedEmail);
-    return user?.oracleEmpId === testAccount.empId ? user : null;
+    return user?.oracleEmpId === testAccount.empId && !user.disabledAt ? user : null;
   }
 
   const identity = await findLdapIdentity(normalizedEmail);
@@ -21,5 +21,6 @@ export async function authenticate(email: string, password: string) {
 
   const employee = await findActiveEmployeeByEmail(identity.email);
   if (!employee) return null;
-  return findUserByOracleEmpId(employee.empId);
+  const user = await findUserByOracleEmpId(employee.empId);
+  return user && !user.disabledAt ? user : null;
 }

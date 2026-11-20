@@ -4,6 +4,7 @@ import type { UserRole } from "@/lib/auth/session";
 import { findOrganizationRows } from "@/lib/employees/org-repository";
 import { findTestAccountByEmpId, getTestAccounts } from "@/lib/employees/test-accounts";
 import { findUsersByOracleEmpIds } from "@/lib/auth/user-repository";
+import { describeError } from "@/lib/logging/describe-error";
 
 const DEFAULT_TTL_SECONDS = 60;
 type OrganizationSnapshot = { adminEmpIds: Set<number>; coordinatorEmpIds: Set<number>; coordinatorByEmpId: Map<number, number | null>; staffEmpIds: Set<number>; teamByCoordinatorEmpId: Map<number, Set<number>> };
@@ -66,7 +67,7 @@ async function getOrganizationSnapshot() {
   if (state.snapshot) {
     if (!state.promise) {
       state.promise = findOrganizationRows().then(buildSnapshot).catch((error) => {
-        console.error("Oracle organization refresh failed; keeping the last known snapshot.", error);
+        console.error("Oracle organization refresh failed; keeping the last known snapshot.", describeError(error));
         state.loadedAt = Date.now() - Math.max(0, getTtlMs() - 5_000);
         return state.snapshot!;
       }).then((snapshot) => { state.snapshot = snapshot; state.loadedAt = Date.now(); return snapshot; }).finally(() => { state.promise = null; });
@@ -76,7 +77,7 @@ async function getOrganizationSnapshot() {
   if (!state.promise) {
     state.promise = findOrganizationRows().then(buildSnapshot).catch((error) => {
       if (!getTestAccounts()) throw error;
-      console.error("Oracle organization unavailable; using test account organization.", error);
+      console.error("Oracle organization unavailable; using test account organization.", describeError(error));
       return buildSnapshot({ roles: [], hierarchy: [] });
     }).then((snapshot) => { state.snapshot = snapshot; state.loadedAt = Date.now(); return snapshot; }).finally(() => { state.promise = null; });
   }

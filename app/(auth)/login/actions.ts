@@ -5,6 +5,7 @@ import { z } from "zod";
 import { authenticate } from "@/lib/auth/authenticate";
 import { LdapUnavailableError } from "@/lib/auth/ldap";
 import { setSessionCookie } from "@/lib/auth/session";
+import { describeError } from "@/lib/logging/describe-error";
 
 const loginSchema = z.object({
   email: z.string().trim().pipe(z.email()).transform((value) => value.toLowerCase()),
@@ -35,7 +36,7 @@ export async function loginAction(
       return { error: "El servicio de autenticación no está disponible.", email: parsed.data.email };
     }
 
-    console.error("Login failed because an internal dependency is unavailable.", error);
+    console.error("Login failed because an internal dependency is unavailable.", describeError(error));
     return { error: "No se ha podido iniciar sesión. Inténtalo de nuevo.", email: parsed.data.email };
   }
 

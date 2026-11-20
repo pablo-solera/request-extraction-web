@@ -1,6 +1,7 @@
 import { z } from "zod";
 import { requireApiIdentity } from "@/lib/auth/guards";
 import { getTransformerInfo } from "@/lib/transformer/service";
+import { describeError } from "@/lib/logging/describe-error";
 
 const privateHeaders = { "Cache-Control": "private, no-store, max-age=0" };
 const idSchema = z.uuid();
@@ -16,7 +17,7 @@ export async function GET(request: Request) {
   try {
     return Response.json(await getTransformerInfo(ids, user), { headers: privateHeaders });
   } catch (error) {
-    console.error("Transformer info lookup failed.", error);
+    console.error("Transformer info lookup failed.", describeError(error));
     return Response.json({ error: { code: "STATUS_UNAVAILABLE", message: "No se ha podido consultar el estado de la carga." } }, { status: 503, headers: privateHeaders });
   }
 }

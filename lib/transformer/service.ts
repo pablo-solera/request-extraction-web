@@ -14,6 +14,7 @@ import type { TransformerRequestInfo } from "@/lib/transformer/info";
 import type { TransformerState } from "@/lib/transformer/types";
 import type { UserRole } from "@/lib/auth/session";
 import { notifyComparisonFailed, notifyLoadCompleted, notifyLoadFailed, notifyReportFailed, retryPendingNotifications } from "@/lib/mail/notifications";
+import { describeError } from "@/lib/logging/describe-error";
 
 type Actor = { id: string; oracleEmpId: number | null; role: UserRole };
 
@@ -307,13 +308,13 @@ async function requireManageableRequest(requestGroupId: string, actor: Actor) {
 export async function retryRequestLoad(requestGroupId: string, actor: Actor) {
   await requireManageableRequest(requestGroupId, actor);
   if (!await resetFailedLoad(requestGroupId)) throw new ReaderError("Solo se puede reintentar una carga fallida.", "LOAD_NOT_RETRYABLE", false, 409);
-  await startLoadForRequest(requestGroupId).catch((error) => console.error("Transformer load could not be restarted.", error));
+  await startLoadForRequest(requestGroupId).catch((error) => console.error("Transformer load could not be restarted.", describeError(error)));
 }
 
 export async function retryRequestReport(requestGroupId: string, actor: Actor) {
   await requireManageableRequest(requestGroupId, actor);
   if (!await resetFailedReport(requestGroupId)) throw new ReaderError("Solo se puede reintentar un informe fallido.", "REPORT_NOT_RETRYABLE", false, 409);
-  await startReportForRequest(requestGroupId).catch((error) => console.error("Transformer report could not be restarted.", error));
+  await startReportForRequest(requestGroupId).catch((error) => console.error("Transformer report could not be restarted.", describeError(error)));
 }
 
 /** The Excel of a Mercedes-Benz request, named after the AX code. A failed report is downloadable when the transformer kept the file. */
@@ -325,12 +326,21 @@ export async function downloadRequestReport(requestGroupId: string, actor: Actor
 }
 
 const lstName = /\.(lst|zip)$/i;
+const ZIP_SIGNATURE = [0x50, 0x4b, 0x03, 0x04];
+
+/** The extension is only a claim: a .ZIP must start with the ZIP signature and a .LST must be text (no NUL bytes). */
+export function hasValidLstContent(name: string, bytes: Uint8Array) {
+  if (/\.zip$/i.test(name)) return ZIP_SIGNATURE.every((byte, index) => bytes[index] === byte);
+  if (ZIP_SIGNATURE.every((byte, index) => bytes[index] === byte)) return false;
+  return !bytes.subarray(0, 8192).includes(0);
+}
 
 export async function uploadComparison(requestGroupId: string, actor: Actor, file: { name: string; bytes: Uint8Array }, client: TransformerClient = getTransformerClient()) {
   const request = await requireManageableRequest(requestGroupId, actor);
   if (request.loadStatus !== "completed" || !request.loadRemoteId) throw new ReaderError("Los datos de la solicitud todavía no están cargados.", "LOAD_NOT_COMPLETED", false, 409);
   if (!lstName.test(file.name)) throw new ReaderError("El fichero debe ser un .LST o un .ZIP con un único .LST.", "INVALID_LST_FILE", false, 400);
   if (file.bytes.byteLength === 0 || file.bytes.byteLength > MAX_LST_BYTES) throw new ReaderError("El fichero está vacío o supera el tamaño permitido.", "INVALID_LST_FILE", false, 400);
+  if (!hasValidLstContent(file.name, file.bytes)) throw new ReaderError("El contenido del fichero no corresponde a un .LST de texto o a un .ZIP válido.", "INVALID_LST_FILE", false, 400);
   const comparison = await insertComparison({ requestGroupId, uploadedById: actor.id, sourceFilename: file.name.slice(0, 200) });
   try {
     const { reportId } = await client.createComparison({ loadId: request.loadRemoteId, axCode: request.axCode, imcEdition: request.imcEdition }, file);
@@ -372,9 +382,9 @@ export async function getTransformerInfo(requestGroupIds: string[], actor: Actor
   const bmwBusy = bmwConfigured && (pendingStart.length > 0 || current.some((request) => running(request.loadStatus)) || comparisons.some((comparison) => running(comparison.status)));
   const mercedesBusy = mercedesConfigured && (pendingReports.length > 0 || current.some((request) => running(request.reportStatus)));
   if (bmwBusy || mercedesBusy) {
-    if (bmwBusy) await startPendingLoads(pendingStart).catch((error) => console.error("Transformer pending load start failed.", error));
-    if (mercedesBusy) await startPendingReports(pendingReports).catch((error) => console.error("Transformer pending report start failed.", error));
-    await syncTransformerStates(visibleIds).catch((error) => console.error("Transformer state sync failed.", error));
+    if (bmwBusy) await startPendingLoads(pendingStart).catch((error) => console.error("Transformer pending load start failed.", describeError(error)));
+    if (mercedesBusy) await startPendingReports(pendingReports).catch((error) => console.error("Transformer pending report start failed.", describeError(error)));
+    await syncTransformerStates(visibleIds).catch((error) => console.error("Transformer state sync failed.", describeError(error)));
     current = await listRequestsByIds(visibleIds);
     comparisons = await listComparisonsForRequests(visibleIds);
   }

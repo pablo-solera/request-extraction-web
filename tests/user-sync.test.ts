@@ -6,6 +6,7 @@ const mocks = vi.hoisted(() => ({
   createSyncedUsers: vi.fn(),
   findExistingFallbackEmails: vi.fn(),
   findUsersWithOracleEmpId: vi.fn(),
+  syncUserActivation: vi.fn(),
 }));
 vi.mock("@/lib/employees/employee-repository", () => ({ findAllActiveEmployees: mocks.findAllActiveEmployees }));
 vi.mock("@/lib/employees/test-accounts", () => ({ getTestAccounts: mocks.getTestAccounts }));
@@ -13,6 +14,7 @@ vi.mock("@/lib/auth/user-repository", () => ({
   createSyncedUsers: mocks.createSyncedUsers,
   findExistingFallbackEmails: mocks.findExistingFallbackEmails,
   findUsersWithOracleEmpId: mocks.findUsersWithOracleEmpId,
+  syncUserActivation: mocks.syncUserActivation,
 }));
 
 import { buildSyncPlan, runUserSync, seedTestAccountUsers } from "@/lib/users/sync-service";
@@ -25,6 +27,7 @@ beforeEach(() => {
   mocks.getTestAccounts.mockReturnValue(null);
   mocks.findExistingFallbackEmails.mockResolvedValue([]);
   mocks.findUsersWithOracleEmpId.mockResolvedValue([]);
+  mocks.syncUserActivation.mockResolvedValue({ disabled: 0, enabled: 0 });
   mocks.createSyncedUsers.mockImplementation(async (users: unknown[]) => users);
 });
 
@@ -53,7 +56,16 @@ describe("user synchronization", () => {
 
   it("reports how many users it created", async () => {
     mocks.findAllActiveEmployees.mockResolvedValue([{ empId: 1, email: "a@example.com", name: "A" }, { empId: 2, email: "b@example.com", name: "B" }]);
-    expect(await runUserSync()).toEqual({ created: 2 });
+    expect(await runUserSync()).toEqual({ created: 2, disabled: 0, enabled: 0 });
+  });
+
+  it("passes the active employees and test accounts to the activation sync", async () => {
+    mocks.findAllActiveEmployees.mockResolvedValue([{ empId: 1, email: "a@example.com", name: "A" }]);
+    mocks.getTestAccounts.mockReturnValue([admin]);
+    mocks.syncUserActivation.mockResolvedValue({ disabled: 1, enabled: 0 });
+
+    expect(await runUserSync()).toMatchObject({ disabled: 1 });
+    expect(mocks.syncUserActivation).toHaveBeenCalledWith([1, 3509]);
   });
 });
 

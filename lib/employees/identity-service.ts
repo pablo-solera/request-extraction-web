@@ -2,6 +2,7 @@ import "server-only";
 
 import { findEmployeesByIds, type OracleEmployee } from "@/lib/employees/employee-repository";
 import { findTestAccountByEmpId } from "@/lib/employees/test-accounts";
+import { describeError } from "@/lib/logging/describe-error";
 export type UserIdentityInput = { id: string; oracleEmpId: number | null; fallbackName: string | null; fallbackEmail: string | null };
 
 const IDENTITY_TTL_MS = 60_000;
@@ -31,7 +32,7 @@ function refreshIdentities(ids: number[]) {
       for (const id of missing) identityCache.set(id, { expiresAt, value: byId.get(id) ?? null });
     })
     .catch((error: unknown) => {
-      console.error("Employee identity lookup failed; using stored identity fallback.", error);
+      console.error("Employee identity lookup failed; using stored identity fallback.", describeError(error));
     })
     .finally(() => {
       for (const id of missing) identityRefreshes.delete(id);

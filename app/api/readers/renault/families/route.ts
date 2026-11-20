@@ -1,5 +1,6 @@
 import { z } from "zod";
 import { requireApiUser } from "@/lib/auth/guards";
+import { limitReaderUsage } from "@/lib/readers/usage";
 import { ReaderError } from "@/lib/readers/errors";
 import { getRenaultLabourFamilies } from "@/lib/readers/renault/client";
 
@@ -9,6 +10,8 @@ const querySchema = z.object({ brand: z.enum(["Renault", "Dacia"]) });
 export async function GET(request: Request) {
   const user = await requireApiUser();
   if (!user) return Response.json({ error: { message: "Inicia sesión." } }, { status: 401, headers: privateHeaders });
+  const limited = limitReaderUsage(user.id);
+  if (limited) return limited;
 
   const parsed = querySchema.safeParse({ brand: new URL(request.url).searchParams.get("brand") });
   if (!parsed.success) return Response.json({ error: { message: "Selecciona Renault o Dacia." } }, { status: 400, headers: privateHeaders });

@@ -23,7 +23,7 @@ const context = (value = id) => ({ params: Promise.resolve({ id: value }) }) as 
 const upload = (file?: File) => {
   const form = new FormData();
   if (file) form.set("file", file);
-  return new Request(`http://localhost/api/requests/${id}/comparisons`, { method: "POST", body: form });
+  return new Request(`http://localhost/api/requests/${id}/comparisons`, { method: "POST", body: form, headers: { origin: "http://localhost", host: "localhost" } });
 };
 
 describe("transformer routes", () => {
@@ -35,7 +35,7 @@ describe("transformer routes", () => {
   it("require a session and a valid identifier", async () => {
     mocks.requireApiIdentity.mockResolvedValue(null);
     expect((await uploadRoute(upload(new File(["x"], "a.lst")), context())).status).toBe(401);
-    expect((await retryRoute(new Request("http://localhost"), context())).status).toBe(401);
+    expect((await retryRoute(new Request("http://localhost", { method: "POST", headers: { origin: "http://localhost", host: "localhost" } }), context())).status).toBe(401);
     expect((await downloadRoute(new Request("http://localhost"), context())).status).toBe(401);
     expect((await infoRoute(new Request("http://localhost/api/requests/transformer?id=" + id))).status).toBe(401);
     mocks.requireApiIdentity.mockResolvedValue(user);
@@ -63,9 +63,9 @@ describe("transformer routes", () => {
 
   it("retries a failed load and reports a conflict otherwise", async () => {
     mocks.retryRequestLoad.mockResolvedValueOnce(undefined);
-    expect((await retryRoute(new Request("http://localhost"), context())).status).toBe(202);
+    expect((await retryRoute(new Request("http://localhost", { method: "POST", headers: { origin: "http://localhost", host: "localhost" } }), context())).status).toBe(202);
     mocks.retryRequestLoad.mockRejectedValueOnce(new ReaderError("Solo se puede reintentar una carga fallida.", "LOAD_NOT_RETRYABLE", false, 409));
-    expect((await retryRoute(new Request("http://localhost"), context())).status).toBe(409);
+    expect((await retryRoute(new Request("http://localhost", { method: "POST", headers: { origin: "http://localhost", host: "localhost" } }), context())).status).toBe(409);
   });
 
   it("streams the Excel with a safe attachment name and private headers", async () => {
@@ -90,21 +90,21 @@ describe("transformer routes", () => {
 
   it("requires a session and a valid identifier for the Mercedes-Benz report routes", async () => {
     mocks.requireApiIdentity.mockResolvedValue(null);
-    expect((await reportRetryRoute(new Request("http://localhost"), context())).status).toBe(401);
+    expect((await reportRetryRoute(new Request("http://localhost", { method: "POST", headers: { origin: "http://localhost", host: "localhost" } }), context())).status).toBe(401);
     expect((await reportDownloadRoute(new Request("http://localhost"), context())).status).toBe(401);
     mocks.requireApiIdentity.mockResolvedValue(user);
-    expect((await reportRetryRoute(new Request("http://localhost"), context("nope"))).status).toBe(400);
+    expect((await reportRetryRoute(new Request("http://localhost", { method: "POST", headers: { origin: "http://localhost", host: "localhost" } }), context("nope"))).status).toBe(400);
     expect((await reportDownloadRoute(new Request("http://localhost"), context("nope"))).status).toBe(400);
   });
 
   it("retries a failed report and maps conflicts and unexpected errors", async () => {
     mocks.retryRequestReport.mockResolvedValueOnce(undefined);
-    expect((await reportRetryRoute(new Request("http://localhost"), context())).status).toBe(202);
+    expect((await reportRetryRoute(new Request("http://localhost", { method: "POST", headers: { origin: "http://localhost", host: "localhost" } }), context())).status).toBe(202);
     expect(mocks.retryRequestReport).toHaveBeenCalledWith(id, user);
     mocks.retryRequestReport.mockRejectedValueOnce(new ReaderError("Solo se puede reintentar un informe fallido.", "REPORT_NOT_RETRYABLE", false, 409));
-    expect((await reportRetryRoute(new Request("http://localhost"), context())).status).toBe(409);
+    expect((await reportRetryRoute(new Request("http://localhost", { method: "POST", headers: { origin: "http://localhost", host: "localhost" } }), context())).status).toBe(409);
     mocks.retryRequestReport.mockRejectedValueOnce(new Error("boom"));
-    expect((await reportRetryRoute(new Request("http://localhost"), context())).status).toBe(502);
+    expect((await reportRetryRoute(new Request("http://localhost", { method: "POST", headers: { origin: "http://localhost", host: "localhost" } }), context())).status).toBe(502);
   });
 
   it("streams the report as {axCode}.xlsx with private headers", async () => {
@@ -118,5 +118,26 @@ describe("transformer routes", () => {
     expect((await reportDownloadRoute(new Request("http://localhost"), context())).status).toBe(409);
     mocks.downloadRequestReport.mockRejectedValueOnce(new Error("boom"));
     expect((await reportDownloadRoute(new Request("http://localhost"), context())).status).toBe(502);
+  });
+});
+
+describe("upload size limit", () => {
+  it("rejects a body larger than the limit even without a trustworthy Content-Length", async () => {
+    const big = new Uint8Array(25 * 1024 * 1024 + 70 * 1024);
+    const stream = new ReadableStream({ start(controller) { controller.enqueue(big); controller.close(); } });
+    const request = new Request(`http://localhost/api/requests/${id}/comparisons`, {
+      method: "POST", body: stream, duplex: "half", headers: { origin: "http://localhost", host: "localhost", "content-type": "multipart/form-data; boundary=x" },
+    } as RequestInit);
+    expect((await uploadRoute(request, context())).status).toBe(413);
+    expect(mocks.uploadComparison).not.toHaveBeenCalled();
+  });
+});
+
+describe("cross-origin protection", () => {
+  it("rejects state-changing requests from another origin before authenticating", async () => {
+    const foreign = () => new Request("http://localhost", { method: "POST", headers: { origin: "https://evil.example" } });
+    expect((await retryRoute(foreign(), context())).status).toBe(403);
+    expect((await reportRetryRoute(foreign(), context())).status).toBe(403);
+    expect((await uploadRoute(foreign(), context())).status).toBe(403);
   });
 });

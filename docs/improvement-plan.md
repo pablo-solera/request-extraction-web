@@ -30,23 +30,28 @@ Esfuerzo: **S** pequeño · **M** medio · **L** grande.
 
 Rama: `feature/security-hardening`
 
-- [ ] **1.1 Sesiones revocables** (M) — `lib/auth/session.ts:7,38-50`, `lib/auth/guards.ts:41`
+- [x] **1.1 Sesiones revocables** (M) — `lib/auth/session.ts:7,38-50`, `lib/auth/guards.ts:41`
   - Comprobar que el usuario sigue activo en cada petición (flag `active` o `disabledAt` en `users`). Añadir `tokenVersion` o `jti`. Reducir la duración a 1–2 h con renovación.
   - Commit: `feat(auth): make sessions revocable and check the user is active`
-- [ ] **1.2 Comprobación de `Origin` en los `POST` de Route Handlers** (S)
+- [x] **1.2 Comprobación de `Origin` en los `POST` de Route Handlers** (S)
   - Helper común que valide `Origin` contra `APP_BASE_URL` en `requests/[id]/comparisons`, `report/retry`, `load/retry` e `internal/reconcile`. Revisar `allowedOrigins` si hay proxy inverso.
+  - Hecho: el helper `lib/security/origin.ts` acepta `Origin` igual a `Host`, `X-Forwarded-Host` o `APP_BASE_URL`. `internal/reconcile` queda fuera a propósito: se autentica con `Bearer` (sin cookie, no hay CSRF) y sus llamadores no envían `Origin`. Pendiente: si hay proxy inverso, `serverActions.allowedOrigins` en `next.config.ts` solo hace falta si el proxy reescribe `Host` sin `X-Forwarded-Host`.
   - Commit: `fix(api): validate request origin on state-changing route handlers`
-- [ ] **1.3 Subida de ficheros más segura** (M) — `app/api/requests/[id]/comparisons/route.ts:16-28`, `next.config.ts:8`
+- [x] **1.3 Subida de ficheros más segura** (M) — `app/api/requests/[id]/comparisons/route.ts:16-28`, `next.config.ts:8`
   - Contar los bytes leídos del stream, comprobar la firma `PK\x03\x04` del ZIP y que el LST sea texto. Verificar contra la documentación de `node_modules/next/dist/docs/` que `proxyClientMaxBodySize` en `experimental` es válido en esta versión.
+  - Hecho: `experimental.proxyClientMaxBodySize` es válido (documentado en `proxyClientMaxBodySize.md`, versión experimental), se mantiene en `26mb`. El tamaño se cuenta ahora sobre los bytes leídos del stream y la firma se valida en `uploadComparison`.
   - Commit: `fix(api): enforce streamed size limit and validate uploaded file signatures`
-- [ ] **1.4 Límite de uso de los lectores externos** (S) — `app/api/readers/*`
+- [x] **1.4 Límite de uso de los lectores externos** (S) — `app/api/readers/*`
   - Limitar el consumo por usuario y cachear respuestas. Confirmar que `extractions/[id]/route.ts` comprueba propiedad con `getManageableExtraction`.
+  - Hecho: tope de 120 consultas/min por usuario en memoria (`lib/readers/usage.ts`, 429 con `Retry-After`; válido mientras la app sea una sola instancia). BMW y Mercedes ya cachean en sus clientes; se añadió caché de 1 h a las familias de Renault. `extractions/[id]/route.ts` comprueba propiedad con `listOwnedExtractions(user.id)` (solo el propietario, más estricto que `getManageableExtraction`).
   - Commit: `feat(readers): cap per-user reader usage and cache responses`
-- [ ] **1.5 Completar variables de entorno** (S)
+- [x] **1.5 Completar variables de entorno** (S)
   - Faltan en `.env`: `BMW_READER_LANGUAGE`, `MERCEDES_READER_BASE_URL`, `MERCEDES_TRANSFORMER_BASE_URL`, `RENAULT_TRANSFORMER_BASE_URL`, `VAG_READER_BASE_URL`, `VAG_TRANSFORMER_BASE_URL`. Confirmar si son opcionales; si no, definirlas y documentarlas en `.env.example` y `README.md`.
+  - Hecho: `BMW_READER_LANGUAGE` (por defecto `en-GB`), `MERCEDES_TRANSFORMER_BASE_URL`, `RENAULT_TRANSFORMER_BASE_URL` y las dos de VAG son opcionales; `MERCEDES_READER_BASE_URL` es obligatoria para pedir extracciones Mercedes-Benz. Documentado en `.env.example` y `README.md`; no se ha tocado `.env`.
   - Commit: `docs(config): document reader and transformer environment variables`
-- [ ] **1.6 Logs sin el objeto de error completo** (S) — `login/actions.ts:38`, `reconcile/route.ts:31`, `history/actions.ts:22`
+- [x] **1.6 Logs sin el objeto de error completo** (S) — `login/actions.ts:38`, `reconcile/route.ts:31`, `history/actions.ts:22`
   - Registrar solo `error.name` y `error.code`, como `mail/notifications.ts:44`.
+  - Hecho en todos los `console.error` con un error (19 archivos, no solo los tres citados) mediante `lib/logging/describe-error.ts`.
   - Commit: `fix(logging): avoid logging full error objects`
 
 ---
