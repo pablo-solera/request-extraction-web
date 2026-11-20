@@ -1,0 +1,112 @@
+{
+  "schemaVersion": 2,
+  "generatedAt": "2026-11-20T12:00:00.000Z",
+  "title": "Design System: Extracciones",
+  "extensions": {
+    "colorMeta": {
+      "canvas": { "role": "neutral", "displayName": "Lienzo Gris", "canonical": "#f4f4f5", "tonalRamp": ["#09090b", "#18181b", "#27272a", "#3f3f46", "#71717a", "#a1a1aa", "#d4d4d8", "#f4f4f5"] },
+      "ink-strong": { "role": "primary", "displayName": "Tinta Negra de Trabajo", "canonical": "#09090b", "tonalRamp": ["#09090b", "#18181b", "#27272a", "#3f3f46", "#52525b", "#71717a", "#a1a1aa", "#d4d4d8"] },
+      "accent-focus": { "role": "secondary", "displayName": "Azul de Foco", "canonical": "#0369a1", "tonalRamp": ["#082f49", "#0c4a6e", "#075985", "#0369a1", "#0284c7", "#38bdf8", "#bae6fd", "#f0f9ff"] },
+      "danger-ink": { "role": "tertiary", "displayName": "Peligro", "canonical": "#991b1b", "tonalRamp": ["#450a0a", "#7f1d1d", "#991b1b", "#b91c1c", "#dc2626", "#f87171", "#fecaca", "#fef2f2"] },
+      "success-ink": { "role": "tertiary", "displayName": "Éxito", "canonical": "#065f46", "tonalRamp": ["#022c22", "#064e3b", "#065f46", "#047857", "#059669", "#34d399", "#a7f3d0", "#ecfdf5"] }
+    },
+    "typographyMeta": {
+      "headline": { "displayName": "Headline", "purpose": "Título de cada página." },
+      "body": { "displayName": "Body", "purpose": "Contenido de tablas, listas y formularios." },
+      "code": { "displayName": "Code", "purpose": "AX Code, typekeys y datos técnicos." }
+    },
+    "shadows": [
+      { "name": "floating", "value": "0 4px 16px rgba(0,0,0,0.06)", "purpose": "Solo menús desplegables y diálogos que flotan sobre el contenido." }
+    ],
+    "motion": [
+      { "name": "ease-state", "value": "150ms ease", "purpose": "Transiciones de borde y color en campos y botones." }
+    ],
+    "breakpoints": [
+      { "name": "md", "value": "768px" },
+      { "name": "xl", "value": "1280px" }
+    ]
+  },
+  "components": [
+    {
+      "name": "Primary Button",
+      "kind": "button",
+      "refersTo": "button-primary",
+      "description": "Acción principal de un formulario o panel.",
+      "html": "<button class=\"ds-btn-primary\" type=\"button\">Nueva extracción</button>",
+      "css": ".ds-btn-primary { min-height: 44px; padding: 10px 16px; background: #09090b; color: #fff; border: 0; border-radius: 8px; font: 600 14px Geist, Arial, sans-serif; cursor: pointer; transition: background 150ms ease; } .ds-btn-primary:hover { background: #27272a; } .ds-btn-primary:focus-visible { outline: 2px solid #18181b; outline-offset: 3px; }"
+    },
+    {
+      "name": "Secondary Button",
+      "kind": "button",
+      "refersTo": "button-secondary",
+      "description": "Acciones secundarias y de cancelación.",
+      "html": "<button class=\"ds-btn-secondary\" type=\"button\">Cancelar</button>",
+      "css": ".ds-btn-secondary { min-height: 44px; padding: 8px 16px; background: #fff; color: #18181b; border: 1px solid #d4d4d8; border-radius: 8px; font: 600 14px Geist, Arial, sans-serif; cursor: pointer; } .ds-btn-secondary:hover { background: #fafafa; } .ds-btn-secondary:focus-visible { outline: 2px solid #0369a1; outline-offset: 2px; }"
+    },
+    {
+      "name": "Text Field",
+      "kind": "input",
+      "refersTo": "input-field",
+      "description": "Campo de formulario con etiqueta.",
+      "html": "<label class=\"ds-label\" for=\"ax\">AX Code</label><input class=\"ds-input\" id=\"ax\" value=\"AX123456\">",
+      "css": ".ds-label { display: block; margin-bottom: 8px; color: #3f3f46; font: 600 14px Geist, Arial, sans-serif; } .ds-input { width: 100%; min-height: 44px; padding: 10px 12px; background: #fff; color: #18181b; border: 1px solid #d4d4d8; border-radius: 10px; font: 400 14px Geist, Arial, sans-serif; transition: border-color 150ms ease, box-shadow 150ms ease; } .ds-input:focus-visible { border-color: #18181b; outline: 2px solid #18181b; outline-offset: 2px; box-shadow: 0 0 0 3px rgba(24,24,27,0.08); }"
+    },
+    {
+      "name": "Nav Link",
+      "kind": "nav",
+      "refersTo": "button-primary",
+      "description": "Enlace de la barra superior; el activo se muestra como botón negro.",
+      "html": "<nav class=\"ds-nav\"><a class=\"ds-nav-active\" href=\"#\">Historial</a><a class=\"ds-nav-link\" href=\"#\">Aprobaciones</a></nav>",
+      "css": ".ds-nav { display: flex; gap: 8px; font: 600 14px Geist, Arial, sans-serif; } .ds-nav-active, .ds-nav-link { display: inline-flex; min-height: 44px; align-items: center; padding: 8px 12px; border-radius: 8px; text-decoration: none; } .ds-nav-active { background: #09090b; color: #fff; } .ds-nav-link { color: #3f3f46; } .ds-nav-link:hover { background: #e4e4e7; }"
+    },
+    {
+      "name": "Status Badge",
+      "kind": "chip",
+      "refersTo": "card",
+      "description": "Estado de una solicitud, siempre con texto.",
+      "html": "<span class=\"ds-badge ds-badge-ok\">Completada</span> <span class=\"ds-badge ds-badge-bad\">Fallida</span>",
+      "css": ".ds-badge { display: inline-flex; align-items: center; padding: 2px 10px; border-radius: 9999px; font: 600 12px Geist, Arial, sans-serif; } .ds-badge-ok { background: #ecfdf5; color: #065f46; } .ds-badge-bad { background: #fef2f2; color: #991b1b; }"
+    },
+    {
+      "name": "Card",
+      "kind": "card",
+      "refersTo": "card",
+      "description": "Contenedor plano con borde fino.",
+      "html": "<section class=\"ds-card\"><h2 class=\"ds-card-title\">Usuarios</h2><p class=\"ds-card-text\">Sincronizados con TimerTask.</p></section>",
+      "css": ".ds-card { padding: 24px; background: #fff; border: 1px solid #e4e4e7; border-radius: 12px; } .ds-card-title { margin: 0 0 8px; color: #18181b; font: 600 20px Geist, Arial, sans-serif; } .ds-card-text { margin: 0; color: #3f3f46; font: 400 14px Geist, Arial, sans-serif; }"
+    }
+  ],
+  "narrative": {
+    "northStar": "El Taller Ordenado",
+    "overview": "Un puesto de trabajo donde cada cosa tiene su sitio. La interfaz es neutra, plana y densa en información útil: el estado de cada solicitud se lee de un vistazo y nada compite con el trabajo. La identidad vive en los detalles precisos, no en el adorno.",
+    "keyCharacteristics": [
+      "Una sola familia tipográfica (Geist) con Geist Mono para códigos y metadatos técnicos.",
+      "Superficies planas con borde fino; la profundidad solo aparece en lo que flota.",
+      "Botón primario oscuro y sólido; el acento azul solo en foco y acciones secundarias.",
+      "Objetivos de 44 px de alto como mínimo en todo control.",
+      "Solo tema claro y solo escritorio (herramienta interna por VPN)."
+    ],
+    "rules": [
+      { "name": "The Quiet Accent Rule", "body": "El azul no decora. Solo marca foco y acciones secundarias; si aparece como relleno grande, sobra.", "section": "colors" },
+      { "name": "The Meaning-Only Color Rule", "body": "Rojo, verde y azul comunican estado. Nunca se usan para dar ambiente.", "section": "colors" },
+      { "name": "The Meta-Only Small Text Rule", "body": "El texto de 12 px es para metadatos. El contenido que el usuario necesita leer va en 14 px o más.", "section": "typography" },
+      { "name": "The Flat-By-Default Rule", "body": "En reposo, ninguna tarjeta ni tabla lleva sombra. Si necesitas separar, usa borde.", "section": "elevation" }
+    ],
+    "dos": [
+      "Do separar las superficies con un borde de 1 px (#e4e4e7) y no con sombra.",
+      "Do usar un radio de 8 px en botones, 10 px en campos y 12 px en tarjetas.",
+      "Do mantener todo control interactivo en 44 px de alto como mínimo.",
+      "Do dar a cada estado texto o icono además de color.",
+      "Do usar Geist Mono para AX Code, typekeys y otros datos técnicos.",
+      "Do respetar prefers-reduced-motion y mantener el foco siempre visible."
+    ],
+    "donts": [
+      "Don't usar shadow-sm, shadow-lg ni radios de 16 px (rounded-2xl) en tarjetas.",
+      "Don't usar azul, verde o rojo como decoración; solo comunican significado.",
+      "Don't poner texto de contenido en 12 px; ese tamaño es solo para metadatos.",
+      "Don't introducir degradados, emojis, glassmorphism ni fondos decorativos.",
+      "Don't diseñar para móvil ni crear tablas apiladas: la herramienta es de escritorio.",
+      "Don't repetir las clases de botón o de estado en línea; deben salir de componentes y tokens compartidos."
+    ]
+  }
+}
