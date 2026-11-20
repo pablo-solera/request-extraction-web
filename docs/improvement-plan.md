@@ -86,9 +86,6 @@ Rama: `feature/database-hardening`. Probar cada migración en un clon antes de p
 - [x] **2.8 Índices redundantes** (S) — `db/schema.ts`
   - `extractions_group_idx` pasa a `(request_group_id, created_at)`. Crear el nuevo antes de eliminar el antiguo.
   - Commit: `perf(db): replace redundant extraction indexes`
-- [x] **2.9 Rol de aplicación sin permisos DDL** (M)
-  - Rol de migración y rol de aplicación con `SELECT/INSERT/UPDATE`. Actualizar `docker-compose.yml`, `.env.example` y `README.md`.
-  - Commit: `feat(db): separate migration and application database roles`
 - [x] **2.10 Ajustes menores de base de datos** (S)
   - `drizzle.config.ts` no debe fallar al importarse sin `DATABASE_URL` en `generate`. Codificar la contraseña en `DATABASE_URL` de `docker-compose.yml`. Normalizar `fallback_email` a minúsculas en `findUserByFallbackEmail`. Valorar `now()` de la BD en `updated_at`.
   - Hecho: `drizzle.config.ts` ya no lanza al importarse; `DATABASE_URL_DOCKER` permite una URL ya codificada en Compose (que no puede codificar); `findUserByFallbackEmail` normaliza a minúsculas. `now()` de la BD en `updated_at` se descarta por ahora: implica tocar muchos `set({ updatedAt: new Date() })` sin ganancia relevante.
@@ -239,6 +236,7 @@ Rama: `feature/housekeeping`
 - Pasar LDAP a `ldaps://` o STARTTLS (sin TLS de red).
 - Limitar los intentos de login.
 - Restringir las cuentas de prueba en producción.
+- Rol de base de datos de aplicación sin permisos DDL (antigua tarea 2.9, ya implementada y retirada después): se quitó por decisión del usuario, junto con `DATABASE_MIGRATION_URL`, `POSTGRES_APP_USER`, `POSTGRES_APP_PASSWORD`, `db/roles/application-role.sql` y su sección del README. Los roles funcionales de la aplicación (admin, coordinador, empleado) no se guardan en la base de datos: se resuelven desde TimerTask en cada petición.
 - Todo lo específico de móvil y tablet: tablas apiladas, menú de navegación en móvil, filas del formulario en tablet.
 
 ## Notas
