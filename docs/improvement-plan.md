@@ -92,7 +92,7 @@ Rama: `feature/database-hardening`. Probar cada migración en un clon antes de p
 
 Rama: `feature/performance`. Consultar `node_modules/next/dist/docs/` antes de tocar APIs de Next.
 
-- [ ] **3.1 `Promise.all` en `getVerifiedUser`** (S) — `lib/auth/guards.ts:17-25`
+- [x] **3.1 `Promise.all` en `getVerifiedUser`** (S) — `lib/auth/guards.ts:17-25`
   - Paralelizar `resolveUserIdentities` y `resolveUserRole`.
   - Commit: `perf(auth): resolve identity and role in parallel`
 - [ ] **3.2 `Suspense` sobre el header del dashboard** (M) — `app/(dashboard)/layout.tsx:6`

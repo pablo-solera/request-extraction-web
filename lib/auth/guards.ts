@@ -14,15 +14,16 @@ export const getVerifiedUser = cache(async () => {
     return null;
   }
 
-   const user = await findUserById(session.id);
-   if (!user) return null;
-    const identity = (await resolveUserIdentities([user])).get(user.id);
-    return {
-      ...user,
-      email: identity?.email ?? user.fallbackEmail,
-      name: identity?.name ?? user.fallbackName,
-      role: await resolveUserRole(user),
-    };
+  const user = await findUserById(session.id);
+  if (!user) return null;
+  const [identities, role] = await Promise.all([resolveUserIdentities([user]), resolveUserRole(user)]);
+  const identity = identities.get(user.id);
+  return {
+    ...user,
+    email: identity?.email ?? user.fallbackEmail,
+    name: identity?.name ?? user.fallbackName,
+    role,
+  };
 });
 
 export async function requireUser() {
