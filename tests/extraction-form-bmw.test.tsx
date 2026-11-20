@@ -58,6 +58,13 @@ describe("extraction request stepper", () => {
     expect(axCode).toHaveAttribute("pattern", "[A-Za-z0-9]{3,4}");
   });
 
+  it("shows the AX code placeholder in normal case while the typed value is uppercase", () => {
+    render(<ExtractionForm />);
+    const input = screen.getAllByLabelText("Código AX")[0];
+    expect(input).toHaveAttribute("placeholder", "Ej.: 1XF");
+    expect(input).toHaveClass("uppercase", "placeholder:normal-case");
+  });
+
   it("keeps common data while navigating and shows the selected group manufacturers", async () => {
     const user = userEvent.setup();
     render(<ExtractionForm />);

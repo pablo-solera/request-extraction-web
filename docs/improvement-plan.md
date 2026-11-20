@@ -223,7 +223,7 @@ Rama: `feature/housekeeping`
   - Verificado en pantalla: serif en los `h1`, modo oscuro, badges, barra de progreso llena (tras corregir la clase `scale-x-0`), historial compacto con fila expandida, menú de usuario y menú de fila con anclaje nativo (el de fila se voltea hacia arriba si no cabe).
   - Corregido: el pie de página no bajaba al fondo (`min-h-full` en un `body` sin altura definida; fallo anterior a esta rama) → `min-h-dvh` en `app/(dashboard)/layout.tsx`.
   - Resuelto: el botón «Mostrar contraseña» se eliminó del login por decisión del usuario (no es necesario).
-  - Pendiente menor: el placeholder del Código AX sale en mayúsculas («EJ.: 1XF») y el de Edición IMC no («Ej.: 05/0»); uniformarlos.
+  - Resuelto: el placeholder del Código AX salía en mayúsculas por la clase `uppercase` del campo; se añadió `placeholder:normal-case` y un test.
   - No probado: el flujo completo de «Nueva extracción» (los readers BMW y Renault están caídos en este entorno), el diálogo de confirmación (solo aparece al cancelar o reanudar) y las pantallas de aprobación con solicitudes pendientes.
   - Nota de herramienta: el clic por referencia de agent-browser no abría la fila del historial; con `element.click()` desde `eval` sí. No es un fallo de la aplicación (la página está hidratada).
 
