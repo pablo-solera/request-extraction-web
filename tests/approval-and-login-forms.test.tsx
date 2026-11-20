@@ -29,17 +29,14 @@ describe("approval form", () => {
 });
 
 describe("login form", () => {
-  it("labels both fields and toggles the password visibility with a pressed button", async () => {
-    const user = userEvent.setup();
+  it("labels both fields and keeps the password hidden", () => {
     render(<LoginForm />);
     const password = screen.getByLabelText("Contraseña");
 
     expect(screen.getByLabelText("Email corporativo")).toBeInTheDocument();
     expect(password).toHaveAttribute("type", "password");
 
-    await user.click(screen.getByRole("button", { name: "Mostrar contraseña" }));
-    expect(password).toHaveAttribute("type", "text");
-    expect(screen.getByRole("button", { name: "Ocultar contraseña" })).toHaveAttribute("aria-pressed", "true");
+    expect(screen.queryByRole("button", { name: /contraseña/i })).not.toBeInTheDocument();
   });
 });
 

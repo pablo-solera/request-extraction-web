@@ -4,14 +4,12 @@ import { useActionState, useState } from "react";
 import { loginAction, type LoginFormState } from "@/app/(auth)/login/actions";
 import { SubmitButton } from "@/components/common/submit-button";
 import { Alert } from "@/components/ui/alert";
-import { Button } from "@/components/ui/button";
 
 const initialState: LoginFormState = {};
 
 export function LoginForm() {
   const [state, action] = useActionState(loginAction, initialState);
   const [email, setEmail] = useState<string | null>(null);
-  const [passwordVisible, setPasswordVisible] = useState(false);
 
   return (
     <form action={action} className="space-y-5">
@@ -38,11 +36,8 @@ export function LoginForm() {
           id="password"
           name="password"
           required
-          type={passwordVisible ? "text" : "password"}
+          type="password"
         />
-        <Button aria-pressed={passwordVisible} className="mt-2 min-h-11" onClick={() => setPasswordVisible((current) => !current)} variant="ghost">
-          {passwordVisible ? "Ocultar contraseña" : "Mostrar contraseña"}
-        </Button>
       </div>
       {state.error ? (
         <Alert role="alert" tone="danger">

@@ -149,7 +149,7 @@ Rama: `feature/ui-refresh`. Orden: tokens (4.1) antes de componentes (4.5) y de 
   - `aria-describedby` hacia `FieldError`, foco en el primer error, `<label>` visible en lugar de `aria-label` (también en `mercedes-model-selector.tsx:84,91`), `:user-invalid`, `pattern`/`minlength` en `axCode` e `imcEdition`, región `aria-live` con el número de resultados del buscador.
   - Commit: `fix(a11y): associate field errors and move focus to the first invalid field`
 - [x] **4.8 Copy y flujo** (S)
-  - `<Link>` en lugar de `<a href>` (`approvals/page.tsx:28`). Enfocar y exigir el comentario al rechazar (`approval-form.tsx`). Etiqueta corta del comentario. Etiquetas del login con `.field-label` y botón "Mostrar contraseña". Página de error con salida al inicio y `digest`. Título de paso por grupo en lugar de "Tiempos X". "Atrás" con `hidden` en lugar de `invisible`. Hora local en infraestructura. `aria-live` para "Guardando borrador…". `text-xs` solo en metadatos.
+  - `<Link>` en lugar de `<a href>` (`approvals/page.tsx:28`). Enfocar y exigir el comentario al rechazar (`approval-form.tsx`). Etiqueta corta del comentario. Etiquetas del login con `.field-label` (el botón "Mostrar contraseña" se descartó después). Página de error con salida al inicio y `digest`. Título de paso por grupo en lugar de "Tiempos X". "Atrás" con `hidden` en lugar de `invisible`. Hora local en infraestructura. `aria-live` para "Guardando borrador…". `text-xs` solo en metadatos.
   - Commit: `fix(ui): improve copy, links and flow in approvals, login and error pages`
 
 ### Pasadas de impeccable (cierre de la Fase 4)
@@ -222,7 +222,7 @@ Rama: `feature/housekeeping`
   - Hecho el 2026-11-20 con agent-browser sobre el servidor de producción (cuenta de prueba `test.manager`, rol admin; migraciones ya aplicadas). Inicio de sesión correcto, sin errores ni mensajes de consola en `/extractions`, `/history`, `/approvals`, `/admin/users` y `/admin/infrastructure`, en tema claro y oscuro.
   - Verificado en pantalla: serif en los `h1`, modo oscuro, badges, barra de progreso llena (tras corregir la clase `scale-x-0`), historial compacto con fila expandida, menú de usuario y menú de fila con anclaje nativo (el de fila se voltea hacia arriba si no cabe).
   - Corregido: el pie de página no bajaba al fondo (`min-h-full` en un `body` sin altura definida; fallo anterior a esta rama) → `min-h-dvh` en `app/(dashboard)/layout.tsx`.
-  - Pendiente menor: el botón «Mostrar contraseña» del login (variante `ghost`) tiene relleno horizontal y su texto queda desalineado con los campos.
+  - Resuelto: el botón «Mostrar contraseña» se eliminó del login por decisión del usuario (no es necesario).
   - Pendiente menor: el placeholder del Código AX sale en mayúsculas («EJ.: 1XF») y el de Edición IMC no («Ej.: 05/0»); uniformarlos.
   - No probado: el flujo completo de «Nueva extracción» (los readers BMW y Renault están caídos en este entorno), el diálogo de confirmación (solo aparece al cancelar o reanudar) y las pantallas de aprobación con solicitudes pendientes.
   - Nota de herramienta: el clic por referencia de agent-browser no abría la fila del historial; con `element.click()` desde `eval` sí. No es un fallo de la aplicación (la página está hidratada).
