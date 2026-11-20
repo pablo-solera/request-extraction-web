@@ -120,7 +120,7 @@ El sistema parte de un lienzo gris muy claro con superficies blancas, tinta casi
 - Superficies planas con borde fino; la profundidad solo aparece en lo que flota.
 - Botón primario oscuro y sólido; el acento azul solo en foco y acciones secundarias.
 - Objetivos de 44 px de alto como mínimo en todo control.
-- Solo tema claro y solo escritorio (herramienta interna por VPN).
+- Tema claro y oscuro según el sistema (`color-scheme: light dark`, sin selector manual) y solo escritorio (herramienta interna por VPN).
 
 ## Colors
 
@@ -150,6 +150,26 @@ Una paleta neutra de grises fríos (escala zinc) con un acento azul de uso muy e
 - **En curso** (#075985 sobre #f0f9ff): extracción en proceso.
 - **Incidencias** (#9a3412 sobre #fff7ed): completada con incidencias o respuesta inesperada. Es un estado propio, distinto de pendiente.
 - **Neutro** (#3f3f46 sobre #f4f4f5): cancelada, sin configurar.
+
+### Tema oscuro
+Cada token de `@theme` se declara como `light-dark(claro, oscuro)` y `:root` fija `color-scheme: light dark`, así que la interfaz sigue el tema del sistema sin JavaScript ni parpadeo. El oscuro mantiene "El Taller Ordenado": superficies planas con borde fino, sin sombras en reposo.
+
+| Token | Claro | Oscuro |
+|---|---|---|
+| canvas / surface / surface-sunken | #f4f4f5 / #ffffff / #fafafa | #09090b / #18181b / #111113 |
+| ink / ink-strong / ink-secondary / ink-muted | #18181b / #09090b / #3f3f46 / #52525b | #f4f4f5 / #fafafa / #d4d4d8 / #a1a1aa |
+| line / line-soft / hover-fill | #d4d4d8 / #e4e4e7 / #27272a | #52525b / #27272a / #d4d4d8 |
+| focus / accent-ink / accent-wash | #0369a1 / #0c4a6e / #f0f9ff | #38bdf8 / #7dd3fc / #082f49 |
+| pending ink / wash / line | #92400e / #fffbeb / #fde68a | #fcd34d / #271c08 / #78350f |
+| running | #075985 / #f0f9ff / #bae6fd | #7dd3fc / #0a2538 / #075985 |
+| success | #065f46 / #ecfdf5 / #a7f3d0 | #6ee7b7 / #0a2419 / #065f46 |
+| danger | #991b1b / #fef2f2 / #fecaca | #fca5a5 / #2a1010 / #7f1d1d |
+| issue | #9a3412 / #fff7ed / #fed7aa | #fdba74 / #2a1608 / #7c2d12 |
+| info | #1d4ed8 / #eff6ff / #bfdbfe | #93c5fd / #0f1d3a / #1e40af |
+| neutral | #3f3f46 / #f4f4f5 / #d4d4d8 | #d4d4d8 / #1f1f23 / #3f3f46 |
+| scrim (fondo de diálogo) | tinta al 40 % | negro al 65 % |
+
+El botón primario se invierte solo (`ink-strong` pasa a casi blanco y su texto `surface` a casi negro). `tests/color-tokens.test.ts` exige que cada token tenga par claro/oscuro y que los pares de texto cumplan AA (4,5:1) en ambos temas.
 
 Cada par tiene además un borde (`*-line`) de un tono más claro. Todos están definidos como tokens en `@theme` de `app/globals.css` (`--color-pending-ink`, `--color-pending-wash`, `--color-pending-line`, etc.) y se consumen con utilidades como `bg-success-wash` o `text-danger-ink`.
 

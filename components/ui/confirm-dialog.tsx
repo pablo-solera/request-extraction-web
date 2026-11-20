@@ -26,7 +26,7 @@ export function ConfirmDialog({ options, onResolve }: { options: ConfirmOptions 
   return <dialog
     aria-describedby={descriptionId}
     aria-labelledby={titleId}
-    className="m-auto w-full max-w-md rounded-xl border border-line-soft bg-surface p-6 text-ink shadow-floating backdrop:bg-ink-strong/40"
+    className="m-auto w-full max-w-md rounded-xl border border-line-soft bg-surface p-6 text-ink shadow-floating backdrop:bg-scrim"
     onClose={(event) => {
       const confirmed = event.currentTarget.returnValue === "confirm";
       event.currentTarget.returnValue = "";
