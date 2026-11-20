@@ -58,7 +58,7 @@ Rama: `feature/database-hardening`. Probar cada migración en un clon antes de p
 - [x] **2.1 Índice para `findLoadedTable`** (S) — `lib/transformer/repository.ts:26-35`
   - `CREATE INDEX` sobre `(brand, imc_edition, upper(ax_code))` parcial (`manufacturer_group='BMW'` y `load_status IN ('queued','running','completed')`). `CONCURRENTLY` no puede ir en la transacción de `drizzle-kit migrate`: usar índice normal (tabla pequeña) o un archivo fuera de transacción.
   - Commit: `perf(db): add index for loaded table lookup`
-- [ ] **2.2 Índices parciales de "listas para cargar/informe"** (S) — `repository.ts:16-17,183-184`
+- [x] **2.2 Índices parciales de "listas para cargar/informe"** (S) — `repository.ts:16-17,183-184`
   - `(created_at) WHERE status='approved' AND manufacturer_group='BMW' AND load_status IS NULL` y el equivalente de Mercedes con `report_status IS NULL`.
   - Commit: `perf(db): add partial indexes for reconciliation queries`
 - [ ] **2.3 Paginación de los listados** (M) — `lib/extractions/repository.ts:257-278,316-324`

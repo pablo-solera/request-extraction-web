@@ -141,6 +141,13 @@
       "when": 1785177630000,
       "tag": "0030_loaded_table_lookup_idx",
       "breakpoints": true
+    },
+    {
+      "idx": 20,
+      "version": "7",
+      "when": 1785177631000,
+      "tag": "0031_ready_requests_partial_idx",
+      "breakpoints": true
     }
   ]
 }
