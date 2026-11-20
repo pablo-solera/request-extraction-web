@@ -89,7 +89,7 @@ export function MercedesModelSelector({ initialSeries, selected, onSeriesChange,
   const failure = currentSeries?.error || currentModels?.error || "";
 
   return <div className="space-y-4">
-    <div className="grid gap-4 md:grid-cols-2">
+    <div className="grid grid-cols-2 gap-4">
       <div>
         <label className="field-label" htmlFor={`${id}-series`}>Serie</label>
         <select className="field-control" disabled={!currentSeries || Boolean(currentSeries.error) || currentSeries.data.length === 0} id={`${id}-series`} onChange={(event) => changeSeries(event.target.value)} value={series}>

@@ -58,7 +58,7 @@ export default async function ExtractionsPage({ searchParams }: { searchParams: 
     if (items) initialValues = seedFromExtractions(items);
   }
   return (
-    <div className="space-y-7">
+    <div className="space-y-6">
       <PageHeader>
         <PageHeader.Title>Nueva extracción</PageHeader.Title>
         <PageHeader.Description>Prepara y realiza una exportación técnica desde un único formulario.</PageHeader.Description>

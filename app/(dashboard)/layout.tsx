@@ -8,7 +8,7 @@ export default function DashboardLayout({ children }: { children: React.ReactNod
       <Suspense fallback={<DashboardHeaderFallback />}>
         <DashboardHeader />
       </Suspense>
-      <main className="mx-auto w-full max-w-6xl flex-1 px-4 py-8 sm:px-6" id="main-content" tabIndex={-1}>
+      <main className="mx-auto w-full max-w-6xl flex-1 px-6 py-8" id="main-content" tabIndex={-1}>
         {children}
       </main>
       <AppFooter />

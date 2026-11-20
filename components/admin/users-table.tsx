@@ -47,7 +47,7 @@ export function UsersTable({ currentUserId, page, query, totalPages, totalUsers,
   }, [debouncedSearch, pathname, query, router]);
 
   return <div className="rounded-xl border border-line-soft bg-surface p-6">
-    <div className="flex flex-col gap-4 sm:flex-row sm:items-start sm:justify-between"><div><h2 className="text-title font-semibold text-ink-strong">Usuarios</h2><p className="mt-1 text-body text-ink-muted">Los roles y coordinadores vienen de TimerTask.</p></div><SyncUsersButton /></div>
+    <div className="flex items-start justify-between gap-4"><div><h2 className="text-title font-semibold text-ink-strong">Usuarios</h2><p className="mt-1 text-body text-ink-muted">Los roles y coordinadores vienen de TimerTask.</p></div><SyncUsersButton /></div>
     <form aria-busy={isPending} className="mt-5 max-w-md" onSubmit={(event) => event.preventDefault()}><label className="block space-y-2"><span className="text-body font-medium text-ink-secondary">Buscar usuarios</span><input autoComplete="off" id="admin-user-search" name="query" className="field-control" onChange={(event) => setSearch(event.target.value)} placeholder="Nombre, email, rol o coordinador…" spellCheck={false} type="search" value={search} /></label></form>
     <p className="sr-only" role="status">{totalUsers} {totalUsers === 1 ? "usuario" : "usuarios"} encontrados.</p>
     {totalUsers === 0 ? <div className="mt-6 rounded-xl border border-dashed border-line px-6 py-12 text-center"><p className="text-body text-ink-secondary">No hay usuarios que coincidan con la búsqueda.</p><button className={buttonStyles("secondary", "mt-3")} onClick={() => setSearch("")} type="button">Limpiar búsqueda</button></div> : <>

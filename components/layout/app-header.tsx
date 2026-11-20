@@ -6,14 +6,14 @@ import type { UserRole } from "@/lib/auth/session";
 export function AppHeader({ user }: { user: { email: string | null; name: string | null; role: UserRole } }) {
   return (
     <header className="border-b border-line-soft bg-surface">
-      <div className="mx-auto flex w-full max-w-6xl flex-wrap items-center justify-between gap-3 px-4 py-4 sm:px-6">
+      <div className="mx-auto flex w-full max-w-6xl flex-wrap items-center justify-between gap-3 px-6 py-4">
         <div className="flex items-center gap-4">
           <Link className="cursor-pointer text-title font-semibold text-ink-strong" href="/extractions">
             Extracciones
           </Link>
         </div>
-        <div className="flex max-w-full items-center gap-2 sm:gap-4">
-          <nav aria-label="Principal" className="flex max-w-[calc(100vw-9rem)] items-center gap-1 overflow-x-auto overscroll-x-contain text-body sm:max-w-none sm:gap-2">
+        <div className="flex items-center gap-4">
+          <nav aria-label="Principal" className="flex items-center gap-2 text-body">
             <ActiveNavLink href="/extractions" section>Nueva extracción</ActiveNavLink>
             <ActiveNavLink href="/history">Historial</ActiveNavLink>
             {user.role !== "employee" ? <ActiveNavLink href="/approvals">Aprobaciones</ActiveNavLink> : null}

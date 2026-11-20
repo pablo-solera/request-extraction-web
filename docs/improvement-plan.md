@@ -180,8 +180,9 @@ Contexto ya creado: `PRODUCT.md`, `DESIGN.md` y `.impeccable/design.json` (coman
 - [x] **4.13 `harden`** (S) — estados vacíos, de error y de carga del historial, aprobaciones y administración
   - Commit: `fix(ui): harden empty, error and loading states`
   - Hecho: `history/actions.ts` estaba guardado en Latin-1 (los acentos de los mensajes salían como `�`) y registraba el objeto de error completo; ahora es UTF-8 y usa `describeError`. El historial ofrece «Reintentar» tras un fallo de búsqueda o de «Cargar más» y avisa de que el filtro solo cubre lo cargado cuando quedan solicitudes sin cargar. Aprobaciones gana «Volver a la primera página» al paginar y un vacío específico en páginas posteriores. Ya existían y se revisan sin cambios: esqueletos de `loading.tsx` en historial, aprobaciones, usuarios e infraestructura, vacío del historial y de usuarios, error de sincronización y límite de errores del dashboard.
-- [ ] **4.14 `polish`** (S) — pasada final de toda la interfaz
+- [x] **4.14 `polish`** (S) — pasada final de toda la interfaz
   - Commit: `style(ui): final polish pass`
+  - Hecho: ritmo vertical único entre secciones (`space-y-6`, antes 6, 7 y 8 según la página, también en los esqueletos); eliminados los restos de móvil y tablet (`sm:`, `md:`, `lg:`, el ancho calculado del menú con desplazamiento) y las rejillas quedan fijas para escritorio.
 - [ ] **4.15 Detector** (S)
   - `impeccable.cmd detect --json --changed` sobre la interfaz terminada, una sola vez. Arreglar los hallazgos reales y anotar los falsos positivos en `.impeccable/critique/ignore.md`.
   - Commit: `style(ui): resolve design detector findings`
