@@ -384,7 +384,7 @@ export function ExtractionHistory({ createdId, openId, draftKey = "extraction-dr
                 <dl className="grid grid-cols-5 gap-x-6 gap-y-3">
                   <div><dt className="text-meta text-ink-muted">Edición IMC</dt><dd className="mt-0.5 text-body font-medium text-ink" translate="no">{first.imcEdition}</dd></div>
                   <div><dt className="text-meta text-ink-muted">Inicio del desarrollo</dt><dd className="mt-0.5 text-body font-medium text-ink">{first.developmentStart ? formatSpanishDate(first.developmentStart) : "—"}</dd></div>
-                  <div><dt className="text-meta text-ink-muted">Completion</dt><dd className="mt-0.5 text-body font-medium text-ink">{formatSpanishDate(first.completion)}</dd></div>
+                  <div><dt className="text-meta text-ink-muted">Fecha de finalización</dt><dd className="mt-0.5 text-body font-medium text-ink">{formatSpanishDate(first.completion)}</dd></div>
                   <div><dt className="text-meta text-ink-muted">{noun === "familia" ? "Familias" : noun === "modelo" ? "Modelos" : "Typekeys"}</dt><dd className="mt-0.5 text-body font-medium text-ink">{groupRows.length}</dd></div>
                   <div><dt className="text-meta text-ink-muted">Solicitada</dt><dd className="mt-0.5 text-body font-medium text-ink"><time dateTime={first.createdAt}>{formatSpanishDateTime(first.createdAt)}</time>{first.requesterName ? ` · ${first.requesterName}` : ""}</dd></div>
                 </dl>

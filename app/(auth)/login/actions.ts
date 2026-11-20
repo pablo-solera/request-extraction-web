@@ -33,7 +33,7 @@ export async function loginAction(
     user = await authenticate(parsed.data.email, parsed.data.password);
   } catch (error) {
     if (error instanceof LdapUnavailableError) {
-      return { error: "El servicio de autenticación no está disponible.", email: parsed.data.email };
+      return { error: "El servicio de autenticación no está disponible. Inténtalo de nuevo en unos minutos; si continúa, avisa a soporte.", email: parsed.data.email };
     }
 
     console.error("Login failed because an internal dependency is unavailable.", describeError(error));

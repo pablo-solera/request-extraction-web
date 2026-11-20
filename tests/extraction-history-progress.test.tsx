@@ -144,7 +144,7 @@ describe("grouped request history", () => {
     expect(screen.getByText("2 de 3 typekeys completados · 1 fallido")).toBeInTheDocument();
     expect(screen.getByText("Edición IMC").parentElement).toHaveTextContent("05/0");
     expect(screen.getByText("Inicio del desarrollo")).toBeInTheDocument();
-    expect(screen.getByText("Completion")).toBeInTheDocument();
+    expect(screen.getByText("Fecha de finalización")).toBeInTheDocument();
   });
 
   it("offers to repeat the whole request once nothing is running, even when everything completed", () => {
