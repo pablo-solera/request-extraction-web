@@ -13,3 +13,12 @@ describe("migration journal", () => {
     });
   });
 });
+
+describe("audit log foreign key", () => {
+  it("restricts deletion of extractions that have action logs", async () => {
+    const { extractionActionLogs } = await import("@/db/schema");
+    const { getTableConfig } = await import("drizzle-orm/pg-core");
+    const fk = getTableConfig(extractionActionLogs).foreignKeys.find((key) => key.reference().columns[0].name === "extraction_id");
+    expect(fk?.onDelete).toBe("restrict");
+  });
+});

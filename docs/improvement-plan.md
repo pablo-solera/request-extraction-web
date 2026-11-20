@@ -74,7 +74,7 @@ Rama: `feature/database-hardening`. Probar cada migración en un clon antes de p
 - [x] **2.6 Advisory lock de 64 bits** (S) — `lib/extractions/repository.ts:37`
   - Sustituir `hashtext(userId)` por `hashtextextended(userId, 0)`.
   - Commit: `fix(extractions): use 64-bit advisory lock key`
-- [ ] **2.7 `RESTRICT` en el FK de los logs de auditoría** (S) — `db/schema.ts:96,137,157,173`
+- [x] **2.7 `RESTRICT` en el FK de los logs de auditoría** (S) — `db/schema.ts:96,137,157,173`
   - `extraction_action_logs.extraction_id` pasa a `RESTRICT`. Migración con `NOT VALID` y luego `VALIDATE`.
   - Commit: `fix(db): protect audit logs from cascade deletion`
 - [ ] **2.8 Índices redundantes** (S) — `db/schema.ts`

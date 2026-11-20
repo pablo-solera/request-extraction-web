@@ -148,6 +148,13 @@
       "when": 1785177631000,
       "tag": "0031_ready_requests_partial_idx",
       "breakpoints": true
+    },
+    {
+      "idx": 21,
+      "version": "7",
+      "when": 1785177632000,
+      "tag": "0032_action_logs_restrict_fk",
+      "breakpoints": true
     }
   ]
 }

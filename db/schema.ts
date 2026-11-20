@@ -173,7 +173,7 @@ export const mailNotifications = pgTable("mail_notifications", {
 
 export const extractionActionLogs = pgTable("extraction_action_logs", {
   id: uuid("id").defaultRandom().primaryKey(),
-  extractionId: uuid("extraction_id").notNull().references(() => extractions.id, { onDelete: "cascade" }),
+  extractionId: uuid("extraction_id").notNull().references(() => extractions.id, { onDelete: "restrict" }),
   actorId: uuid("actor_id").notNull().references(() => users.id, { onDelete: "restrict" }),
   action: text("action").notNull(),
   outcome: text("outcome").notNull(),
