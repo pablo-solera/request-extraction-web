@@ -140,7 +140,7 @@ Rama: `feature/ui-refresh`. Orden: tokens (4.1) antes de componentes (4.5) y de 
 - [x] **4.7 Accesibilidad del formulario por pasos** (S–M) — `extraction-stepper-form.tsx:494-497,149-150`
   - `aria-describedby` hacia `FieldError`, foco en el primer error, `<label>` visible en lugar de `aria-label` (también en `mercedes-model-selector.tsx:84,91`), `:user-invalid`, `pattern`/`minlength` en `axCode` e `imcEdition`, región `aria-live` con el número de resultados del buscador.
   - Commit: `fix(a11y): associate field errors and move focus to the first invalid field`
-- [ ] **4.8 Copy y flujo** (S)
+- [x] **4.8 Copy y flujo** (S)
   - `<Link>` en lugar de `<a href>` (`approvals/page.tsx:28`). Enfocar y exigir el comentario al rechazar (`approval-form.tsx`). Etiqueta corta del comentario. Etiquetas del login con `.field-label` y botón "Mostrar contraseña". Página de error con salida al inicio y `digest`. Título de paso por grupo en lugar de "Tiempos X". "Atrás" con `hidden` en lugar de `invisible`. Hora local en infraestructura. `aria-live` para "Guardando borrador…". `text-xs` solo en metadatos.
   - Commit: `fix(ui): improve copy, links and flow in approvals, login and error pages`
 

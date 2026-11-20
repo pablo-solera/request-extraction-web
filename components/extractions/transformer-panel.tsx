@@ -38,11 +38,11 @@ function ReportSection({ allCompleted, busy, info, onRetry, requestGroupId }: { 
 
 function ComparisonRow({ comparison }: { comparison: TransformerComparisonInfo }) {
   return <li className="flex flex-wrap items-center gap-x-3 gap-y-1 py-2 text-sm">
-    <span className="min-w-0 break-all font-mono text-xs text-zinc-800">{comparison.filename}</span>
+    <span className="min-w-0 break-all font-mono text-code text-zinc-800">{comparison.filename}</span>
     <time className="text-xs text-zinc-500" dateTime={comparison.createdAt}>{formatSpanishDateTime(comparison.createdAt)}</time>
     <Badge tone={comparisonTones[comparison.status]}>{comparisonLabels[comparison.status]}</Badge>
     {comparison.downloadReady ? <a className="text-sm font-medium text-sky-800 underline underline-offset-2" href={`/api/comparisons/${comparison.id}/download`}>Descargar Excel</a> : null}
-    {comparison.error ? <span className="w-full break-words text-xs text-red-700">{comparison.error}</span> : null}
+    {comparison.error ? <span className="w-full break-words text-body text-danger-ink">{comparison.error}</span> : null}
   </li>;
 }
 

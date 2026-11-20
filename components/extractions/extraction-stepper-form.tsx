@@ -165,9 +165,9 @@ function BmwOptionField({
     {onAddMultiple ? <div className="mt-3 rounded-lg border border-zinc-200 bg-white p-3">
       <label><span className="field-label">Pegar varios typekeys</span><textarea className="field-control min-h-20 resize-y font-mono" disabled={!url || loading || Boolean(message) || options.length === 0} onChange={(event) => setPasteValue(event.target.value)} placeholder="Ej.: 11EH, 41HZ, 51HY" value={pasteValue} /></label>
       <div className="mt-2 flex flex-wrap items-center gap-3"><Button disabled={!pasteValue.trim() || loading || options.length === 0} onClick={addPastedTypekeys}>Añadir typekeys</Button><span className="text-xs text-zinc-500">Separados por espacios, comas o punto y coma</span></div>
-      {pasteMessage ? <p className="mt-2 text-xs text-zinc-600" role="status">{pasteMessage}</p> : null}
+      {pasteMessage ? <p className="mt-2 text-body text-zinc-600" role="status">{pasteMessage}</p> : null}
     </div> : null}
-    {message ? <div className="mt-2 flex items-center gap-2 text-xs text-red-700" role="status"><span>{message}</span><button className="font-semibold underline underline-offset-2" onClick={() => setRetry((current) => current + 1)} type="button">Reintentar</button></div> : null}
+    {message ? <div className="mt-2 flex items-center gap-2 text-body text-danger-ink" role="status"><span>{message}</span><button className="font-semibold underline underline-offset-2" onClick={() => setRetry((current) => current + 1)} type="button">Reintentar</button></div> : null}
   </div>;
 }
 
@@ -488,7 +488,7 @@ export function ExtractionStepperForm({
     return fieldError(state, localErrors, `vehicle.${index}.${field}`);
   }
 
-  const summaryTitle = group === "BMW" ? `Tiempos ${brand}` : `Tiempos ${brand}`;
+  const summaryTitle = group === "BMW" ? "Serie y typekeys" : group === "Mercedes" ? "Serie y modelos" : "Familias";
 
   return <form action={action} className="overflow-hidden rounded-xl border border-zinc-200 bg-white" ref={formRef}>
     {confirmDialog}
@@ -497,7 +497,7 @@ export function ExtractionStepperForm({
       <nav aria-label="Progreso de la solicitud">
         <ol className="flex items-center">
           {STEP_TITLES.map((title, index) => <li className={`flex min-w-0 items-center ${index < STEP_TITLES.length - 1 ? "flex-1" : ""}`} key={title}>
-            <button aria-current={step === index ? "step" : undefined} className={`flex min-h-11 shrink-0 items-center gap-3 rounded-lg text-xs transition-colors sm:text-sm ${step === index ? "font-semibold text-zinc-950" : index < step ? "text-zinc-800 hover:text-sky-800" : "cursor-not-allowed text-zinc-500"}`} disabled={index > step} onClick={() => goToStep(index)} type="button">
+            <button aria-current={step === index ? "step" : undefined} className={`flex min-h-11 shrink-0 items-center gap-3 rounded-lg text-body transition-colors ${step === index ? "font-semibold text-zinc-950" : index < step ? "text-zinc-800 hover:text-sky-800" : "cursor-not-allowed text-zinc-500"}`} disabled={index > step} onClick={() => goToStep(index)} type="button">
               <span className={`flex size-8 shrink-0 items-center justify-center rounded-full border text-sm font-medium tabular-nums ${step === index ? "border-2 border-sky-700 bg-white text-sky-800" : index < step ? "border-sky-700 bg-sky-700 text-white" : "border-zinc-400 bg-white text-zinc-700"}`}>{index < step ? <svg aria-hidden="true" className="size-4" fill="none" stroke="currentColor" strokeLinecap="round" strokeLinejoin="round" strokeWidth="3" viewBox="0 0 24 24"><path d="M5 12.5l4.5 4.5L19 7.5" /></svg> : index + 1}</span>
               <span className={step === index ? "inline" : "hidden sm:inline"}>{title}</span>{index < step ? <span className="sr-only"> (completado)</span> : null}
             </button>
@@ -526,7 +526,7 @@ export function ExtractionStepperForm({
             {(["BMW", "Renault", "Mercedes"] as const).map((option) => <button aria-pressed={group === option} className={`min-h-16 rounded-xl border px-4 py-3 text-left text-sm font-semibold transition-colors ${group === option ? "border-sky-700 bg-sky-50 text-sky-950" : "border-zinc-300 bg-white text-zinc-800 hover:bg-zinc-50"}`} key={option} onClick={() => void selectGroup(option)} type="button">{option === "BMW" ? "BMW Group" : option === "Renault" ? "Renault Group" : "Mercedes-Benz Group"}</button>)}
             <button aria-describedby="vag-disabled-description" aria-disabled="true" className="min-h-16 cursor-not-allowed rounded-xl border border-zinc-200 bg-zinc-100 px-4 py-3 text-left text-sm font-semibold text-zinc-500" disabled type="button">VAG <span className="mt-1 block text-xs font-normal">Deshabilitado</span></button>
           </div>
-          <p className="text-xs text-zinc-500" id="vag-disabled-description">El reader VAG está disponible, pero las solicitudes siguen deshabilitadas en este formulario. Incluye Volkswagen, Audi, Škoda y SEAT.</p>
+          <p className="text-body text-zinc-600" id="vag-disabled-description">El reader VAG está disponible, pero las solicitudes siguen deshabilitadas en este formulario. Incluye Volkswagen, Audi, Škoda y SEAT.</p>
         </fieldset>
         {group ? <fieldset className="space-y-3"><legend className="field-label">Fabricante</legend><div className="flex flex-wrap gap-2">{BRAND_OPTIONS[group].map((option) => <button aria-pressed={brand === option} className={`min-h-11 rounded-lg border px-4 py-2 text-sm font-semibold transition-colors ${brand === option ? "border-sky-700 bg-sky-700 text-white" : "border-zinc-300 bg-white text-zinc-800 hover:bg-zinc-50"}`} key={option} onClick={() => void selectBrand(option)} type="button">{option}</button>)}</div></fieldset> : <p className="text-sm text-zinc-600">Selecciona un grupo para ver sus fabricantes.</p>}
         {stepError ? <p className="text-sm text-red-700" role="alert">{stepError}</p> : null}
@@ -592,7 +592,7 @@ export function ExtractionStepperForm({
       <input name="confirmReplace" type="hidden" value={replacesTable && replaceConfirmed ? "true" : "false"} />
       <input name="vehicles" type="hidden" value={JSON.stringify(vehicles)} />
       <div className="flex flex-col-reverse gap-3 sm:flex-row sm:items-center sm:justify-between">
-        <div className="flex items-center gap-2"><Button className="disabled:invisible" disabled={step === 0} onClick={() => { setStep((current) => Math.max(0, current - 1)); clearValidation(); }} variant="ghost">Atrás</Button><span className="text-xs text-zinc-500">{draftReady ? draftSaved ? "Borrador guardado" : "Guardando borrador…" : "Cargando borrador…"}</span></div>
+        <div className="flex items-center gap-2"><Button hidden={step === 0} onClick={() => { setStep((current) => Math.max(0, current - 1)); clearValidation(); }} variant="ghost">Atrás</Button><span aria-live="polite" className="text-meta text-ink-muted" role="status">{draftReady ? draftSaved ? "Borrador guardado" : "Guardando borrador…" : "Cargando borrador…"}</span></div>
         {step < 3 ? <Button aria-busy={checking !== null} disabled={checking !== null} onClick={nextStep} variant="primary">{checking ? `Comprobando disponibilidad (${checking.done}/${checking.total})…` : "Continuar"}</Button> : <SubmitButton className="sm:min-w-52" disabled={unavailableTypekeys.length > 0 || (replacesTable && !replaceConfirmed)} pendingLabel="Iniciando…">Iniciar extracción</SubmitButton>}
       </div>
     </div>

@@ -77,8 +77,8 @@ function ExtractionActions({ confirm, item, detailsExpanded, onToggleDetails, on
         {item.canForceResume ? <p className="px-3 pb-2 text-meta text-ink-muted">Recupera una extracción que el reader detecta atascada; conserva los typekeys ya completados.</p> : null}
       </>}</PopoverMenu> : null}
     </div>
-    {busy ? <span className="text-meta text-ink-muted" role="status">Procesando…</span> : null}
-    {feedback ? <p className="max-w-56 text-right text-meta text-ink-muted" role="status">{feedback}</p> : null}
+    {busy ? <span className="text-body text-ink-muted" role="status">Procesando…</span> : null}
+    {feedback ? <p className="max-w-56 text-right text-body text-ink-muted" role="status">{feedback}</p> : null}
   </div>;
 }
 
@@ -111,8 +111,8 @@ function RequestActions({ confirm, items, onUpdated }: { confirm: Confirm; items
     {cancellable.length ? <button className={buttonStyles("danger")} disabled={busy} onClick={() => void runAll("cancel", cancellable)} type="button">Cancelar solicitud</button> : null}
     {resumable.length ? <button className={buttonStyles("secondary")} disabled={busy} onClick={() => void runAll("resume", resumable)} type="button">Reanudar fallidos</button> : null}
     {canRepeat ? <Link className={buttonStyles("secondary")} href={`/extractions?request=${encodeURIComponent(items[0]!.requestGroupId)}`}>Volver a solicitar</Link> : null}
-    {busy ? <span className="text-xs text-zinc-600" role="status">Procesando…</span> : null}
-    {feedback ? <span className="text-xs text-zinc-600" role="status">{feedback}</span> : null}
+    {busy ? <span className="text-body text-ink-muted" role="status">Procesando…</span> : null}
+    {feedback ? <span className="text-body text-ink-muted" role="status">{feedback}</span> : null}
   </div>;
 }
 
