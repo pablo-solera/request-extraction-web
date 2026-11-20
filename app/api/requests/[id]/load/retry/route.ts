@@ -3,6 +3,7 @@ import { requireApiIdentity } from "@/lib/auth/guards";
 import { rejectCrossOrigin } from "@/lib/security/origin";
 import { ReaderError } from "@/lib/readers/errors";
 import { retryRequestLoad } from "@/lib/transformer/service";
+import { describeError } from "@/lib/logging/describe-error";
 
 const privateHeaders = { "Cache-Control": "private, no-store, max-age=0" };
 
@@ -21,7 +22,7 @@ export async function POST(request: Request, context: RouteContext<"/api/request
     return Response.json({ ok: true }, { status: 202, headers: privateHeaders });
   } catch (error) {
     if (error instanceof ReaderError) return Response.json({ error: { code: error.code, message: error.message } }, { status: error.status ?? 502, headers: privateHeaders });
-    console.error("Transformer load retry failed.", error);
+    console.error("Transformer load retry failed.", describeError(error));
     return Response.json({ error: { code: "RETRY_FAILED", message: "No se ha podido reintentar la carga." } }, { status: 502, headers: privateHeaders });
   }
 }

@@ -32,6 +32,7 @@ import { getRenaultLabourFamilies } from "@/lib/readers/renault/client";
 import { findCoordinatorTeamUserIds, findCoordinatorUser, isUserInCoordinatorTeam } from "@/lib/employees/org-service";
 import type { UserRole } from "@/lib/auth/session";
 import type { RenaultState } from "@/lib/readers/renault/types";
+import { describeError } from "@/lib/logging/describe-error";
 
 export function mapReaderStatus(state: RenaultState): ExtractionStatus {
   return mapRenaultReaderStatus(state);
@@ -55,7 +56,7 @@ async function submitExtraction(extraction: Extraction, context?: Awaited<Return
     const readerError = error instanceof ReaderError ? error : null;
     // A temporary reader problem is not the technician's failure: hand the submission back and let the reconciliation try again.
     if (readerError?.retryable && claimed.attemptCount < MAX_SUBMISSION_ATTEMPTS && await releaseSubmission(claimed.id, claimed.submittedAt!)) return claimed;
-    if (error instanceof ReaderError && error.code === "READER_CONFIGURATION_ERROR") console.error("Reader integration configuration is invalid.", error);
+    if (error instanceof ReaderError && error.code === "READER_CONFIGURATION_ERROR") console.error("Reader integration configuration is invalid.", describeError(error));
     const failed = await markSubmissionFailed(claimed.id, claimed.submittedAt!, {
       errorCode: readerError?.code ?? "INTERNAL_ERROR",
       errorMessage: readerError?.message ?? "No se ha podido iniciar la extracción.",
@@ -145,8 +146,8 @@ async function syncExtraction(extraction: Extraction) {
       ...(status === "completed" && remote.dataDate ? { dataDate: remote.dataDate } : {}),
     });
     if (status === "completed") {
-      await startLoadForRequest(extraction.requestGroupId).catch((error) => console.error("Transformer load could not be started.", error));
-      await startReportForRequest(extraction.requestGroupId).catch((error) => console.error("Transformer report could not be started.", error));
+      await startLoadForRequest(extraction.requestGroupId).catch((error) => console.error("Transformer load could not be started.", describeError(error)));
+      await startReportForRequest(extraction.requestGroupId).catch((error) => console.error("Transformer report could not be started.", describeError(error)));
     }
     if (status === "completed" || status === "failed" || status === "cancelled") await notifyExtractionFailures(extraction.requestGroupId);
     return updated;
@@ -222,7 +223,7 @@ export async function performExtractionAction(
     try {
       await recordExtractionAction({ extractionId: id, actorId: actor.id, action: auditAction, outcome, readerStatus });
     } catch (error) {
-      console.error("Extraction action audit could not be saved.", error);
+      console.error("Extraction action audit could not be saved.", describeError(error));
     }
   };
 

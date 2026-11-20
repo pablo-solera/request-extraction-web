@@ -14,6 +14,7 @@ import type { TransformerRequestInfo } from "@/lib/transformer/info";
 import type { TransformerState } from "@/lib/transformer/types";
 import type { UserRole } from "@/lib/auth/session";
 import { notifyComparisonFailed, notifyLoadCompleted, notifyLoadFailed, notifyReportFailed, retryPendingNotifications } from "@/lib/mail/notifications";
+import { describeError } from "@/lib/logging/describe-error";
 
 type Actor = { id: string; oracleEmpId: number | null; role: UserRole };
 
@@ -307,13 +308,13 @@ async function requireManageableRequest(requestGroupId: string, actor: Actor) {
 export async function retryRequestLoad(requestGroupId: string, actor: Actor) {
   await requireManageableRequest(requestGroupId, actor);
   if (!await resetFailedLoad(requestGroupId)) throw new ReaderError("Solo se puede reintentar una carga fallida.", "LOAD_NOT_RETRYABLE", false, 409);
-  await startLoadForRequest(requestGroupId).catch((error) => console.error("Transformer load could not be restarted.", error));
+  await startLoadForRequest(requestGroupId).catch((error) => console.error("Transformer load could not be restarted.", describeError(error)));
 }
 
 export async function retryRequestReport(requestGroupId: string, actor: Actor) {
   await requireManageableRequest(requestGroupId, actor);
   if (!await resetFailedReport(requestGroupId)) throw new ReaderError("Solo se puede reintentar un informe fallido.", "REPORT_NOT_RETRYABLE", false, 409);
-  await startReportForRequest(requestGroupId).catch((error) => console.error("Transformer report could not be restarted.", error));
+  await startReportForRequest(requestGroupId).catch((error) => console.error("Transformer report could not be restarted.", describeError(error)));
 }
 
 /** The Excel of a Mercedes-Benz request, named after the AX code. A failed report is downloadable when the transformer kept the file. */
@@ -381,9 +382,9 @@ export async function getTransformerInfo(requestGroupIds: string[], actor: Actor
   const bmwBusy = bmwConfigured && (pendingStart.length > 0 || current.some((request) => running(request.loadStatus)) || comparisons.some((comparison) => running(comparison.status)));
   const mercedesBusy = mercedesConfigured && (pendingReports.length > 0 || current.some((request) => running(request.reportStatus)));
   if (bmwBusy || mercedesBusy) {
-    if (bmwBusy) await startPendingLoads(pendingStart).catch((error) => console.error("Transformer pending load start failed.", error));
-    if (mercedesBusy) await startPendingReports(pendingReports).catch((error) => console.error("Transformer pending report start failed.", error));
-    await syncTransformerStates(visibleIds).catch((error) => console.error("Transformer state sync failed.", error));
+    if (bmwBusy) await startPendingLoads(pendingStart).catch((error) => console.error("Transformer pending load start failed.", describeError(error)));
+    if (mercedesBusy) await startPendingReports(pendingReports).catch((error) => console.error("Transformer pending report start failed.", describeError(error)));
+    await syncTransformerStates(visibleIds).catch((error) => console.error("Transformer state sync failed.", describeError(error)));
     current = await listRequestsByIds(visibleIds);
     comparisons = await listComparisonsForRequests(visibleIds);
   }

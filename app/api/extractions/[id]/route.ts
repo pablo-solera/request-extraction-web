@@ -2,6 +2,7 @@ import { z } from "zod";
 import { requireApiUser } from "@/lib/auth/guards";
 import { extractionDto } from "@/lib/extractions/service";
 import { listOwnedExtractions } from "@/lib/extractions/repository";
+import { describeError } from "@/lib/logging/describe-error";
 
 const privateHeaders = { "Cache-Control": "private, no-store, max-age=0" };
 
@@ -27,7 +28,7 @@ export async function GET(_request: Request, context: RouteContext<"/api/extract
 
     return Response.json(extractionDto(row.extraction, row.requestStatus), { headers: privateHeaders });
   } catch (error) {
-    console.error("Extraction status lookup failed.", error);
+    console.error("Extraction status lookup failed.", describeError(error));
     return Response.json({ error: { code: "STATUS_UNAVAILABLE", message: "No se ha podido consultar el estado." } }, { status: 503, headers: privateHeaders });
   }
 }

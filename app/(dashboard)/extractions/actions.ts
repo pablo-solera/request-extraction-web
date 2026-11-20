@@ -7,6 +7,7 @@ import { createExtraction, submitNewApprovedRequest } from "@/lib/extractions/se
 import { extractionFormSchema } from "@/lib/extractions/validation";
 import { requireUser } from "@/lib/auth/guards";
 import { ReaderError } from "@/lib/readers/errors";
+import { describeError } from "@/lib/logging/describe-error";
 
 export type ExtractionFormState = {
   error?: string;
@@ -57,7 +58,7 @@ export async function createExtractionAction(
       return { error: error.code === "READER_CONFIGURATION_ERROR" ? "La integración con el reader no está disponible. Contacta con soporte." : error.message, values };
     }
 
-    console.error("Extraction creation failed.", error);
+    console.error("Extraction creation failed.", describeError(error));
     return { error: "No se ha podido crear la extracción.", values };
   }
 
@@ -65,7 +66,7 @@ export async function createExtractionAction(
     try {
       await submitNewApprovedRequest(extraction.requestGroupId);
     } catch (error) {
-      console.error("Approved extraction submission failed after response.", error);
+      console.error("Approved extraction submission failed after response.", describeError(error));
     }
   });
   revalidatePath("/history");

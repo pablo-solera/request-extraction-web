@@ -4,6 +4,7 @@ import { rejectCrossOrigin } from "@/lib/security/origin";
 import { ReaderError } from "@/lib/readers/errors";
 import { MAX_LST_BYTES } from "@/lib/transformer/client";
 import { uploadComparison } from "@/lib/transformer/service";
+import { describeError } from "@/lib/logging/describe-error";
 
 const privateHeaders = { "Cache-Control": "private, no-store, max-age=0" };
 const MULTIPART_OVERHEAD_BYTES = 64 * 1024;
@@ -56,7 +57,7 @@ export async function POST(request: Request, context: RouteContext<"/api/request
     return Response.json({ id: comparisonId }, { status: 202, headers: privateHeaders });
   } catch (error) {
     if (error instanceof ReaderError) return Response.json({ error: { code: error.code, message: error.message } }, { status: error.status ?? 502, headers: privateHeaders });
-    console.error("Comparison upload failed.", error);
+    console.error("Comparison upload failed.", describeError(error));
     return Response.json({ error: { code: "UPLOAD_FAILED", message: "No se ha podido iniciar la comparación." } }, { status: 502, headers: privateHeaders });
   }
 }

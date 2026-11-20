@@ -2,6 +2,7 @@ import { z } from "zod";
 import { requireApiIdentity } from "@/lib/auth/guards";
 import { extractionDto, getReaderCapabilitiesForExtractions, syncLiveReaderProgress } from "@/lib/extractions/service";
 import { listExtractionsVisibleToUserByIds } from "@/lib/extractions/service";
+import { describeError } from "@/lib/logging/describe-error";
 
 const privateHeaders = { "Cache-Control": "private, no-store, max-age=0" };
 const idSchema = z.uuid();
@@ -24,7 +25,7 @@ export async function GET(request: Request) {
     const capabilities = await getReaderCapabilitiesForExtractions(synchronized);
     return Response.json(synchronized.map(({ extraction, requestStatus, requester }) => extractionDto(extraction, requestStatus, requester.fallbackName ?? requester.fallbackEmail, capabilities.get(extraction.readerKey))), { headers: privateHeaders });
   } catch (error) {
-    console.error("Extraction status batch lookup failed.", error);
+    console.error("Extraction status batch lookup failed.", describeError(error));
     return Response.json({ error: { code: "STATUS_UNAVAILABLE", message: "No se ha podido consultar el estado." } }, { status: 503, headers: privateHeaders });
   }
 }

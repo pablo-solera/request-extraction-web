@@ -49,8 +49,9 @@ Rama: `feature/security-hardening`
   - Faltan en `.env`: `BMW_READER_LANGUAGE`, `MERCEDES_READER_BASE_URL`, `MERCEDES_TRANSFORMER_BASE_URL`, `RENAULT_TRANSFORMER_BASE_URL`, `VAG_READER_BASE_URL`, `VAG_TRANSFORMER_BASE_URL`. Confirmar si son opcionales; si no, definirlas y documentarlas en `.env.example` y `README.md`.
   - Hecho: `BMW_READER_LANGUAGE` (por defecto `en-GB`), `MERCEDES_TRANSFORMER_BASE_URL`, `RENAULT_TRANSFORMER_BASE_URL` y las dos de VAG son opcionales; `MERCEDES_READER_BASE_URL` es obligatoria para pedir extracciones Mercedes-Benz. Documentado en `.env.example` y `README.md`; no se ha tocado `.env`.
   - Commit: `docs(config): document reader and transformer environment variables`
-- [ ] **1.6 Logs sin el objeto de error completo** (S) — `login/actions.ts:38`, `reconcile/route.ts:31`, `history/actions.ts:22`
+- [x] **1.6 Logs sin el objeto de error completo** (S) — `login/actions.ts:38`, `reconcile/route.ts:31`, `history/actions.ts:22`
   - Registrar solo `error.name` y `error.code`, como `mail/notifications.ts:44`.
+  - Hecho en todos los `console.error` con un error (19 archivos, no solo los tres citados) mediante `lib/logging/describe-error.ts`.
   - Commit: `fix(logging): avoid logging full error objects`
 
 ---

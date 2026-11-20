@@ -1,6 +1,7 @@
 import { z } from "zod";
 import { requireApiIdentity } from "@/lib/auth/guards";
 import { findTableConflict } from "@/lib/transformer/service";
+import { describeError } from "@/lib/logging/describe-error";
 
 const privateHeaders = { "Cache-Control": "private, no-store, max-age=0" };
 const querySchema = z.object({
@@ -22,7 +23,7 @@ export async function GET(request: Request) {
     const conflict = await findTableConflict(parsed.data);
     return Response.json({ conflict: conflict !== null, loadedAt: conflict?.loadedAt ?? null }, { headers: privateHeaders });
   } catch (error) {
-    console.error("Table conflict lookup failed.", error);
+    console.error("Table conflict lookup failed.", describeError(error));
     return Response.json({ error: { code: "LOOKUP_FAILED", message: "No se ha podido comprobar si la tabla ya existe." } }, { status: 503, headers: privateHeaders });
   }
 }

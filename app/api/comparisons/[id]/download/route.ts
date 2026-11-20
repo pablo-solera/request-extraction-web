@@ -2,6 +2,7 @@ import { z } from "zod";
 import { requireApiIdentity } from "@/lib/auth/guards";
 import { ReaderError } from "@/lib/readers/errors";
 import { downloadComparison } from "@/lib/transformer/service";
+import { describeError } from "@/lib/logging/describe-error";
 
 const privateHeaders = { "Cache-Control": "private, no-store, max-age=0" };
 
@@ -22,7 +23,7 @@ export async function GET(_request: Request, context: RouteContext<"/api/compari
     return new Response(file.body, { status: 200, headers });
   } catch (error) {
     if (error instanceof ReaderError) return Response.json({ error: { code: error.code, message: error.message } }, { status: error.status ?? 502, headers: privateHeaders });
-    console.error("Comparison download failed.", error);
+    console.error("Comparison download failed.", describeError(error));
     return Response.json({ error: { code: "DOWNLOAD_UNAVAILABLE", message: "No se ha podido preparar la descarga." } }, { status: 502, headers: privateHeaders });
   }
 }
