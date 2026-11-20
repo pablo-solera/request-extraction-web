@@ -1,10 +1,11 @@
 import { AppHeader } from "@/components/layout/app-header";
 import { requireUser } from "@/lib/auth/guards";
+import { getTheme } from "@/lib/theme-server";
 
 export async function DashboardHeader() {
-  const user = await requireUser();
+  const [user, theme] = await Promise.all([requireUser(), getTheme()]);
 
-  return <AppHeader user={{ email: user.email, name: user.name, role: user.role }} />;
+  return <AppHeader theme={theme} user={{ email: user.email, name: user.name, role: user.role }} />;
 }
 
 export function DashboardHeaderFallback() {

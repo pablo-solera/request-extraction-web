@@ -1,5 +1,7 @@
 import type { Metadata, Viewport } from "next";
 import { Geist, Geist_Mono, Newsreader } from "next/font/google";
+import { THEME_COLORS, themeAttribute } from "@/lib/theme";
+import { getTheme } from "@/lib/theme-server";
 import "./globals.css";
 
 const geistSans = Geist({
@@ -25,21 +27,29 @@ export const metadata: Metadata = {
   description: "Portal interno de extracciones de fabricantes.",
 };
 
-export const viewport: Viewport = {
-  colorScheme: "light dark",
-  themeColor: [
-    { media: "(prefers-color-scheme: light)", color: "#f4f4f5" },
-    { media: "(prefers-color-scheme: dark)", color: "#09090b" },
-  ],
-};
+export async function generateViewport(): Promise<Viewport> {
+  const theme = await getTheme();
+  if (theme === "system") {
+    return {
+      colorScheme: "light dark",
+      themeColor: [
+        { media: "(prefers-color-scheme: light)", color: THEME_COLORS.light },
+        { media: "(prefers-color-scheme: dark)", color: THEME_COLORS.dark },
+      ],
+    };
+  }
+  return { colorScheme: theme, themeColor: THEME_COLORS[theme] };
+}
 
-export default function RootLayout({
+export default async function RootLayout({
   children,
 }: Readonly<{
   children: React.ReactNode;
 }>) {
+  const theme = await getTheme();
   return (
     <html
+      data-theme={themeAttribute(theme)}
       lang="es"
       className={`${geistSans.variable} ${geistMono.variable} ${newsreader.variable} h-full antialiased`}
     >

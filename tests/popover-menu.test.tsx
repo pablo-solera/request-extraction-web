@@ -2,7 +2,7 @@ import { cleanup, render, screen } from "@testing-library/react";
 import userEvent from "@testing-library/user-event";
 import { afterEach, describe, expect, it, vi } from "vitest";
 
-vi.mock("@/app/(dashboard)/actions", () => ({ logoutAction: vi.fn() }));
+vi.mock("@/app/(dashboard)/actions", () => ({ logoutAction: vi.fn(), setThemeAction: vi.fn() }));
 
 import { UserMenu } from "@/components/layout/user-menu";
 
@@ -11,7 +11,7 @@ afterEach(cleanup);
 describe("user menu popover", () => {
   it("opens from the account button, exposes the logout action and closes with Escape", async () => {
     const user = userEvent.setup();
-    render(<UserMenu user={{ email: "ana@example.com", name: "Ana Pérez", role: "coordinator" }} />);
+    render(<UserMenu user={{ email: "ana@example.com", name: "Ana Pérez", role: "coordinator" }} theme="dark" />);
     const trigger = screen.getByRole("button", { name: "Cuenta de Ana Pérez" });
 
     expect(trigger).toHaveAttribute("aria-expanded", "false");
@@ -20,6 +20,7 @@ describe("user menu popover", () => {
     await user.click(trigger);
     expect(trigger).toHaveAttribute("aria-expanded", "true");
     expect(screen.getByRole("button", { name: "Cerrar sesión" })).toBeVisible();
+    expect(screen.getByRole("radio", { name: "Oscuro" })).toBeChecked();
 
     await user.keyboard("{Escape}");
     expect(trigger).toHaveAttribute("aria-expanded", "false");

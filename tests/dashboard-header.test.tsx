@@ -3,8 +3,9 @@ import { beforeEach, describe, expect, it, vi } from "vitest";
 
 const mocks = vi.hoisted(() => ({ requireUser: vi.fn() }));
 vi.mock("@/lib/auth/guards", () => ({ requireUser: mocks.requireUser }));
+vi.mock("@/lib/theme-server", () => ({ getTheme: async () => "dark" }));
 vi.mock("@/components/layout/app-header", () => ({
-  AppHeader: ({ user }: { user: { role: string } }) => <header>role:{user.role}</header>,
+  AppHeader: ({ user, theme }: { user: { role: string }; theme: string }) => <header>role:{user.role} theme:{theme}</header>,
 }));
 
 import { DashboardHeader } from "@/components/layout/dashboard-header";
@@ -16,6 +17,7 @@ describe("DashboardHeader", () => {
     mocks.requireUser.mockResolvedValue({ email: "a@x.com", name: "Ana", role: "admin", id: "1" });
     const element = await DashboardHeader();
     expect(renderToStaticMarkup(element)).toContain("role:admin");
+    expect(renderToStaticMarkup(element)).toContain("theme:dark");
     expect(mocks.requireUser).toHaveBeenCalledTimes(1);
   });
 

@@ -226,6 +226,11 @@ Rama: `feature/housekeeping`
   - Resuelto: el placeholder del Código AX salía en mayúsculas por la clase `uppercase` del campo; se añadió `placeholder:normal-case` y un test.
   - No probado: el flujo completo de «Nueva extracción» (los readers BMW y Renault están caídos en este entorno), el diálogo de confirmación (solo aparece al cancelar o reanudar) y las pantallas de aprobación con solicitudes pendientes.
   - Nota de herramienta: el clic por referencia de agent-browser no abría la fila del historial; con `element.click()` desde `eval` sí. No es un fallo de la aplicación (la página está hidratada).
+- [x] **5.8 Selector de tema (claro, oscuro o sistema)** (S–M) — petición posterior al plan
+  - Decisiones: la elección se guarda en una cookie `theme` (`system` por defecto, `light`, `dark`; httpOnly, 1 año, `SameSite=Lax`) y no en la base de datos; el selector está solo en el menú de usuario, encima de «Cerrar sesión». El login sigue la cookie si existe.
+  - El layout raíz lee la cookie en el servidor y pinta `<html data-theme>`: sin parpadeo y sin script en línea, así que la CSP no cambia. `generateViewport` ajusta `colorScheme` y `themeColor`. El cambio es instantáneo en el cliente y una Server Action valida y guarda; si falla, se revierte.
+  - Pendiente menor: `app/global-error.tsx` no puede leer la cookie y sigue el tema del sistema.
+  - Commits: `feat(theme): follow a stored theme preference on the document` y `feat(theme): add a theme selector to the account menu`.
 
 ---
 
