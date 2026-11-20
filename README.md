@@ -46,6 +46,7 @@ Variables principales:
 | `BMW_READER_LANGUAGE` | Idioma de series y etiquetas BMW/MINI; por defecto `en-GB`. |
 | `MERCEDES_READER_BASE_URL` | URL interna de `mercedes-reader` (`http://mercedes-reader-api:3005` en Docker; misma regla de HTTP). Sin ella no se pueden solicitar extracciones Mercedes-Benz. |
 | `MERCEDES_TRANSFORMER_BASE_URL` | URL de `mercedes-transformer` (solo informes). Sin ella no se piden los informes de Mercedes-Benz. También aparece en la página de infraestructura. |
+| `TRANSFORMER_DOWNLOAD_ORIGINS` | Orígenes extra (separados por comas) a los que un transformer puede redirigir la descarga del informe. Su propio origen siempre se admite; las IP privadas y de metadatos nunca. |
 | `BMW_TRANSFORMER_BASE_URL` | URL de `bmw-transformer` (`http://bmw-transformer-api:3005` en Docker; misma regla de HTTP). Sin ella no se cargan datos ni se comparan `.LST`. |
 | `MAIL_ENABLED` | `true` para enviar correos; por defecto no se envía ninguno. |
 | `SMTP_HOST`, `SMTP_PORT` | Relay SMTP interno (puerto 25 por defecto, sin usuario ni contraseña; se usa STARTTLS si el servidor lo ofrece). |

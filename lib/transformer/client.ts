@@ -2,6 +2,7 @@ import "server-only";
 
 import { ReaderError } from "@/lib/readers/errors";
 import { isTrustedServiceUrl } from "@/lib/readers/service-url";
+import { isAllowedDownloadTarget } from "@/lib/transformer/download-origin";
 import { bmwLoadSelection, createBody, transformerDefinitions, type TransformerKey } from "@/lib/transformer/registry";
 import {
   transformerEnqueuedSchema, transformerInfoSchema, transformerStateSchema,
@@ -167,7 +168,7 @@ export function createTransformerClient(options: { fetcher?: typeof fetch; trans
       if (redirect.status !== 307 || !location) throw new ReaderError("No se ha podido preparar la descarga del Excel.", "TRANSFORMER_REQUEST_FAILED", false);
       let target: URL;
       try { target = new URL(location); } catch { throw new ReaderError("No se ha podido preparar la descarga del Excel.", "TRANSFORMER_REQUEST_FAILED", false); }
-      if (target.protocol !== "https:" && target.protocol !== "http:") throw new ReaderError("No se ha podido preparar la descarga del Excel.", "TRANSFORMER_REQUEST_FAILED", false);
+      if (!isAllowedDownloadTarget(target, baseUrl())) throw new ReaderError("No se ha podido preparar la descarga del Excel.", "TRANSFORMER_REQUEST_FAILED", false);
       let file: Response;
       try { file = await fetcher(target, { cache: "no-store", redirect: "error", signal: AbortSignal.timeout(DOWNLOAD_TIMEOUT_MS) }); }
       catch { throw new ReaderError("No se ha podido descargar el Excel.", "TRANSFORMER_UNAVAILABLE", true); }
