@@ -10,6 +10,7 @@ import { formatSpanishDate, formatSpanishDateTime } from "@/lib/date-format";
 import { retryableItems, summarizeRequest, type RequestAggregateStatus } from "@/lib/extractions/request-summary";
 import { Alert } from "@/components/ui/alert";
 import { Badge, type BadgeTone } from "@/components/ui/badge";
+import { ProgressBar } from "@/components/ui/progress-bar";
 import { Button, buttonStyles } from "@/components/ui/button";
 import { useConfirm, type Confirm } from "@/components/ui/confirm-dialog";
 import { PopoverMenu } from "@/components/ui/popover-menu";
@@ -154,10 +155,6 @@ function mergeUpdates(current: ExtractionListItem[], incoming: ExtractionListIte
     const updated = byId.get(item.id);
     return updated && updated.updatedAt >= item.updatedAt ? updated : item;
   });
-}
-
-function ProgressBar({ label, value, className = "" }: { label: string; value: number; className?: string }) {
-  return <div className={className}><div className="mb-1 flex justify-between text-meta text-ink-muted"><span>Progreso</span><span>{value}%</span></div><div aria-label={label} aria-valuemax={100} aria-valuemin={0} aria-valuenow={value} className="h-2 overflow-hidden rounded-full bg-line-soft" role="progressbar"><div className="h-full w-full origin-left bg-focus transition-transform duration-500" style={{ transform: `scaleX(${value / 100})` }} /></div></div>;
 }
 
 function ReaderDetail({ item, state }: { item: ExtractionListItem; state: { loading?: boolean; detail?: ExtractionReaderDetail; error?: string } | undefined }) {
