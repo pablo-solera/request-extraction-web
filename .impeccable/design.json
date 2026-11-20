@@ -93,7 +93,7 @@
       "Superficies planas con borde fino; la profundidad solo aparece en lo que flota.",
       "Botón primario oscuro y sólido; el acento azul solo en foco y acciones secundarias.",
       "Objetivos de 44 px de alto como mínimo en todo control.",
-      "Tema claro y oscuro según el sistema (light-dark(), sin selector manual) y solo escritorio (herramienta interna por VPN)."
+      "Tema claro y oscuro: por defecto el del sistema (light-dark()), y cada usuario puede fijar uno desde el menú de cuenta. Solo escritorio (herramienta interna por VPN)."
     ],
     "rules": [
       { "name": "The Quiet Accent Rule", "body": "El azul no decora. Solo marca foco y acciones secundarias; si aparece como relleno grande, sobra.", "section": "colors" },

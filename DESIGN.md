@@ -120,7 +120,7 @@ El sistema parte de un lienzo gris muy claro con superficies blancas, tinta casi
 - Superficies planas con borde fino; la profundidad solo aparece en lo que flota.
 - Botón primario oscuro y sólido; el acento azul solo en foco y acciones secundarias.
 - Objetivos de 44 px de alto como mínimo en todo control.
-- Tema claro y oscuro según el sistema (`color-scheme: light dark`, sin selector manual) y solo escritorio (herramienta interna por VPN).
+- Tema claro y oscuro: por defecto el del sistema, y cada usuario puede fijar uno desde el menú de cuenta. Solo escritorio (herramienta interna por VPN).
 
 ## Colors
 
@@ -152,7 +152,7 @@ Una paleta neutra de grises fríos (escala zinc) con un acento azul de uso muy e
 - **Neutro** (#3f3f46 sobre #f4f4f5): cancelada, sin configurar.
 
 ### Tema oscuro
-Cada token de `@theme` se declara como `light-dark(claro, oscuro)` y `:root` fija `color-scheme: light dark`, así que la interfaz sigue el tema del sistema sin JavaScript ni parpadeo. El oscuro mantiene "El Taller Ordenado": superficies planas con borde fino, sin sombras en reposo.
+Cada token de `@theme` se declara como `light-dark(claro, oscuro)` y `:root` fija `color-scheme: light dark`, así que la interfaz sigue el tema del sistema sin JavaScript ni parpadeo. Si el usuario elige «Claro» u «Oscuro» en el menú de cuenta, el servidor lee la cookie `theme` y pinta `<html data-theme="light|dark">`; las reglas `:root[data-theme=...]` de `app/globals.css` fijan entonces `color-scheme` y todos los tokens cambian solos. Con «Sistema» no hay atributo y decide el sistema. El oscuro mantiene "El Taller Ordenado": superficies planas con borde fino, sin sombras en reposo.
 
 | Token | Claro | Oscuro |
 |---|---|---|
