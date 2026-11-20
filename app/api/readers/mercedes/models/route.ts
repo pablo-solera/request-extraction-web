@@ -1,5 +1,6 @@
 import { z } from "zod";
 import { requireApiUser } from "@/lib/auth/guards";
+import { limitReaderUsage } from "@/lib/readers/usage";
 import { ReaderError } from "@/lib/readers/errors";
 import { getMercedesModels } from "@/lib/readers/mercedes/client";
 
@@ -9,6 +10,8 @@ const querySchema = z.object({ series: z.string().trim().min(1).max(100), produc
 export async function GET(request: Request) {
   const user = await requireApiUser();
   if (!user) return Response.json({ error: { message: "Inicia sesión." } }, { status: 401, headers: privateHeaders });
+  const limited = limitReaderUsage(user.id);
+  if (limited) return limited;
 
   const params = new URL(request.url).searchParams;
   const parsed = querySchema.safeParse({ series: params.get("series") ?? "", productGroup: params.get("productGroup") ?? undefined });

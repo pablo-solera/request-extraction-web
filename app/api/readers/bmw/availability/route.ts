@@ -1,5 +1,6 @@
 import { z } from "zod";
 import { requireApiUser } from "@/lib/auth/guards";
+import { limitReaderUsage } from "@/lib/readers/usage";
 import { ReaderError } from "@/lib/readers/errors";
 import { getBmwTypekeyAvailability } from "@/lib/readers/bmw/client";
 
@@ -15,6 +16,8 @@ const queryKeys = ["brand", "series", "developmentCode", "typekey"] as const;
 export async function GET(request: Request) {
   const user = await requireApiUser();
   if (!user) return Response.json({ error: { message: "Inicia sesión." } }, { status: 401, headers: privateHeaders });
+  const limited = limitReaderUsage(user.id);
+  if (limited) return limited;
 
   const search = new URL(request.url).searchParams;
   const parsed = querySchema.safeParse(Object.fromEntries(queryKeys.map((key) => [key, search.get(key)])));

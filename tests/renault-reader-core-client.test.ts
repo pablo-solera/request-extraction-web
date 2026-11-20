@@ -1,10 +1,11 @@
 import { afterEach, describe, expect, it, vi } from "vitest";
-import { cancelRenaultLabour, createRenaultLabour, getRenaultDownloadLocation, getRenaultLabourFamilies, getRenaultLabourState, resumeRenaultLabour } from "@/lib/readers/renault/client";
+import { clearRenaultFamiliesCache, cancelRenaultLabour, createRenaultLabour, getRenaultDownloadLocation, getRenaultLabourFamilies, getRenaultLabourState, resumeRenaultLabour } from "@/lib/readers/renault/client";
 
 const originalBaseUrl = process.env.RENAULT_READER_BASE_URL;
 const originalDownloadOrigin = process.env.RENAULT_READER_DOWNLOAD_ORIGIN;
 
 afterEach(() => {
+  clearRenaultFamiliesCache();
   vi.unstubAllGlobals();
   if (originalBaseUrl === undefined) delete process.env.RENAULT_READER_BASE_URL;
   else process.env.RENAULT_READER_BASE_URL = originalBaseUrl;
@@ -53,5 +54,21 @@ describe("Renault shared reader-core adapter", () => {
       selection: { family: "X98", format: "TM01", range: "active" },
     });
     expect(fetcher.mock.calls[6]?.[1]?.redirect).toBe("manual");
+  });
+});
+
+describe("Renault families cache", () => {
+  it("serves repeated family lookups for the same brand from memory", async () => {
+    process.env.RENAULT_READER_BASE_URL = "http://127.0.0.1:3010";
+    const fetcher = vi.fn(async (url: unknown) => String(url).endsWith("/v1/info")
+      ? Response.json({ capabilities: { labours: { create: true, list: true, cancel: true, resume: true, download: true }, models: { options: true } } })
+      : Response.json({ filters: [{ name: "family", values: [{ value: "B52", label: "Sandero" }] }], models: [] }));
+    vi.stubGlobal("fetch", fetcher);
+
+    const first = await getRenaultLabourFamilies("Dacia");
+    const second = await getRenaultLabourFamilies("Dacia");
+
+    expect(second).toEqual(first);
+    expect(fetcher.mock.calls.filter(([url]) => String(url).includes("/v1/models/options"))).toHaveLength(1);
   });
 });

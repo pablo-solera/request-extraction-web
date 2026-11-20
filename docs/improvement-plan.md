@@ -41,8 +41,9 @@ Rama: `feature/security-hardening`
   - Contar los bytes leídos del stream, comprobar la firma `PK\x03\x04` del ZIP y que el LST sea texto. Verificar contra la documentación de `node_modules/next/dist/docs/` que `proxyClientMaxBodySize` en `experimental` es válido en esta versión.
   - Hecho: `experimental.proxyClientMaxBodySize` es válido (documentado en `proxyClientMaxBodySize.md`, versión experimental), se mantiene en `26mb`. El tamaño se cuenta ahora sobre los bytes leídos del stream y la firma se valida en `uploadComparison`.
   - Commit: `fix(api): enforce streamed size limit and validate uploaded file signatures`
-- [ ] **1.4 Límite de uso de los lectores externos** (S) — `app/api/readers/*`
+- [x] **1.4 Límite de uso de los lectores externos** (S) — `app/api/readers/*`
   - Limitar el consumo por usuario y cachear respuestas. Confirmar que `extractions/[id]/route.ts` comprueba propiedad con `getManageableExtraction`.
+  - Hecho: tope de 120 consultas/min por usuario en memoria (`lib/readers/usage.ts`, 429 con `Retry-After`; válido mientras la app sea una sola instancia). BMW y Mercedes ya cachean en sus clientes; se añadió caché de 1 h a las familias de Renault. `extractions/[id]/route.ts` comprueba propiedad con `listOwnedExtractions(user.id)` (solo el propietario, más estricto que `getManageableExtraction`).
   - Commit: `feat(readers): cap per-user reader usage and cache responses`
 - [ ] **1.5 Completar variables de entorno** (S)
   - Faltan en `.env`: `BMW_READER_LANGUAGE`, `MERCEDES_READER_BASE_URL`, `MERCEDES_TRANSFORMER_BASE_URL`, `RENAULT_TRANSFORMER_BASE_URL`, `VAG_READER_BASE_URL`, `VAG_TRANSFORMER_BASE_URL`. Confirmar si son opcionales; si no, definirlas y documentarlas en `.env.example` y `README.md`.
