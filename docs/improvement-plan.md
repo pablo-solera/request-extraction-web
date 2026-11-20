@@ -95,7 +95,7 @@ Rama: `feature/performance`. Consultar `node_modules/next/dist/docs/` antes de t
 - [x] **3.1 `Promise.all` en `getVerifiedUser`** (S) — `lib/auth/guards.ts:17-25`
   - Paralelizar `resolveUserIdentities` y `resolveUserRole`.
   - Commit: `perf(auth): resolve identity and role in parallel`
-- [ ] **3.2 `Suspense` sobre el header del dashboard** (M) — `app/(dashboard)/layout.tsx:6`
+- [x] **3.2 `Suspense` sobre el header del dashboard** (M) — `app/(dashboard)/layout.tsx:6`
   - Layout síncrono y `AppHeader` async dentro de `<Suspense>`. Las páginas siguen autorizando con `requireUser()`.
   - Commit: `perf(layout): stream the dashboard header behind Suspense`
 - [ ] **3.3 `matcher` en `proxy.ts`** (S)
