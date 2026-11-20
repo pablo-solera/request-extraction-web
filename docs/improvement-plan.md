@@ -181,7 +181,7 @@ Rama: `feature/housekeeping`
   - Commit: `fix(transformer): restrict report download to trusted origins`
 - [x] **5.3 Dependabot y auditoría en CI** (S) — `.github/workflows`
   - Commit: `ci: add dependency audit and Dependabot`
-- [ ] **5.4 Docker** (S)
+- [x] **5.4 Docker** (S)
   - Puerto 3000 en `127.0.0.1`, imágenes fijadas por digest y `HEALTHCHECK` en el `Dockerfile`.
   - Commit: `build(docker): pin images, bind loopback and add healthcheck`
 - [ ] **5.5 Serif editorial en los títulos de página** (S) — solo en los `h1`, vía `next/font`.

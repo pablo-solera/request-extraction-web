@@ -48,12 +48,12 @@ services:
       MAIL_REDIRECT_TO: ${MAIL_REDIRECT_TO:-}
       APP_BASE_URL: ${APP_BASE_URL:-}
     ports:
-      - "3000:3000"
+      - "127.0.0.1:3000:3000"
     depends_on:
       postgres:
         condition: service_healthy
   postgres:
-    image: postgres:18.3
+    image: postgres:18.3@sha256:7e32e9833a6fb1c92c32552794cb6ed569d51b445a54907d35fc112ef39684db
     container_name: request-extraction-postgres
     restart: unless-stopped
     environment:
