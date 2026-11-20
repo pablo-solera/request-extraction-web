@@ -207,9 +207,10 @@ Rama: `feature/housekeeping`
 - [x] **5.5 Serif editorial en los títulos de página** (S) — solo en los `h1`, vía `next/font`.
   - Hecho: Newsreader (variable `--font-newsreader`, token `--font-serif` y `--text-display` en `@theme`) en `PageHeader.Title`, el `h1` del login, `not-found` y el error del dashboard. `global-error` queda en sans: no carga las fuentes del layout.
   - Commit: `style(ui): use a serif face for page titles`
-- [ ] **5.6 Refinamientos menores** (S)
+- [x] **5.6 Refinamientos menores** (S)
   - Debounce con `useDeferredValue` en los buscadores (`users-table.tsx:37`, `mercedes-model-selector.tsx:100`). Animar el progreso con `transform: scaleX`. Caché de `fetch` entre pasos del formulario. Unificar alertas con los tokens de color.
   - Commit: `perf(ui): defer search filtering and animate progress with transform`
+  - Hecho: `useDeferredValue` en los filtros locales del formulario (Mercedes, Renault y typekeys de BMW); `users-table` se queda con el debounce porque su búsqueda navega al servidor y `useDeferredValue` no reduce ese viaje. Barra de progreso con `transform: scaleX()`. Caché de 5 min en memoria de las listas de opciones entre pasos (`lib/client/cached-json.ts`; solo respuestas válidas). Componente `Alert` en `components/ui/alert.tsx` para unificar los avisos con tokens (login, aprobaciones, historial, formulario, disponibilidad BMW).
 - [ ] **5.7 Pasada autenticada** (M)
   - Revisar con `next-dev-loop` y un usuario de pruebas `/extractions`, `/history`, `/approvals` y `/admin/*` (consola y Web Vitals). No se pudo hacer en la auditoría.
 

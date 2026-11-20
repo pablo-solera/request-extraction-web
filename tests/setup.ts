@@ -1,4 +1,8 @@
 import "@testing-library/jest-dom/vitest";
+import { afterEach } from "vitest";
+import { clearCachedJson } from "@/lib/client/cached-json";
+
+afterEach(() => clearCachedJson());
 
 if (typeof HTMLDialogElement !== "undefined") {
   HTMLDialogElement.prototype.showModal ??= function showModal(this: HTMLDialogElement) {

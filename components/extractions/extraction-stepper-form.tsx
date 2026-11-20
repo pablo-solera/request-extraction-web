@@ -1,16 +1,18 @@
 "use client";
 
 import dynamic from "next/dynamic";
-import { useActionState, useEffect, useId, useRef, useState } from "react";
+import { useActionState, useDeferredValue, useEffect, useId, useRef, useState } from "react";
 import { z } from "zod";
 import { createExtractionAction, type ExtractionFormState } from "@/app/(dashboard)/extractions/actions";
 import { SubmitButton } from "@/components/common/submit-button";
+import { Alert } from "@/components/ui/alert";
 import { Badge } from "@/components/ui/badge";
 import { Button, buttonStyles } from "@/components/ui/button";
 import { useConfirm } from "@/components/ui/confirm-dialog";
 import { BmwAvailabilityNotice } from "@/components/extractions/bmw-availability-notice";
 import { formatSpanishDate, formatSpanishDateTime } from "@/lib/date-format";
 import { extractionFormSchema, type ExtractionVehicle } from "@/lib/extractions/validation";
+import { loadCachedJson } from "@/lib/client/cached-json";
 import { useBmwAvailability, type AvailabilityTarget } from "@/lib/hooks/use-bmw-availability";
 
 const BmwSwapReview = dynamic(() => import("@/components/extractions/bmw-swap-review").then((module) => module.BmwSwapReview));
@@ -90,6 +92,11 @@ function CheckIcon() {
   return <svg aria-hidden="true" className="size-4 shrink-0" fill="none" stroke="currentColor" strokeLinecap="round" strokeLinejoin="round" strokeWidth="2.5" viewBox="0 0 24 24"><path d="M5 12.5l4.5 4.5L19 7.5" /></svg>;
 }
 
+function hasOptionList(body: unknown) {
+  const options = body && typeof body === "object" ? (body as { options?: unknown }).options : null;
+  return Array.isArray(options) && options.every((option) => option && typeof option === "object" && "value" in option && typeof option.value === "string" && "label" in option && typeof option.label === "string");
+}
+
 function resultsLabel(count: number) {
   return count === 1 ? "1 resultado" : `${count} resultados`;
 }
@@ -123,22 +130,20 @@ function BmwOptionField({
   const options = currentResult?.options ?? [];
   const message = currentResult?.message ?? "";
   const loading = Boolean(url && !currentResult);
-  const filtered = search.trim()
-    ? options.filter((option) => `${option.value} ${option.label}`.toLocaleLowerCase("es-ES").includes(search.trim().toLocaleLowerCase("es-ES")))
+  const deferredSearch = useDeferredValue(search);
+  const filtered = deferredSearch.trim()
+    ? options.filter((option) => `${option.value} ${option.label}`.toLocaleLowerCase("es-ES").includes(deferredSearch.trim().toLocaleLowerCase("es-ES")))
     : options;
 
   useEffect(() => {
     if (!url) return;
     const controller = new AbortController();
-    void fetch(url, { cache: "no-store", signal: controller.signal })
-      .then(async (response) => {
-        const body: unknown = await response.json();
+    void loadCachedJson(url, controller.signal, hasOptionList)
+      .then(({ ok, body }) => {
         const envelope = body && typeof body === "object" ? body as { options?: unknown; error?: { message?: string } } : null;
-        if (!response.ok) throw new Error(envelope?.error?.message || `No se han podido cargar ${label.toLocaleLowerCase("es-ES")} BMW.`);
-        if (!Array.isArray(envelope?.options) || !envelope.options.every((option) => option && typeof option === "object" && "value" in option && typeof option.value === "string" && "label" in option && typeof option.label === "string")) {
-          throw new Error("BMW ha devuelto una lista de opciones no válida.");
-        }
-        setResult({ requestUrl: url, options: envelope.options as Option[], message: "" });
+        if (!ok) throw new Error(envelope?.error?.message || `No se han podido cargar ${label.toLocaleLowerCase("es-ES")} BMW.`);
+        if (!hasOptionList(body)) throw new Error("BMW ha devuelto una lista de opciones no válida.");
+        setResult({ requestUrl: url, options: (envelope?.options ?? []) as Option[], message: "" });
       })
       .catch((error: unknown) => {
         if (controller.signal.aborted) return;
@@ -162,10 +167,10 @@ function BmwOptionField({
   }
 
   return <div className={className}>
-    {searchable ? <div className="mb-3"><label className="field-label" htmlFor={`${id}-search`}>{`Buscar ${label.toLocaleLowerCase("es-ES")}`}</label><input autoComplete="off" className="field-control" disabled={!url || loading || Boolean(message)} id={`${id}-search`} onChange={(event) => setSearch(event.target.value)} placeholder="Por código o descripción" type="search" value={search} /><p aria-live="polite" className="sr-only" role="status">{search.trim() && options.length > 0 ? resultsLabel(filtered.length) : ""}</p></div> : null}
+    {searchable ? <div className="mb-3"><label className="field-label" htmlFor={`${id}-search`}>{`Buscar ${label.toLocaleLowerCase("es-ES")}`}</label><input autoComplete="off" className="field-control" disabled={!url || loading || Boolean(message)} id={`${id}-search`} onChange={(event) => setSearch(event.target.value)} placeholder="Por código o descripción" type="search" value={search} /><p aria-live="polite" className="sr-only" role="status">{deferredSearch.trim() && options.length > 0 ? resultsLabel(filtered.length) : ""}</p></div> : null}
     <label className="field-label" htmlFor={`${id}-select`}>{label}</label>
     <select aria-describedby={error ? `${id}-error` : undefined} aria-invalid={Boolean(error)} className="field-control" disabled={!url || loading || Boolean(message) || options.length === 0} id={`${id}-select`} onChange={(event) => onChange(event.target.value)} required value={value}>
-      <option value="">{!url ? initialText : loading ? loadingText : message ? "Opciones no disponibles" : options.length === 0 ? emptyText : searchable && search && filtered.length === 0 ? "No se encontraron typekeys" : `Selecciona ${label.toLocaleLowerCase("es-ES")}`}</option>
+      <option value="">{!url ? initialText : loading ? loadingText : message ? "Opciones no disponibles" : options.length === 0 ? emptyText : searchable && deferredSearch && filtered.length === 0 ? "No se encontraron typekeys" : `Selecciona ${label.toLocaleLowerCase("es-ES")}`}</option>
       {filtered.map((option) => <option key={option.value} value={option.value}>{option.label}</option>)}
     </select>
     <FieldError id={`${id}-error`}>{error}</FieldError>
@@ -187,13 +192,12 @@ function RenaultFamilySelector({ brand, selected, onToggle }: { brand: "Renault"
 
   useEffect(() => {
     const controller = new AbortController();
-    void fetch(url, { cache: "no-store", signal: controller.signal })
-      .then(async (response) => {
-        const body: unknown = await response.json();
+    void loadCachedJson(url, controller.signal, hasOptionList)
+      .then(({ ok, body }) => {
         const envelope = body && typeof body === "object" ? body as { options?: unknown; error?: { message?: string } } : null;
-        if (!response.ok) throw new Error(envelope?.error?.message || `No se han podido cargar las familias de ${brand}.`);
-        if (!Array.isArray(envelope?.options) || !envelope.options.every((option) => option && typeof option === "object" && "value" in option && typeof option.value === "string" && "label" in option && typeof option.label === "string")) throw new Error("El reader ha devuelto una lista de familias no válida.");
-        setResult({ url, options: envelope.options as Option[], error: "" });
+        if (!ok) throw new Error(envelope?.error?.message || `No se han podido cargar las familias de ${brand}.`);
+        if (!hasOptionList(body)) throw new Error("El reader ha devuelto una lista de familias no válida.");
+        setResult({ url, options: (envelope?.options ?? []) as Option[], error: "" });
       })
       .catch((error: unknown) => {
         if (!controller.signal.aborted) setResult({ url, options: [], error: error instanceof Error ? error.message : "No se han podido cargar las familias." });
@@ -202,10 +206,11 @@ function RenaultFamilySelector({ brand, selected, onToggle }: { brand: "Renault"
   }, [url, retry, brand]);
 
   const options = current?.options ?? [];
-  const filtered = search.trim() ? options.filter((option) => `${option.value} ${option.label}`.toLocaleLowerCase("es-ES").includes(search.trim().toLocaleLowerCase("es-ES"))) : options;
+  const deferredSearch = useDeferredValue(search);
+  const filtered = deferredSearch.trim() ? options.filter((option) => `${option.value} ${option.label}`.toLocaleLowerCase("es-ES").includes(deferredSearch.trim().toLocaleLowerCase("es-ES"))) : options;
   return <div className="space-y-3">
     <label className="block"><span className="field-label">Buscar familias</span><input className="field-control" disabled={!current || Boolean(current.error)} onChange={(event) => setSearch(event.target.value)} placeholder="Escribe nombre o código" type="search" value={search} /></label>
-    <p aria-live="polite" className="sr-only" role="status">{search.trim() && options.length > 0 ? resultsLabel(filtered.length) : ""}</p>
+    <p aria-live="polite" className="sr-only" role="status">{deferredSearch.trim() && options.length > 0 ? resultsLabel(filtered.length) : ""}</p>
     {!current ? <p className="text-body text-ink-muted" role="status">Cargando familias de {brand}…</p> : current.error ? <div className="flex flex-wrap items-center gap-3 text-body text-danger-ink" role="alert"><span>{current.error}</span><Button onClick={() => setRetry((value) => value + 1)}>Reintentar</Button></div> : options.length === 0 ? <p className="rounded-lg border border-dashed border-line p-5 text-body text-ink-muted">El reader no ha devuelto familias para {brand}.</p> : filtered.length === 0 ? <p className="text-body text-ink-muted">No hay coincidencias.</p> : <ul className="max-h-96 divide-y divide-line-soft overflow-y-auto rounded-xl border border-line-soft bg-surface">{filtered.map((option) => {
       const checked = selected.some((vehicle) => vehicle.manufacturerGroup === "Renault" && vehicle.modelCode === option.value);
       return <li key={option.value}><label className="flex min-h-12 cursor-pointer items-center gap-3 px-4 py-3 hover:bg-surface-sunken"><input aria-label={`Seleccionar familia ${option.label}`} checked={checked} className="size-4 accent-focus" onChange={(event) => onToggle(option, event.target.checked)} type="checkbox" /><span className="min-w-0 text-body text-ink">{option.label}<span className="ml-2 font-mono text-meta text-ink-muted">{option.value}</span></span></label></li>;
@@ -581,14 +586,14 @@ export function ExtractionStepperForm({
             </li>;
           })}</ul>
         </div>
-        {replacesTable ? <label className="flex items-start gap-3 rounded-lg border border-pending-line bg-pending-wash px-4 py-3 text-body text-pending-ink">
+        {replacesTable ? <Alert tone="pending"><label className="flex items-start gap-3">
           <input checked={replaceConfirmed} className="mt-1 size-4" onChange={(event) => setReplaceConfirmed(event.target.checked)} type="checkbox" />
           <span>Ya hay datos cargados en BMW_Labour para el código AX <strong className="font-mono">{values.axCode}</strong> y la edición <strong className="font-mono">{values.imcEdition}</strong>{conflict?.loadedAt ? ` (${formatSpanishDateTime(conflict.loadedAt)})` : ""}. Al terminar esta extracción se reemplazará la tabla completa por los typekeys de esta solicitud. Entiendo que se perderán los datos anteriores.</span>
-        </label> : null}
-        {unavailableTypekeys.length ? <p className="rounded-lg border border-danger-line bg-danger-wash px-4 py-3 text-body text-danger-ink" role="alert">BMW no tiene tiempos para {unavailableTypekeys.join(", ")}. Quita esos typekeys o sustitúyelos por un tipo base sugerido para poder iniciar la extracción.</p> : null}
-        {requiresApproval ? <p className="rounded-lg border border-pending-line bg-pending-wash px-4 py-3 text-body text-pending-ink">La solicitud quedará pendiente de aprobación de tu coordinador.</p> : null}
+        </label></Alert> : null}
+        {unavailableTypekeys.length ? <Alert role="alert" tone="danger">BMW no tiene tiempos para {unavailableTypekeys.join(", ")}. Quita esos typekeys o sustitúyelos por un tipo base sugerido para poder iniciar la extracción.</Alert> : null}
+        {requiresApproval ? <Alert tone="pending">La solicitud quedará pendiente de aprobación de tu coordinador.</Alert> : null}
         <label className="block"><span className="field-label">Comentarios (opcional)</span><textarea autoComplete="off" className="field-control min-h-24 resize-y" maxLength={4_000} onChange={(event) => setValues((current) => ({ ...current, comments: event.target.value }))} placeholder="Añade información útil para la extracción…" value={values.comments} /></label>
-        {state.error ? <div aria-live="polite" className="rounded-xl border border-danger-line bg-danger-wash px-4 py-3 text-body text-danger-ink" role="alert"><p>{state.error}</p>{state.fieldErrors ? <ul className="mt-2 list-inside list-disc">{Object.entries(state.fieldErrors).map(([field, message]) => <li key={field}>{message}</li>)}</ul> : null}</div> : null}
+        {state.error ? <Alert aria-live="polite" role="alert" tone="danger"><p>{state.error}</p>{state.fieldErrors ? <ul className="mt-2 list-inside list-disc">{Object.entries(state.fieldErrors).map(([field, message]) => <li key={field}>{message}</li>)}</ul> : null}</Alert> : null}
       </section> : null}
 
       <input name="axCode" type="hidden" value={values.axCode} />

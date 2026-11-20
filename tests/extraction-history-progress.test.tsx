@@ -56,6 +56,7 @@ describe("BMW extraction progress in history", () => {
     expect(screen.getAllByText("45%")).toHaveLength(2);
     expect(screen.getByRole("progressbar", { name: "Progreso de la solicitud AX-100" })).toHaveAttribute("aria-valuenow", "45");
     expect(screen.getByRole("progressbar", { name: "Progreso de AX-100" })).toHaveAttribute("aria-valuenow", "45");
+    expect(screen.getByRole("progressbar", { name: "Progreso de AX-100" }).firstElementChild).toHaveStyle({ transform: "scaleX(0.45)" });
   });
 
   it("shows queue and paused notices without displaying a completed progress bar", () => {

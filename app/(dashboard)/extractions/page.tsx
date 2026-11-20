@@ -1,5 +1,6 @@
 import type { Metadata } from "next";
 import { PageHeader } from "@/components/common/page-header";
+import { Alert } from "@/components/ui/alert";
 import { ExtractionForm, type ExtractionFormSeed } from "@/components/extractions/extraction-form";
 import { requireUser } from "@/lib/auth/guards";
 import type { Extraction } from "@/db/schema";
@@ -62,7 +63,7 @@ export default async function ExtractionsPage({ searchParams }: { searchParams: 
         <PageHeader.Title>Nueva extracción</PageHeader.Title>
         <PageHeader.Description>Prepara y realiza una exportación técnica desde un único formulario.</PageHeader.Description>
       </PageHeader>
-      {initialValues ? <p className="rounded-xl border border-running-line bg-accent-wash px-4 py-3 text-body text-accent-ink" role="status">Se cargaron los datos comunes y todos los typekeys de la solicitud anterior para extraerlos de nuevo con los datos de hoy. Revísalos y actualiza lo que necesites antes de solicitarla.</p> : null}
+      {initialValues ? <Alert role="status" tone="info">Se cargaron los datos comunes y todos los typekeys de la solicitud anterior para extraerlos de nuevo con los datos de hoy. Revísalos y actualiza lo que necesites antes de solicitarla.</Alert> : null}
       <ExtractionForm draftKey={`extraction-draft-v1-${user.id}`} initialValues={initialValues} requiresApproval={user.role === "employee"} />
     </div>
   );

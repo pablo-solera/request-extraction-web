@@ -1,3 +1,4 @@
+import { clearCachedJson } from "@/lib/client/cached-json";
 import { cleanup, render, screen, waitFor } from "@testing-library/react";
 import userEvent from "@testing-library/user-event";
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
@@ -86,6 +87,7 @@ describe("extraction form for Mercedes-Benz", () => {
     expect(JSON.parse((container.querySelector('input[name="vehicles"]') as HTMLInputElement).value)).toEqual([]);
 
     cleanup();
+    clearCachedJson();
     vi.stubGlobal("fetch", vi.fn(async () => Response.json({ error: { message: "El servicio de Mercedes-Benz no está disponible." } }, { status: 502 })));
     render(<ExtractionForm />);
     await reachModels(user);

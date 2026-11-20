@@ -1,7 +1,8 @@
 "use client";
 
-import { useEffect, useId, useState } from "react";
+import { useDeferredValue, useEffect, useId, useState } from "react";
 import { Button } from "@/components/ui/button";
+import { loadCachedJson } from "@/lib/client/cached-json";
 
 type ModelOption = { value: string; label: string; productGroup: string | null };
 type Option = { value: string; label: string };
@@ -10,9 +11,17 @@ type Loaded<T> = { url: string; data: T; error: string };
 export type MercedesSelectedModel = { series: string; modelCode: string };
 
 async function loadJson<T>(url: string, signal: AbortSignal, parse: (body: Record<string, unknown>) => T, fallback: string): Promise<T> {
-  const response = await fetch(url, { cache: "no-store", signal });
-  const body = await response.json() as Record<string, unknown> & { error?: { message?: string } };
-  if (!response.ok) throw new Error(body?.error?.message || fallback);
+  const accept = (candidate: unknown) => {
+    try {
+      parse(candidate as Record<string, unknown>);
+      return true;
+    } catch {
+      return false;
+    }
+  };
+  const { ok, body: raw } = await loadCachedJson(url, signal, accept);
+  const body = raw as Record<string, unknown> & { error?: { message?: string } };
+  if (!ok) throw new Error(body?.error?.message || fallback);
   return parse(body);
 }
 
@@ -74,7 +83,8 @@ export function MercedesModelSelector({ initialSeries, selected, onSeriesChange,
 
   const knownGroups = groupsResult?.series === series ? groupsResult.groups : [];
   const models = currentModels?.data.models ?? [];
-  const term = search.trim().toLocaleLowerCase("es-ES");
+  const deferredSearch = useDeferredValue(search);
+  const term = deferredSearch.trim().toLocaleLowerCase("es-ES");
   const filtered = term ? models.filter((model) => `${model.value} ${model.label}`.toLocaleLowerCase("es-ES").includes(term)) : models;
   const failure = currentSeries?.error || currentModels?.error || "";
 
