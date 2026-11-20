@@ -85,6 +85,7 @@ Rama: `feature/database-hardening`. Probar cada migración en un clon antes de p
   - Commit: `feat(db): separate migration and application database roles`
 - [x] **2.10 Ajustes menores de base de datos** (S)
   - `drizzle.config.ts` no debe fallar al importarse sin `DATABASE_URL` en `generate`. Codificar la contraseña en `DATABASE_URL` de `docker-compose.yml`. Normalizar `fallback_email` a minúsculas en `findUserByFallbackEmail`. Valorar `now()` de la BD en `updated_at`.
+  - Hecho: `drizzle.config.ts` ya no lanza al importarse; `DATABASE_URL_DOCKER` permite una URL ya codificada en Compose (que no puede codificar); `findUserByFallbackEmail` normaliza a minúsculas. `now()` de la BD en `updated_at` se descarta por ahora: implica tocar muchos `set({ updatedAt: new Date() })` sin ganancia relevante.
   - Commit: `fix(db): tolerate missing DATABASE_URL on generate and normalize fallback emails`
 
 ---

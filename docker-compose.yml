@@ -5,7 +5,7 @@ services:
     container_name: request-extraction-web
     restart: unless-stopped
     environment:
-      DATABASE_URL: postgres://${POSTGRES_APP_USER:-${POSTGRES_USER}}:${POSTGRES_APP_PASSWORD:-${POSTGRES_PASSWORD}}@postgres:5432/${POSTGRES_DB}
+      DATABASE_URL: ${DATABASE_URL_DOCKER:-postgres://${POSTGRES_APP_USER:-${POSTGRES_USER}}:${POSTGRES_APP_PASSWORD:-${POSTGRES_PASSWORD}}@postgres:5432/${POSTGRES_DB}}
       SESSION_SECRET: ${SESSION_SECRET}
       SESSION_COOKIE_SECURE: ${SESSION_COOKIE_SECURE}
       ORACLE_USER: ${ORACLE_USER}

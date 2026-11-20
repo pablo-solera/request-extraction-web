@@ -32,6 +32,7 @@ Variables principales:
 | --- | --- |
 | `DATABASE_URL` | Conexión PostgreSQL de la aplicación. |
 | `DATABASE_MIGRATION_URL` | Opcional. Conexión con permisos DDL (rol propietario) usada solo por `db:migrate`/`db:deploy`. Si falta, se usa `DATABASE_URL`. |
+| `DATABASE_URL_DOCKER` | Opcional, solo Docker Compose: `DATABASE_URL` completa del contenedor `web`; úsala si la contraseña tiene caracteres que deben codificarse en una URL (`@ : / # ? %`). |
 | `POSTGRES_APP_USER`, `POSTGRES_APP_PASSWORD` | Opcionales, solo Docker Compose: credenciales del rol de aplicación para el contenedor `web`. Si faltan, usa `POSTGRES_USER`. |
 | `SESSION_SECRET` | Secreto aleatorio de al menos 32 caracteres. |
 | `INTEGRATION_LDAP_URL` | Endpoint obligatorio `ldap://`, normalmente Global Catalog en el puerto 3268. |

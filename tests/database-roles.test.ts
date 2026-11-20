@@ -26,4 +26,10 @@ describe("drizzle.config", () => {
     vi.stubEnv("DATABASE_MIGRATION_URL", "postgres://owner@localhost/db");
     expect(await configUrl()).toBe("postgres://owner@localhost/db");
   });
+
+  it("can be imported without any database URL (drizzle-kit generate)", async () => {
+    vi.stubEnv("DATABASE_URL", "");
+    vi.stubEnv("DATABASE_MIGRATION_URL", "");
+    await expect(import("../drizzle.config")).resolves.toHaveProperty("default");
+  });
 });
