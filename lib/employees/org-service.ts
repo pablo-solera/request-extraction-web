@@ -1,6 +1,7 @@
 import "server-only";
 
 import type { UserRole } from "@/lib/auth/session";
+import { adminGroupId as configuredAdminGroupId, coordinatorGroupId as configuredCoordinatorGroupId } from "@/lib/employees/org-config";
 import { findOrganizationRows } from "@/lib/employees/org-repository";
 import { findTestAccountByEmpId, getTestAccounts } from "@/lib/employees/test-accounts";
 import { findUsersByOracleEmpIds } from "@/lib/auth/user-repository";
@@ -13,12 +14,6 @@ type SnapshotState = { loadedAt: number; promise: Promise<OrganizationSnapshot> 
 declare global { var __requestExtractionOrganizationSnapshot: SnapshotState | undefined; }
 const state: SnapshotState = globalThis.__requestExtractionOrganizationSnapshot ?? { loadedAt: 0, promise: null, snapshot: null };
 globalThis.__requestExtractionOrganizationSnapshot = state;
-
-function configuredGroupId(name: string, fallback: number) {
-  const value = Number(process.env[name] ?? fallback);
-  if (!Number.isSafeInteger(value) || value <= 0) throw new Error(`${name} must be a positive integer.`);
-  return value;
-}
 
 function getTtlMs() {
   const seconds = Number(process.env.ORG_SNAPSHOT_TTL_SECONDS ?? DEFAULT_TTL_SECONDS);
@@ -40,8 +35,8 @@ function testOrganization(adminGroupId: number, coordinatorGroupId: number) {
 }
 
 function buildSnapshot(rows: Awaited<ReturnType<typeof findOrganizationRows>>): OrganizationSnapshot {
-  const adminGroupId = configuredGroupId("ORACLE_ADMIN_GROUP_ID", 1024);
-  const coordinatorGroupId = configuredGroupId("ORACLE_COORDINATOR_GROUP_ID", 1017);
+  const adminGroupId = configuredAdminGroupId();
+  const coordinatorGroupId = configuredCoordinatorGroupId();
   const synthetic = testOrganization(adminGroupId, coordinatorGroupId);
   const combined = synthetic ? { roles: [...rows.roles, ...synthetic.roles], hierarchy: [...rows.hierarchy, ...synthetic.hierarchy] } : rows;
   const coordinatorByEmpId = new Map(combined.hierarchy.map((row) => [row.EMP_ID, row.COORDINATOR_EMP_ID]));
