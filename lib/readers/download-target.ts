@@ -1,4 +1,7 @@
+import "server-only";
+
 import { isIP } from "node:net";
+import { isTrustedServiceUrl } from "@/lib/readers/service-url";
 
 const METADATA_HOSTS = new Set(["metadata.google.internal", "metadata.goog", "instance-data"]);
 
@@ -22,20 +25,13 @@ export function isPrivateOrMetadataHost(hostname: string) {
   return false;
 }
 
-function originsFromEnvironment() {
-  return (process.env.TRANSFORMER_DOWNLOAD_ORIGINS ?? "").split(",").map((value) => value.trim()).filter(Boolean).flatMap((value) => {
-    try { return [new URL(value).origin]; } catch { return []; }
-  });
-}
-
 /**
- * The signed download location must be the transformer's own origin or one listed in TRANSFORMER_DOWNLOAD_ORIGINS
- * (comma separated). Literal private or metadata addresses are refused unless it is the transformer's own origin.
+ * The signed download location a reader or transformer answers with points at the S3 it uploaded to, which only that
+ * service knows, so the web checks the shape of the URL and not its host: HTTPS (plain HTTP only inside the machine or the
+ * Docker network), no credentials in it, and no literal private or metadata address. The service's own origin is always accepted.
  */
-export function isAllowedDownloadTarget(target: URL, transformerBase: URL) {
-  if (target.protocol !== "https:" && target.protocol !== "http:") return false;
+export function isAcceptableDownloadTarget(target: URL, serviceBase?: URL) {
   if (target.username || target.password) return false;
-  if (target.origin === transformerBase.origin) return true;
-  if (isPrivateOrMetadataHost(target.hostname)) return false;
-  return originsFromEnvironment().includes(target.origin);
+  if (serviceBase && target.origin === serviceBase.origin) return true;
+  return isTrustedServiceUrl(target) && !isPrivateOrMetadataHost(target.hostname);
 }

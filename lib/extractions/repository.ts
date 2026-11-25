@@ -29,7 +29,6 @@ export async function insertExtractionsWithCapacity(userId: string, input: Extra
   const usesRenault = input.vehicles.some((vehicle) => vehicle.manufacturerGroup === "Renault");
   const renaultCoreCapabilities = usesRenault ? await getRenaultReaderCapabilities() : null;
   const renaultSettings = usesRenault && !renaultCoreCapabilities?.create ? getRenaultSettings() : null;
-  const bmwLanguage = process.env.BMW_READER_LANGUAGE?.trim() || "en-GB";
   const mercedesDate = new Date().toISOString().slice(0, 10).replace(/-/g, "");
   const requestGroupId = crypto.randomUUID();
 
@@ -59,7 +58,7 @@ export async function insertExtractionsWithCapacity(userId: string, input: Extra
           modelDescription: [vehicle.modelDescription, `${vehicle.series} / ${vehicle.developmentCode}`].filter(Boolean).join(" · "),
           modelCode: vehicle.typekey,
           readerKey: "bmw-labours",
-          readerParams: { series: vehicle.series, developmentCode: vehicle.developmentCode, typekey: vehicle.typekey, language: bmwLanguage },
+          readerParams: { series: vehicle.series, developmentCode: vehicle.developmentCode, typekey: vehicle.typekey },
         };
       }
       if (vehicle.manufacturerGroup === "Mercedes") {
@@ -77,7 +76,7 @@ export async function insertExtractionsWithCapacity(userId: string, input: Extra
         modelDescription: vehicle.modelDescription,
         modelCode: vehicle.modelCode,
         readerKey: "renault-labours",
-        readerParams: { format: renaultSettings?.format ?? "", language: renaultSettings?.language ?? "", range: renaultSettings?.range ?? "", family: vehicle.modelCode },
+        readerParams: { format: renaultSettings?.format ?? "", range: renaultSettings?.range ?? "", family: vehicle.modelCode },
       };
     });
 
