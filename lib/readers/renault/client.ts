@@ -6,6 +6,7 @@ import {
   renaultStateSchema,
 } from "@/lib/readers/renault/types";
 import { ReaderError } from "@/lib/readers/errors";
+import { isAcceptableDownloadTarget } from "@/lib/readers/download-target";
 import { isTrustedServiceUrl } from "@/lib/readers/service-url";
 import { z } from "zod";
 
@@ -106,7 +107,6 @@ async function request(path: string, init?: RequestInit) {
 export function getRenaultSettings() {
   return {
     format: requiredEnvironment("RENAULT_READER_FORMAT"),
-    language: requiredEnvironment("RENAULT_READER_LANGUAGE").toLowerCase(),
     range: requiredEnvironment("RENAULT_READER_RANGE"),
   };
 }
@@ -232,9 +232,9 @@ export async function createRenaultLabour(input: {
   const format = options.formats.find(
     (item) => item.toLocaleLowerCase() === settings.format.toLocaleLowerCase(),
   );
-  const language = options.languages?.find(
-    (item) => item.toLocaleLowerCase() === settings.language,
-  );
+  const wanted = input.language?.toLocaleLowerCase();
+  // A reader without the /v1 contract has no default language: ask for the one of the request, or the first it authorises.
+  const language = wanted ? options.languages?.find((item) => item.toLocaleLowerCase() === wanted) : options.languages?.[0];
 
   if (!family) {
     throw new ReaderError("La family indicada no esta disponible en Renault.", "INVALID_FAMILY", false, 400);
@@ -300,15 +300,13 @@ export async function getRenaultDownloadLocation(requestId: string) {
   }
 
   const location = response.headers.get("location");
-  const allowedOrigin = new URL(requiredEnvironment("RENAULT_READER_DOWNLOAD_ORIGIN")).origin;
-
   if (!location) {
     throw new ReaderError("El reader no ha devuelto una descarga.", "DOWNLOAD_UNAVAILABLE", true);
   }
 
   const url = new URL(location);
 
-  if (url.protocol !== "https:" || url.origin !== allowedOrigin) {
+  if (!isAcceptableDownloadTarget(url, readerBaseUrl())) {
     throw new ReaderError("El destino de descarga no es valido.", "INVALID_DOWNLOAD_LOCATION", false);
   }
 

@@ -136,7 +136,6 @@ export function createBmwReaderClient(options: { fetcher?: typeof fetch; now?: (
       brand,
       modelSeries: series,
       ...(developmentCode ? { developmentCode } : {}),
-      language: process.env.BMW_READER_LANGUAGE?.trim() || "en-GB",
     });
   }
 
@@ -177,7 +176,7 @@ export function createBmwReaderClient(options: { fetcher?: typeof fetch; now?: (
 
     const active = inflight.get(brand);
     if (active) return active;
-    const query = new URLSearchParams({ brand, language: process.env.BMW_READER_LANGUAGE?.trim() || "en-GB" });
+    const query = new URLSearchParams({ brand });
     const pending = (async () => {
       const raw = await read(`/v1/models/options?${query.toString()}`);
       let values: BmwSeriesOption[];
@@ -230,7 +229,7 @@ export function createBmwReaderClient(options: { fetcher?: typeof fetch; now?: (
     const series = z.string().trim().min(1).max(100).parse(rawSeries);
     const developmentCode = z.string().regex(/^[A-Z0-9]+$/).parse(rawDevelopmentCode);
     const typekey = z.string().regex(/^[A-Z0-9]{4}$/).parse(rawTypekey);
-    const query = new URLSearchParams({ brand, typekey, series, developmentCode, language: process.env.BMW_READER_LANGUAGE?.trim() || "en-GB" });
+    const query = new URLSearchParams({ brand, typekey, series, developmentCode });
     const key = query.toString();
     const cached = availabilityCache.get(key);
     if (cached && cached.expiresAt > now()) return cached.value;
@@ -271,7 +270,7 @@ export function createBmwReaderClient(options: { fetcher?: typeof fetch; now?: (
           manufacturer: parsed.brand,
           axCode: parsed.axCode,
           edition,
-          language: parsed.language || process.env.BMW_READER_LANGUAGE?.trim() || "en-GB",
+          ...(parsed.language ? { language: parsed.language } : {}),
           selection: {
             series: parsed.series,
             typekeys: [{ typekey: parsed.typekey, series: parsed.series, family: parsed.developmentCode }],

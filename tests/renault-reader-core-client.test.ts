@@ -2,21 +2,17 @@ import { afterEach, describe, expect, it, vi } from "vitest";
 import { clearRenaultFamiliesCache, cancelRenaultLabour, createRenaultLabour, getRenaultDownloadLocation, getRenaultLabourFamilies, getRenaultLabourState, resumeRenaultLabour } from "@/lib/readers/renault/client";
 
 const originalBaseUrl = process.env.RENAULT_READER_BASE_URL;
-const originalDownloadOrigin = process.env.RENAULT_READER_DOWNLOAD_ORIGIN;
 
 afterEach(() => {
   clearRenaultFamiliesCache();
   vi.unstubAllGlobals();
   if (originalBaseUrl === undefined) delete process.env.RENAULT_READER_BASE_URL;
   else process.env.RENAULT_READER_BASE_URL = originalBaseUrl;
-  if (originalDownloadOrigin === undefined) delete process.env.RENAULT_READER_DOWNLOAD_ORIGIN;
-  else process.env.RENAULT_READER_DOWNLOAD_ORIGIN = originalDownloadOrigin;
 });
 
 describe("Renault shared reader-core adapter", () => {
   it("uses advertised v1 create, status, cancel, resume and download routes", async () => {
     process.env.RENAULT_READER_BASE_URL = "http://127.0.0.1:3010";
-    process.env.RENAULT_READER_DOWNLOAD_ORIGIN = "https://downloads.example.test";
     const requestId = "7be5f2af-879b-4c61-84d5-6e728f438a02";
     const fetcher = vi.fn()
       .mockResolvedValueOnce(Response.json({ capabilities: { labours: { create: true, list: true, cancel: true, resume: true, download: true }, models: { options: true } } }))
@@ -70,5 +66,31 @@ describe("Renault families cache", () => {
 
     expect(second).toEqual(first);
     expect(fetcher.mock.calls.filter(([url]) => String(url).includes("/v1/models/options"))).toHaveLength(1);
+  });
+});
+
+describe("Renault download location", () => {
+  const requestId = "7be5f2af-879b-4c61-84d5-6e728f438a02";
+  const withLocation = (location: string) => {
+    process.env.RENAULT_READER_BASE_URL = "http://127.0.0.1:3010";
+    vi.stubGlobal("fetch", vi.fn(async (url: unknown) => String(url).endsWith("/v1/info")
+      ? Response.json({ capabilities: { labours: { create: true, list: true, cancel: true, resume: true, download: true }, models: { options: true } } })
+      : new Response(null, { status: 307, headers: { location } })));
+  };
+
+  it("accepts the signed link of the reader's own S3, whatever its host", async () => {
+    withLocation("https://s3.example.internal/bucket/result.zip?sig=1");
+    await expect(getRenaultDownloadLocation(requestId)).resolves.toEqual(new URL("https://s3.example.internal/bucket/result.zip?sig=1"));
+  });
+
+  it.each([
+    ["credentials in the URL", "https://user:pw@s3.example.internal/result.zip"],
+    ["plain HTTP to a remote host", "http://s3.example.internal/result.zip"],
+    ["a private address", "https://10.0.0.5/result.zip"],
+    ["a metadata address", "https://169.254.169.254/latest/meta-data"],
+    ["another scheme", "file:///etc/passwd"],
+  ])("refuses %s", async (_name, location) => {
+    withLocation(location);
+    await expect(getRenaultDownloadLocation(requestId)).rejects.toThrow();
   });
 });

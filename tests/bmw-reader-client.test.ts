@@ -2,14 +2,11 @@ import { afterEach, describe, expect, it, vi } from "vitest";
 import { createBmwReaderClient } from "@/lib/readers/bmw/client";
 
 const originalBaseUrl = process.env.BMW_READER_BASE_URL;
-const originalLanguage = process.env.BMW_READER_LANGUAGE;
 
 afterEach(() => {
   vi.unstubAllGlobals();
   if (originalBaseUrl === undefined) delete process.env.BMW_READER_BASE_URL;
   else process.env.BMW_READER_BASE_URL = originalBaseUrl;
-  if (originalLanguage === undefined) delete process.env.BMW_READER_LANGUAGE;
-  else process.env.BMW_READER_LANGUAGE = originalLanguage;
 });
 
 describe("BMW reader client", () => {
@@ -25,7 +22,7 @@ describe("BMW reader client", () => {
     await client.getSeries("BMW");
 
     expect(fetcher).toHaveBeenCalledOnce();
-    expect(fetcher).toHaveBeenCalledWith(new URL("http://127.0.0.1:3004/v1/models/options?brand=BMW&language=en-GB"), expect.objectContaining({ cache: "no-store", redirect: "manual" }));
+    expect(fetcher).toHaveBeenCalledWith(new URL("http://127.0.0.1:3004/v1/models/options?brand=BMW"), expect.objectContaining({ cache: "no-store", redirect: "manual" }));
   });
 
   it("loads and caches development codes for a selected series", async () => {
@@ -78,7 +75,6 @@ describe("BMW reader client", () => {
 
   it("checks typekey availability once per typekey and keeps unknown answers uncached", async () => {
     process.env.BMW_READER_BASE_URL = "http://localhost:3004";
-    process.env.BMW_READER_LANGUAGE = "en-GB";
     const unavailable = { typekey: "6J02", status: "unavailable", code: "CGWATB0085", suggestedTypekey: null, baseType: { typekey: "6J92", status: "available", reliable: false, differences: [{ attribute: "transmission", requested: "AUT", baseType: "MECH" }] } };
     const fetcher = vi.fn()
       .mockResolvedValueOnce(Response.json(unavailable))
@@ -91,7 +87,7 @@ describe("BMW reader client", () => {
     expect(fetcher).toHaveBeenCalledTimes(1);
     const url = fetcher.mock.calls[0]![0] as URL;
     expect(url.pathname).toBe("/v1/models/availability");
-    expect(Object.fromEntries(url.searchParams)).toEqual({ brand: "BMW", typekey: "6J02", series: "6'", developmentCode: "F13", language: "en-GB" });
+    expect(Object.fromEntries(url.searchParams)).toEqual({ brand: "BMW", typekey: "6J02", series: "6'", developmentCode: "F13" });
 
     await expect(client.getTypekeyAvailability("BMW", "6'", "F13", "6J92")).resolves.toMatchObject({ status: "unknown" });
     await expect(client.getTypekeyAvailability("BMW", "6'", "F13", "6J92")).resolves.toMatchObject({ status: "available" });
@@ -109,7 +105,6 @@ describe("BMW reader client", () => {
 
   it("submits one typekey and converts the common edition format for BMW", async () => {
     process.env.BMW_READER_BASE_URL = "http://localhost:3004";
-    process.env.BMW_READER_LANGUAGE = "es-ES";
     const fetcher = vi.fn().mockResolvedValue(Response.json({ requestId: "7be5f2af-879b-4c61-84d5-6e728f438a02", resource: "labours", status: "queued", links: { self: "/v1/labours/7be5f2af-879b-4c61-84d5-6e728f438a02" } }, { status: 202 }));
     const client = createBmwReaderClient({ fetcher });
 
@@ -124,6 +119,16 @@ describe("BMW reader client", () => {
       language: "es-ES",
       selection: { series: "F56", typekeys: [{ typekey: "11EH", series: "F56", family: "F56" }] },
     });
+  });
+
+  it("leaves the language to the reader when the request names none", async () => {
+    process.env.BMW_READER_BASE_URL = "http://localhost:3004";
+    const fetcher = vi.fn().mockResolvedValue(Response.json({ requestId: "7be5f2af-879b-4c61-84d5-6e728f438a02", resource: "labours", status: "queued", links: { self: "/v1/labours/7be5f2af-879b-4c61-84d5-6e728f438a02" } }, { status: 202 }));
+    const client = createBmwReaderClient({ fetcher });
+
+    await client.createLabour({ brand: "BMW", series: "7", developmentCode: "G70", typekey: "11EH", axCode: "ax1", imcEdition: "05/0" });
+
+    expect(JSON.parse(String((fetcher.mock.calls[0]![1] as RequestInit).body))).not.toHaveProperty("language");
   });
 
   it("rejects BMW AX codes outside the 3–4 character alphanumeric rule before calling the reader", async () => {
