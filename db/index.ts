@@ -4,6 +4,7 @@ import { readFileSync } from "node:fs";
 import { drizzle } from "drizzle-orm/postgres-js";
 import postgres from "postgres";
 import * as schema from "@/db/schema";
+import { allowsPlainHttp } from "@/lib/readers/service-url";
 
 type PostgresClient = ReturnType<typeof postgres>;
 type Database = ReturnType<typeof drizzle<typeof schema>>;
@@ -23,11 +24,11 @@ export function getDb() {
 
   {
     const parsedUrl = new URL(databaseUrl);
-    const isLoopback = parsedUrl.hostname === "127.0.0.1" || parsedUrl.hostname === "localhost";
-    const isComposePostgres = parsedUrl.hostname === "postgres";
+    // The machine itself or a Docker service name (a single label such as "postgres" or "request-extraction-db"): no TLS needed.
+    const isLoopback = allowsPlainHttp(parsedUrl.hostname);
     const caPath = process.env.DATABASE_CA_CERT_PATH?.trim();
 
-    if (!isLoopback && !isComposePostgres && parsedUrl.searchParams.get("sslmode") !== "verify-full") {
+    if (!isLoopback && parsedUrl.searchParams.get("sslmode") !== "verify-full") {
       throw new Error("Remote PostgreSQL connections must use sslmode=verify-full.");
     }
 
@@ -38,7 +39,7 @@ export function getDb() {
       connect_timeout: 10,
       connection: { statement_timeout: 30_000, idle_in_transaction_session_timeout: 60_000 },
       prepare: false,
-      ssl: isLoopback || isComposePostgres
+      ssl: isLoopback
         ? false
         : {
             ca: caPath ? readFileSync(caPath) : undefined,

@@ -47,6 +47,7 @@ The format follows [Keep a Changelog](https://keepachangelog.com/en/1.1.0/) and 
 
 - **api**: validate the request origin on state-changing route handlers.
 - **api**: enforce the upload size limit while streaming and validate the signature of uploaded ZIP and LST files.
+- **db**: connect without TLS to any Docker service name (for example `request-extraction-db`), not only to `postgres`.
 - **transformer**: refuse report downloads from credentials, plain remote HTTP and private or metadata addresses.
 - **logging**: stop logging full error objects.
 - **db**: set statement and idle-in-transaction timeouts on the pool, use a 64-bit advisory lock key, protect the audit logs from cascade deletion (migration `0032`), tolerate a missing `DATABASE_URL` when generating and normalize fallback emails.
